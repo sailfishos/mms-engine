@@ -20,6 +20,8 @@ BuildRequires: pkgconfig(gmime-2.6)
 BuildRequires: pkgconfig(glib-2.0) >= 2.32
 BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
 BuildRequires: pkgconfig(libwspcodec) >= 2.2
+BuildRequires: pkgconfig(libgofono)
+BuildRequires: pkgconfig(libglibutil)
 #BuildRequires: pkgconfig(ImageMagick)
 BuildRequires:  pkgconfig(Qt5Gui)
 

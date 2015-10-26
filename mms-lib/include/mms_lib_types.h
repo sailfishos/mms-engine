@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,8 +32,9 @@
 
 #include <fcntl.h>
 
-#include <glib.h>
-#include <glib-object.h>
+#include <gutil_types.h>
+
+typedef GLogModule MMSLogModule;
 
 #ifndef O_BINARY
 #  define O_BINARY (0)
@@ -56,7 +58,6 @@ typedef struct mms_settings MMSSettings;
 typedef struct mms_settings_sim_data MMSSettingsSimData;
 typedef struct mms_handler MMSHandler;
 typedef struct mms_connman MMSConnMan;
-typedef struct mms_log_module MMSLogModule;
 typedef struct mms_dispatcher MMSDispatcher;
 typedef struct mms_connection MMSConnection;
 typedef struct mms_message MMSPdu;

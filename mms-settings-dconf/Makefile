@@ -3,7 +3,7 @@
 .PHONY: clean all debug release
 
 # Required packages
-PKGS = dconf
+PKGS = libglibutil dconf glib-2.0
 
 #
 # Default target

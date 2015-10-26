@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,36 +17,14 @@
 #define JOLLA_MMS_CONNECTION_OFONO_H
 
 #include "mms_connection.h"
-#include "mms_ofono_types.h"
 
-struct mms_ofono_connection {
-    MMSConnection connection;
-    MMSOfonoContext* context;
-    struct _OrgOfonoConnectionContext* proxy;
-    gulong property_change_signal_id;
-};
+#include <gofono_types.h>
 
-MMSOfonoConnection*
+MMSConnection*
 mms_ofono_connection_new(
-    MMSOfonoContext* context,
+    OfonoSimMgr* sim,
+    OfonoConnCtx* context,
     gboolean user_request);
-
-MMSOfonoConnection*
-mms_ofono_connection_ref(
-    MMSOfonoConnection* connection);
-
-void
-mms_ofono_connection_unref(
-    MMSOfonoConnection* connection);
-
-void
-mms_ofono_connection_cancel(
-    MMSOfonoConnection* connection);
-
-gboolean
-mms_ofono_connection_set_state(
-    MMSOfonoConnection* connection,
-    MMS_CONNECTION_STATE state);
 
 #endif /* JOLLA_MMS_CONNECTION_OFONO_H */
 

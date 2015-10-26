@@ -12,7 +12,7 @@ include Config.mak
 # Required packages
 #
 
-PKGS = gmime-2.6 glib-2.0 libsoup-2.4 libwspcodec
+PKGS = libglibutil libwspcodec gmime-2.6 libsoup-2.4 glib-2.0
 
 #
 # Default target
@@ -36,7 +36,7 @@ SRC = \
   mms_handler.c \
   mms_lib_util.c \
   mms_file_util.c \
-  mms_log.c mms_message.c \
+  mms_message.c \
   mms_settings.c \
   mms_task.c \
   mms_task_ack.c \

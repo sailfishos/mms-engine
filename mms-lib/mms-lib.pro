@@ -1,7 +1,7 @@
 TEMPLATE = lib
 CONFIG += staticlib
 CONFIG += link_pkgconfig
-PKGCONFIG += gmime-2.6 glib-2.0 libsoup-2.4 libwspcodec
+PKGCONFIG += libglibutil libwspcodec gmime-2.6 glib-2.0 libsoup-2.4
 INCLUDEPATH += include
 QMAKE_CFLAGS += -Wno-unused-parameter
 
@@ -38,7 +38,6 @@ SOURCES += \
   src/mms_handler.c \
   src/mms_message.c \
   src/mms_lib_util.c \
-  src/mms_log.c \
   src/mms_settings.c \
   src/mms_task.c \
   src/mms_task_ack.c \

@@ -23,7 +23,7 @@
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_task_decode_log
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-task-decode");
+MMS_LOG_MODULE_DEFINE2("mms-task-decode", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskDecodeClass;

@@ -3,7 +3,7 @@
 .PHONY: clean all debug release
 
 # Required packages
-PKGS = glib-2.0 gio-2.0 gio-unix-2.0
+PKGS = libgofono libglibutil glib-2.0 gio-2.0 gio-unix-2.0
 
 #
 # Default target
@@ -16,17 +16,8 @@ all: debug release
 #
 
 SRC = \
-  mms_ofono_manager.c \
-  mms_ofono_modem.c \
-  mms_ofono_context.c \
   mms_ofono_connection.c \
   mms_ofono_connman.c
-GEN_SRC = \
-  org.ofono.Modem.c \
-  org.ofono.Manager.c \
-  org.ofono.SimManager.c \
-  org.ofono.ConnectionManager.c \
-  org.ofono.ConnectionContext.c
 
 #
 # Directories
@@ -35,7 +26,6 @@ GEN_SRC = \
 SRC_DIR = src
 INCLUDE_DIR = include
 BUILD_DIR = build
-GEN_DIR = $(BUILD_DIR)
 SPEC_DIR = spec
 MMS_LIB_INCLUDE = ../mms-lib/include
 DEBUG_BUILD_DIR = $(BUILD_DIR)/debug
@@ -53,7 +43,7 @@ RELEASE_FLAGS = -O2
 DEBUG_DEFS = -DDEBUG
 RELEASE_DEFS =
 WARNINGS = -Wall
-INCLUDES = -I$(SRC_DIR) -I$(INCLUDE_DIR) -I$(MMS_LIB_INCLUDE) -I$(GEN_DIR) -I.
+INCLUDES = -I$(SRC_DIR) -I$(INCLUDE_DIR) -I$(MMS_LIB_INCLUDE) -I.
 CFLAGS += $(WARNINGS) $(INCLUDES) $(shell pkg-config --cflags $(PKGS)) \
   -fPIC -MMD
 
@@ -72,14 +62,8 @@ RELEASE_CFLAGS = $(RELEASE_FLAGS) $(RELEASE_DEFS) $(CFLAGS)
 # Files
 #
 
-DEBUG_OBJS = \
-  $(GEN_SRC:%.c=$(DEBUG_BUILD_DIR)/%.o) \
-  $(SRC:%.c=$(DEBUG_BUILD_DIR)/%.o)
-RELEASE_OBJS = \
-  $(GEN_SRC:%.c=$(RELEASE_BUILD_DIR)/%.o) \
-  $(SRC:%.c=$(RELEASE_BUILD_DIR)/%.o)
-GEN_FILES = $(GEN_SRC:%=$(GEN_DIR)/%)
-.PRECIOUS: $(GEN_FILES)
+DEBUG_OBJS = $(SRC:%.c=$(DEBUG_BUILD_DIR)/%.o)
+RELEASE_OBJS = $(SRC:%.c=$(RELEASE_BUILD_DIR)/%.o)
 
 #
 # Dependencies
@@ -92,7 +76,6 @@ ifneq ($(strip $(DEPS)),)
 endif
 endif
 
-$(GEN_FILES): | $(GEN_DIR)
 $(DEBUG_OBJS): | $(DEBUG_BUILD_DIR)
 $(RELEASE_OBJS): | $(RELEASE_BUILD_DIR)
 
@@ -110,29 +93,17 @@ release: $(RELEASE_LIB)
 clean:
 	rm -fr $(BUILD_DIR) *~ $(SRC_DIR)/*~ $(INCLUDE_DIR)/*~
 
-$(GEN_DIR):
-	mkdir -p $@
-
 $(DEBUG_BUILD_DIR):
 	mkdir -p $@
 
 $(RELEASE_BUILD_DIR):
 	mkdir -p $@
 
-$(GEN_DIR)/%.c: $(SPEC_DIR)/%.xml
-	gdbus-codegen --generate-c-code $(@:%.c=%) $<
-
 $(DEBUG_BUILD_DIR)/%.o : $(SRC_DIR)/%.c
 	$(CC) -c $(WARN) $(DEBUG_CFLAGS) -MT"$@" -MF"$(@:%.o=%.d)" $< -o $@
 
 $(RELEASE_BUILD_DIR)/%.o : $(SRC_DIR)/%.c
 	$(CC) -c $(WARN) $(RELEASE_CFLAGS) -MT"$@" -MF"$(@:%.o=%.d)" $< -o $@
-
-$(DEBUG_BUILD_DIR)/%.o : $(GEN_DIR)/%.c
-	$(CC) -c $(DEBUG_CFLAGS) -MT"$@" -MF"$(@:%.o=%.d)" $< -o $@
-
-$(RELEASE_BUILD_DIR)/%.o : $(GEN_DIR)/%.c
-	$(CC) -c $(RELEASE_CFLAGS) -MT"$@" -MF"$(@:%.o=%.d)" $< -o $@
 
 $(DEBUG_LIB): $(DEBUG_OBJS)
 	$(AR) $(ARFLAGS) $@ $^

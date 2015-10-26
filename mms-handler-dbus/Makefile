@@ -3,7 +3,7 @@
 .PHONY: clean all debug release
 
 # Required packages
-PKGS = glib-2.0 gio-2.0 gio-unix-2.0
+PKGS = libglibutil glib-2.0 gio-2.0 gio-unix-2.0
 
 #
 # Default target

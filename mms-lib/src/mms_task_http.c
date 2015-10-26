@@ -30,9 +30,9 @@
 #endif
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_http_log
+#define MMS_LOG_MODULE_NAME MMS_TASK_HTTP_LOG
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-task-http");
+MMS_LOG_MODULE_DEFINE2("mms-task-http", MMS_TASK_LOG);
 
 /* HTTP task state */
 typedef enum _mms_http_state {

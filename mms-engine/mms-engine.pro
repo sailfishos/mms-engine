@@ -1,6 +1,7 @@
 TEMPLATE = app
 CONFIG += link_pkgconfig
-PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf libwspcodec ImageMagick
+PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf
+PKGCONFIG += libwspcodec libgofono libglibutil
 DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
 MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
 MMS_OFONO_DIR = $$_PRO_FILE_PWD_/../mms-ofono
