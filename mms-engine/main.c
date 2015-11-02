@@ -286,6 +286,7 @@ int main(int argc, char* argv[])
     int result = RET_ERR;
     MMSAppOptions opt = {0};
     mms_lib_init(argv[0]);
+    gofono_log.name = "mms-ofono";
     mms_log_default.name = MMS_APP_LOG_PREFIX;
     mms_lib_default_config(&opt.config);
     mms_settings_sim_data_default(&opt.settings);

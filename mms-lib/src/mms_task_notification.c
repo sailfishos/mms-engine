@@ -23,7 +23,7 @@
 #define MMS_LOG_MODULE_NAME mms_task_notification_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE("mms-task-notification");
+MMS_LOG_MODULE_DEFINE2("mms-task-notification", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskNotificationClass;

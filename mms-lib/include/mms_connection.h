@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,25 +31,21 @@ typedef enum _MMS_CONNECTION_STATE {
     MMS_CONNECTION_STATE_CLOSED         /* Connection has been closed */
 } MMS_CONNECTION_STATE;
 
-/* Delegate (one per connection) */
-typedef struct mms_connection_delegate MMSConnectionDelegate;
-struct mms_connection_delegate {
-    void (*fn_connection_state_changed)(
-        MMSConnectionDelegate* delegate,
-        MMSConnection* connection);
-};
+typedef
+void
+(*MMSConnectionStateChangeFunc)(
+    MMSConnection* connection,
+    void* data);
 
-/* Connection data. The delegate field may be changed by the client at
- * any time. */
+/* Connection object */
 struct mms_connection {
     GObject parent;
-    char* imsi;
-    char* mmsc;
-    char* mmsproxy;
-    char* netif;
+    const char* imsi;
+    const char* mmsc;
+    const char* mmsproxy;
+    const char* netif;
     gboolean user_connection;
     MMS_CONNECTION_STATE state;
-    MMSConnectionDelegate* delegate;
 };
 
 /* Connection class for implementation */
@@ -59,6 +56,8 @@ typedef struct mms_connection_class {
 
 GType mms_connection_get_type(void);
 #define MMS_TYPE_CONNECTION (mms_connection_get_type())
+#define MMS_CONNECTION(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
+        MMS_TYPE_CONNECTION, MMSConnection))
 
 MMSConnection*
 mms_connection_ref(
@@ -75,6 +74,21 @@ mms_connection_state_name(
 MMS_CONNECTION_STATE
 mms_connection_state(
     MMSConnection* connection);
+
+gulong
+mms_connection_add_state_change_handler(
+    MMSConnection* connection,
+    MMSConnectionStateChangeFunc fn,
+    void* data);
+
+void
+mms_connection_signal_state_change(
+    MMSConnection* connection);
+
+void
+mms_connection_remove_handler(
+    MMSConnection* connection,
+    gulong id);
 
 void
 mms_connection_close(

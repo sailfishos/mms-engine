@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,11 +19,9 @@
 #include "mms_log.h"
 
 #define MMS_OFONO_LOG_MODULES(log) \
-    log(mms_ofono_modem_log)\
-    log(mms_ofono_manager_log)\
-    log(mms_ofono_context_log)
+    log(gofono_log)
 
-MMS_OFONO_LOG_MODULES(MMS_LOG_MODULE_DECL)
+MMS_OFONO_LOG_MODULES(GLOG_MODULE_DECL)
 
 #endif /* JOLLA_MMS_OFONO_LOG_H */
 

@@ -39,12 +39,12 @@ struct mms_dispatcher {
     MMSHandler* handler;
     MMSConnMan* cm;
     MMSConnection* connection;
-    MMSConnectionDelegate connection_delegate;
     MMSDispatcherDelegate* delegate;
     GQueue* tasks;
     guint next_run_id;
     guint network_idle_id;
     gulong handler_done_id;
+    gulong connection_changed_id;
     gboolean started;
 };
 
@@ -57,9 +57,6 @@ typedef struct mms_dispatcher_idle_callback {
 inline static MMSDispatcher*
 mms_dispatcher_from_task_delegate(MMSTaskDelegate* delegate)
     { return MMS_CAST(delegate,MMSDispatcher,task_delegate); }
-inline static MMSDispatcher*
-mms_dispatcher_from_connection_delegate(MMSConnectionDelegate* delegate)
-    { return MMS_CAST(delegate,MMSDispatcher,connection_delegate); }
 
 static
 void
@@ -98,8 +95,10 @@ mms_dispatcher_drop_connection(
 {
     if (disp->connection) {
         MMS_ASSERT(!mms_connection_is_active(disp->connection));
+        mms_connection_remove_handler(disp->connection,
+            disp->connection_changed_id);
+        disp->connection_changed_id = 0;
         mms_connection_unref(disp->connection);
-        disp->connection->delegate = NULL;
         disp->connection = NULL;
         if (disp->network_idle_id) {
             g_source_remove(disp->network_idle_id);
@@ -243,8 +242,48 @@ mms_dispatcher_next_run_schedule(
 }
 
 /**
+ * Connection state callback
+ */
+static
+void
+mms_dispatcher_connection_state_changed(
+    MMSConnection* conn,
+    void* data)
+{
+    MMSDispatcher* disp = data;
+    MMS_CONNECTION_STATE state = mms_connection_state(conn);
+    MMS_DEBUG("%s %s", conn->imsi, mms_connection_state_name(conn));
+    MMS_ASSERT(conn == disp->connection);
+    if (state == MMS_CONNECTION_STATE_FAILED ||
+        state == MMS_CONNECTION_STATE_CLOSED) {
+        GList* entry;
+        mms_dispatcher_close_connection(disp);
+        for (entry = disp->tasks->head; entry; entry = entry->next) {
+            MMSTask* task = entry->data;
+            switch (task->state) {
+            case MMS_TASK_STATE_NEED_CONNECTION:
+            case MMS_TASK_STATE_NEED_USER_CONNECTION:
+            case MMS_TASK_STATE_TRANSMITTING:
+                if (!strcmp(conn->imsi, task->imsi)) {
+                    mms_task_network_unavailable(task, TRUE);
+                }
+            default:
+                break;
+            }
+        }
+        mms_dispatcher_drop_connection(disp);
+        mms_dispatcher_check_if_done(disp);
+    }
+    if (!disp->active_task) {
+        mms_dispatcher_next_run_schedule(disp);
+    }
+}
+
+/**
  * Set the delegate that receives dispatcher notifications.
  * One delegate per dispatcher.
+ *
+ * TODO: Replace this delegate stuff wuth glib signals
  */
 void
 mms_dispatcher_set_delegate(
@@ -325,7 +364,10 @@ mms_dispatcher_pick_next_task(
                 disp->connection = mms_connman_open_connection(
                     disp->cm, task->imsi, FALSE);
                 if (disp->connection) {
-                    disp->connection->delegate = &disp->connection_delegate;
+                    MMS_ASSERT(!disp->connection_changed_id);
+                    disp->connection_changed_id =
+                        mms_connection_add_state_change_handler(disp->connection,
+                            mms_dispatcher_connection_state_changed, disp);
                     g_queue_delete_link(disp->tasks, entry);
                     return task;
                 } else {
@@ -584,44 +626,6 @@ mms_dispatcher_cancel(
 }
 
 /**
- * Connection delegate callbacks
- */
-static
-void
-mms_dispatcher_delegate_connection_state_changed(
-    MMSConnectionDelegate* delegate,
-    MMSConnection* conn)
-{
-    MMSDispatcher* disp = mms_dispatcher_from_connection_delegate(delegate);
-    MMS_CONNECTION_STATE state = mms_connection_state(conn);
-    MMS_DEBUG("%s %s", conn->imsi, mms_connection_state_name(conn));
-    MMS_ASSERT(conn == disp->connection);
-    if (state == MMS_CONNECTION_STATE_FAILED ||
-        state == MMS_CONNECTION_STATE_CLOSED) {
-        GList* entry;
-        mms_dispatcher_close_connection(disp);
-        for (entry = disp->tasks->head; entry; entry = entry->next) {
-            MMSTask* task = entry->data;
-            switch (task->state) {
-            case MMS_TASK_STATE_NEED_CONNECTION:
-            case MMS_TASK_STATE_NEED_USER_CONNECTION:
-            case MMS_TASK_STATE_TRANSMITTING:
-                if (!strcmp(conn->imsi, task->imsi)) {
-                    mms_task_network_unavailable(task, TRUE);
-                }
-            default:
-                break;
-            }
-        }
-        mms_dispatcher_drop_connection(disp);
-        mms_dispatcher_check_if_done(disp);
-    }
-    if (!disp->active_task) {
-        mms_dispatcher_next_run_schedule(disp);
-    }
-}
-
-/**
  * Task delegate callbacks
  */
 static
@@ -683,8 +687,6 @@ mms_dispatcher_new(
         mms_dispatcher_delegate_task_queue;
     disp->task_delegate.fn_task_state_changed =
         mms_dispatcher_delegate_task_state_changed;
-    disp->connection_delegate.fn_connection_state_changed =
-        mms_dispatcher_delegate_connection_state_changed;
     disp->handler_done_id = mms_handler_add_done_callback(handler,
         mms_dispatcher_handler_done, disp);
     return disp;

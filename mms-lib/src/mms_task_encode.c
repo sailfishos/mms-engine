@@ -28,7 +28,7 @@
 #define MMS_LOG_MODULE_NAME mms_task_encode_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE("mms-task-encode");
+MMS_LOG_MODULE_DEFINE2("mms-task-encode", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskEncodeClass;

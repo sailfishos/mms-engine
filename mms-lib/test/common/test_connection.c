@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -43,10 +44,7 @@ test_connection_test_state_change_cb(
         test->state != MMS_CONNECTION_STATE_FAILED &&
         test->state != change->state) {
         test->state = change->state;
-        if (test->delegate &&
-            test->delegate->fn_connection_state_changed) {
-            test->delegate->fn_connection_state_changed(test->delegate, test);
-        }
+        mms_connection_signal_state_change(test);
     }
     mms_connection_unref(change->test);
     g_free(change);

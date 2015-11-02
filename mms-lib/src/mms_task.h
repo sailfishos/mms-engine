@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2015 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -84,6 +85,7 @@ typedef struct mms_task_class {
 } MMSTaskClass;
 
 GType mms_task_get_type(void);
+#define MMS_TASK_LOG mms_task_log
 #define MMS_TYPE_TASK (mms_task_get_type())
 #define MMS_TASK_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), \
         MMS_TYPE_TASK, MMSTaskClass))

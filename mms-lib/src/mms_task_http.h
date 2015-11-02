@@ -45,6 +45,7 @@ typedef struct mms_task_http_class {
 } MMSTaskHttpClass;
 
 GType mms_task_http_get_type(void);
+#define MMS_TASK_HTTP_LOG mms_task_http_log
 #define MMS_TYPE_TASK_HTTP (mms_task_http_get_type())
 #define MMS_TASK_HTTP_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), \
         MMS_TYPE_TASK_HTTP, MMSTaskHttpClass))

@@ -23,7 +23,7 @@
 #define MMS_LOG_MODULE_NAME mms_task_send_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE("mms-task-send");
+MMS_LOG_MODULE_DEFINE2("mms-task-send", MMS_TASK_HTTP_LOG);
 
 /* Class definition */
 typedef MMSTaskHttpClass MMSTaskSendClass;
