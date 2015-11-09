@@ -62,6 +62,45 @@ G_DEFINE_TYPE(MMSOfonoConnMan, mms_ofono_connman, MMS_TYPE_CONNMAN)
 #define MMS_OFONO_CONNMAN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_OFONO_CONNMAN, MMSOfonoConnMan))
 
+#define MMS_OFONO_TIMEOUT (30000)
+
+/**
+ * Waits until ofono client interfaces are initialized.
+ */
+static
+void
+mms_ofono_connman_wait_valid(
+    MMSOfonoConnMan* self)
+{
+    GError* error = NULL;
+    if (ofono_manager_wait_valid(self->manager, MMS_OFONO_TIMEOUT, &error)) {
+        if (self->default_modem &&
+            self->default_modem->modem &&
+            !ofono_modem_wait_valid(self->default_modem->modem,
+            MMS_OFONO_TIMEOUT, &error)) {
+            MMS_ERR("%s", MMS_ERRMSG(error));
+            g_error_free(error);
+        }
+        if (self->default_modem &&
+            self->default_modem->simmgr &&
+            !ofono_simmgr_wait_valid(self->default_modem->simmgr,
+            MMS_OFONO_TIMEOUT, &error)) {
+            MMS_ERR("%s", MMS_ERRMSG(error));
+            g_error_free(error);
+        }
+        if (self->default_modem &&
+            self->default_modem->connmgr &&
+            !ofono_connmgr_wait_valid(self->default_modem->connmgr,
+            MMS_OFONO_TIMEOUT, &error)) {
+            MMS_ERR("%s", MMS_ERRMSG(error));
+            g_error_free(error);
+        }
+    } else {
+        MMS_ERR("%s", MMS_ERRMSG(error));
+        g_error_free(error);
+    }
+}
+
 /**
  * Finds OfonoModem for the specified IMSI. If it returns non-NULL, the modem
  * is guaranteed to have SimManager associated with it.
@@ -72,6 +111,7 @@ mms_ofono_connman_modem_for_imsi(
     MMSOfonoConnMan* self,
     const char* imsi)
 {
+    mms_ofono_connman_wait_valid(self);
     if (imsi) {
         GHashTableIter iter;
         gpointer key, value;
@@ -111,6 +151,7 @@ mms_ofono_connman_default_imsi(
     MMSConnMan* cm)
 {
     MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(cm);
+    mms_ofono_connman_wait_valid(self);
     if (self->default_modem &&
         self->default_modem->simmgr &&
         self->default_modem->simmgr->imsi &&
