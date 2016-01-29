@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 #include <glib-unix.h>
 
 #include "mms_engine.h"
-#include "mms_ofono_log.h"
+#include "mms_connman_ofono_log.h"
 #include "mms_lib_log.h"
 #include "mms_lib_util.h"
 #include "mms_settings.h"
@@ -41,7 +41,7 @@ static MMSLogModule* mms_app_log_modules[] = {
     &mms_log_default,
 #define MMS_LIB_LOG_MODULE(m) &(m),
     MMS_LIB_LOG_MODULES(MMS_LIB_LOG_MODULE)
-    MMS_OFONO_LOG_MODULES(MMS_LIB_LOG_MODULE)
+    MMS_CONNMAN_LOG_MODULES(MMS_LIB_LOG_MODULE)
 #undef MMS_LIB_LOG_MODULE
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -13,20 +13,17 @@
  *
  */
 
-#ifndef JOLLA_MMS_CONNECTION_OFONO_H
-#define JOLLA_MMS_CONNECTION_OFONO_H
+#ifndef JOLLA_MMS_CONNMAN_OFONO_LOG_H
+#define JOLLA_MMS_CONNMAN_OFONO_LOG_H
 
-#include "mms_connection.h"
+#include "mms_log.h"
 
-#include <gofono_types.h>
+#define MMS_CONNMAN_LOG_MODULES(log) \
+    log(gofono_log)
 
-MMSConnection*
-mms_ofono_connection_new(
-    OfonoSimMgr* sim,
-    OfonoConnCtx* context,
-    gboolean user_request);
+MMS_CONNMAN_LOG_MODULES(GLOG_MODULE_DECL)
 
-#endif /* JOLLA_MMS_CONNECTION_OFONO_H */
+#endif /* JOLLA_MMS_CONNMAN_OFONO_LOG_H */
 
 /*
  * Local Variables:

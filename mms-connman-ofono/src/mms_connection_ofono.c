@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -13,15 +13,15 @@
  *
  */
 
-#include "mms_ofono_connection.h"
+#include "mms_connection_ofono.h"
 
 #include <gofono_connctx.h>
 #include <gofono_simmgr.h>
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connection_log
-#include "mms_ofono_log.h"
-MMS_LOG_MODULE_DEFINE("mms-ofono-connection");
+#include "mms_connman_ofono_log.h"
+MMS_LOG_MODULE_DEFINE("mms-connection-ofono");
 
 enum context_handler_id {
     CONTEXT_HANDLER_ACTIVATE_FAILED,
@@ -38,25 +38,25 @@ enum sim_handler_id {
     SIM_HANDLER_COUNT
 };
 
-typedef struct mms_ofono_connection {
+typedef struct mms_connection_ofono {
     MMSConnection connection;
     OfonoSimMgr* sim;
     OfonoConnCtx* context;
     gulong context_handler_id[CONTEXT_HANDLER_COUNT];
     gulong sim_handler_id[SIM_HANDLER_COUNT];
     char* imsi;
-} MMSOfonoConnection;
+} MMSConnectionOfono;
 
-typedef MMSConnectionClass MMSOfonoConnectionClass;
-G_DEFINE_TYPE(MMSOfonoConnection, mms_ofono_connection, MMS_TYPE_CONNECTION)
-#define MMS_TYPE_OFONO_CONNECTION (mms_ofono_connection_get_type())
-#define MMS_OFONO_CONNECTION(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
-   MMS_TYPE_OFONO_CONNECTION, MMSOfonoConnection))
+typedef MMSConnectionClass MMSConnectionOfonoClass;
+G_DEFINE_TYPE(MMSConnectionOfono, mms_connection_ofono, MMS_TYPE_CONNECTION)
+#define MMS_TYPE_CONNECTION_OFONO (mms_connection_ofono_get_type())
+#define MMS_CONNECTION_OFONO(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
+   MMS_TYPE_CONNECTION_OFONO, MMSConnectionOfono))
 
 static
 void
-mms_connection_desconnect_handlers(
-    MMSOfonoConnection* self)
+mms_connection_ofono_disconnect(
+    MMSConnectionOfono* self)
 {
     ofono_connctx_remove_handlers(self->context,
         self->context_handler_id, CONTEXT_HANDLER_COUNT);
@@ -66,8 +66,8 @@ mms_connection_desconnect_handlers(
 
 static
 gboolean
-mms_ofono_connection_set_state(
-    MMSOfonoConnection* self,
+mms_connection_ofono_set_state(
+    MMSConnectionOfono* self,
     MMS_CONNECTION_STATE state)
 {
     if (self->connection.state != state) {
@@ -82,7 +82,7 @@ mms_ofono_connection_set_state(
         if (state == MMS_CONNECTION_STATE_FAILED ||
             state == MMS_CONNECTION_STATE_CLOSED) {
             /* Stop listening for property changes */
-            mms_connection_desconnect_handlers(self);
+            mms_connection_ofono_disconnect(self);
         }
         self->connection.state = state;
         mms_connection_signal_state_change(&self->connection);
@@ -92,39 +92,39 @@ mms_ofono_connection_set_state(
 
 static
 void
-mms_ofono_connection_cancel(
-    MMSOfonoConnection* self)
+mms_connection_ofono_cancel(
+    MMSConnectionOfono* self)
 {
     if (self->connection.state <= MMS_CONNECTION_STATE_OPENING) {
-        mms_ofono_connection_set_state(self, MMS_CONNECTION_STATE_FAILED);
+        mms_connection_ofono_set_state(self, MMS_CONNECTION_STATE_FAILED);
     } else {
-        mms_ofono_connection_set_state(self, MMS_CONNECTION_STATE_CLOSED);
+        mms_connection_ofono_set_state(self, MMS_CONNECTION_STATE_CLOSED);
     }
 }
 
 static
 void
-mms_ofono_connection_active_changed(
+mms_connection_ofono_active_changed(
     OfonoConnCtx* context,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->context == context);
     if (context->active) {
         MMS_DEBUG("Connection %s opened", self->connection.imsi);
-        mms_ofono_connection_set_state(self, MMS_CONNECTION_STATE_OPEN);
+        mms_connection_ofono_set_state(self, MMS_CONNECTION_STATE_OPEN);
     } else {
-        mms_ofono_connection_set_state(self, MMS_CONNECTION_STATE_CLOSED);
+        mms_connection_ofono_set_state(self, MMS_CONNECTION_STATE_CLOSED);
     }
 }
 
 static
 void
-mms_ofono_connection_interface_changed(
+mms_connection_ofono_interface_changed(
     OfonoConnCtx* context,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->context == context);
     if (context->ifname) {
         self->connection.netif = context->ifname;
@@ -136,11 +136,11 @@ mms_ofono_connection_interface_changed(
 
 static
 void
-mms_ofono_connection_mms_proxy_changed(
+mms_connection_ofono_mms_proxy_changed(
     OfonoConnCtx* context,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->context == context);
     if (context->mms_proxy) {
         self->connection.mmsproxy = context->mms_proxy;
@@ -152,11 +152,11 @@ mms_ofono_connection_mms_proxy_changed(
 
 static
 void
-mms_ofono_connection_mms_center_changed(
+mms_connection_ofono_mms_center_changed(
     OfonoConnCtx* context,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->context == context);
     if (context->mms_center) {
         self->connection.mmsc = context->mms_center;
@@ -168,52 +168,52 @@ mms_ofono_connection_mms_center_changed(
 
 static
 void
-mms_ofono_connection_imsi_changed(
+mms_connection_ofono_imsi_changed(
     OfonoSimMgr* sim,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->sim == sim);
     if (g_strcmp0(sim->imsi, self->connection.imsi)) {
         MMS_DEBUG_("%s", sim->imsi);
-        mms_ofono_connection_cancel(self);
+        mms_connection_ofono_cancel(self);
     }
 }
 
 static
 void
-mms_ofono_connection_present_changed(
+mms_connection_ofono_present_changed(
     OfonoSimMgr* sim,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->sim == sim);
     MMS_DEBUG_("%s", sim->present ? "true" : "false");
     if (!sim->present) {
         MMS_DEBUG_("%s", sim->imsi);
-        mms_ofono_connection_cancel(self);
+        mms_connection_ofono_cancel(self);
     }
 }
 
 static
 void
-mms_ofono_connection_activate_failed(
+mms_connection_ofono_activate_failed(
     OfonoConnCtx* context,
     const GError* error,
     void* arg)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(arg);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(arg);
     MMS_ASSERT(self->context == context);
-    mms_ofono_connection_cancel(self);
+    mms_connection_ofono_cancel(self);
 }
 
 MMSConnection*
-mms_ofono_connection_new(
+mms_connection_ofono_new(
     OfonoSimMgr* sim,
     OfonoConnCtx* context,
     gboolean user_request)
 {
-    MMSOfonoConnection* self = g_object_new(MMS_TYPE_OFONO_CONNECTION, NULL);
+    MMSConnectionOfono* self = g_object_new(MMS_TYPE_CONNECTION_OFONO, NULL);
     MMSConnection* conn = &self->connection;
 
     MMS_ASSERT(ofono_simmgr_valid(sim));
@@ -243,36 +243,36 @@ mms_ofono_connection_new(
     /* Listen for property changes */
     self->context_handler_id[CONTEXT_HANDLER_ACTIVATE_FAILED] =
         ofono_connctx_add_activate_failed_handler(context,
-        mms_ofono_connection_activate_failed, self);
+        mms_connection_ofono_activate_failed, self);
     self->context_handler_id[CONTEXT_HANDLER_ACTIVE_CHANGED] =
         ofono_connctx_add_active_changed_handler(context,
-        mms_ofono_connection_active_changed, self);
+        mms_connection_ofono_active_changed, self);
     self->context_handler_id[CONTEXT_HANDLER_INTERFACE_CHANGED] =
         ofono_connctx_add_interface_changed_handler(context,
-        mms_ofono_connection_interface_changed, self);
+        mms_connection_ofono_interface_changed, self);
     self->context_handler_id[CONTEXT_HANDLER_MMS_PROXY] =
         ofono_connctx_add_mms_proxy_changed_handler(context,
-        mms_ofono_connection_mms_proxy_changed, self);
+        mms_connection_ofono_mms_proxy_changed, self);
     self->context_handler_id[CONTEXT_HANDLER_MMS_CENTER] =
         ofono_connctx_add_mms_center_changed_handler(context,
-        mms_ofono_connection_mms_center_changed, self);
+        mms_connection_ofono_mms_center_changed, self);
 
     self->sim_handler_id[SIM_HANDLER_IMSI_CHANGED] =
         ofono_simmgr_add_imsi_changed_handler(sim,
-        mms_ofono_connection_imsi_changed, self);
+        mms_connection_ofono_imsi_changed, self);
     self->sim_handler_id[SIM_HANDLER_PRESENT_CHANGED] =
         ofono_simmgr_add_present_changed_handler(sim,
-        mms_ofono_connection_present_changed, self);
+        mms_connection_ofono_present_changed, self);
 
     return &self->connection;
 }
 
 static
 void
-mms_ofono_connection_close(
+mms_connection_ofono_close(
     MMSConnection* connection)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(connection);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(connection);
     ofono_connctx_deactivate(self->context);
 }
 
@@ -282,13 +282,13 @@ mms_ofono_connection_close(
  */
 static
 void
-mms_ofono_connection_dispose(
+mms_connection_ofono_dispose(
     GObject* object)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(object);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(object);
     MMS_VERBOSE_("%p %s", self, self->imsi);
     MMS_ASSERT(!mms_connection_is_active(&self->connection));
-    mms_connection_desconnect_handlers(self);
+    mms_connection_ofono_disconnect(self);
     if (self->sim) {
         ofono_simmgr_unref(self->sim);
         self->sim = NULL;
@@ -302,7 +302,7 @@ mms_ofono_connection_dispose(
         self->context = NULL;
     }
     self->connection.netif = NULL;
-    G_OBJECT_CLASS(mms_ofono_connection_parent_class)->dispose(object);
+    G_OBJECT_CLASS(mms_connection_ofono_parent_class)->dispose(object);
 }
 
 /**
@@ -310,13 +310,13 @@ mms_ofono_connection_dispose(
  */
 static
 void
-mms_ofono_connection_finalize(
+mms_connection_ofono_finalize(
     GObject* object)
 {
-    MMSOfonoConnection* self = MMS_OFONO_CONNECTION(object);
+    MMSConnectionOfono* self = MMS_CONNECTION_OFONO(object);
     MMS_VERBOSE_("%p %s", self, self->imsi);
     g_free(self->imsi);
-    G_OBJECT_CLASS(mms_ofono_connection_parent_class)->finalize(object);
+    G_OBJECT_CLASS(mms_connection_ofono_parent_class)->finalize(object);
 }
 
 /**
@@ -324,13 +324,13 @@ mms_ofono_connection_finalize(
  */
 static
 void
-mms_ofono_connection_class_init(
-    MMSOfonoConnectionClass* klass)
+mms_connection_ofono_class_init(
+    MMSConnectionOfonoClass* klass)
 {
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
-    klass->fn_close = mms_ofono_connection_close;
-    object_class->dispose = mms_ofono_connection_dispose;
-    object_class->finalize = mms_ofono_connection_finalize;
+    klass->fn_close = mms_connection_ofono_close;
+    object_class->dispose = mms_connection_ofono_dispose;
+    object_class->finalize = mms_connection_ofono_finalize;
 }
 
 /**
@@ -338,8 +338,8 @@ mms_ofono_connection_class_init(
  */
 static
 void
-mms_ofono_connection_init(
-    MMSOfonoConnection* self)
+mms_connection_ofono_init(
+    MMSConnectionOfono* self)
 {
     MMS_VERBOSE_("%p", self);
 }

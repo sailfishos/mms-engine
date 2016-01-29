@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -13,8 +13,8 @@
  *
  */
 
-#include "mms_ofono_connman.h"
-#include "mms_ofono_connection.h"
+#include "mms_connman_ofono.h"
+#include "mms_connection_ofono.h"
 
 #include <gofono_manager.h>
 #include <gofono_connmgr.h>
@@ -24,8 +24,8 @@
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connman_log
-#include "mms_ofono_log.h"
-MMS_LOG_MODULE_DEFINE("mms-ofono-connman");
+#include "mms_connman_ofono_log.h"
+MMS_LOG_MODULE_DEFINE("mms-connman-ofono");
 
 enum manager_handler_id {
     MANAGER_HANDLER_VALID_CHANGED,
@@ -48,19 +48,19 @@ typedef struct mms_ofono_modem {
     gulong simmgr_handler_id[SIMMGR_HANDLER_COUNT];
 } MMSOfonoModem;
 
-typedef MMSConnManClass MMSOfonoConnManClass;
-typedef struct mms_ofono_connman {
+typedef MMSConnManClass MMSConnManOfonoClass;
+typedef struct mms_connman_ofono {
     MMSConnMan cm;
     GHashTable* modems;
     MMSOfonoModem* default_modem;
     OfonoManager* manager;
     gulong manager_handler_id[MANAGER_HANDLER_COUNT];
-} MMSOfonoConnMan;
+} MMSConnManOfono;
 
-G_DEFINE_TYPE(MMSOfonoConnMan, mms_ofono_connman, MMS_TYPE_CONNMAN)
-#define MMS_TYPE_OFONO_CONNMAN (mms_ofono_connman_get_type())
-#define MMS_OFONO_CONNMAN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
-    MMS_TYPE_OFONO_CONNMAN, MMSOfonoConnMan))
+G_DEFINE_TYPE(MMSConnManOfono, mms_connman_ofono, MMS_TYPE_CONNMAN)
+#define MMS_TYPE_CONNMAN_OFONO (mms_connman_ofono_get_type())
+#define MMS_CONNMAN_OFONO(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
+    MMS_TYPE_CONNMAN_OFONO, MMSConnManOfono))
 
 #define MMS_OFONO_TIMEOUT (30000)
 
@@ -69,8 +69,8 @@ G_DEFINE_TYPE(MMSOfonoConnMan, mms_ofono_connman, MMS_TYPE_CONNMAN)
  */
 static
 void
-mms_ofono_connman_wait_valid(
-    MMSOfonoConnMan* self)
+mms_connman_ofono_wait_valid(
+    MMSConnManOfono* self)
 {
     GError* error = NULL;
     if (ofono_manager_wait_valid(self->manager, MMS_OFONO_TIMEOUT, &error)) {
@@ -107,11 +107,11 @@ mms_ofono_connman_wait_valid(
  */
 static
 MMSOfonoModem*
-mms_ofono_connman_modem_for_imsi(
-    MMSOfonoConnMan* self,
+mms_connman_ofono_modem_for_imsi(
+    MMSConnManOfono* self,
     const char* imsi)
 {
-    mms_ofono_connman_wait_valid(self);
+    mms_connman_ofono_wait_valid(self);
     if (imsi) {
         GHashTableIter iter;
         gpointer key, value;
@@ -147,11 +147,11 @@ mms_ofono_connman_modem_for_imsi(
  */
 static
 char*
-mms_ofono_connman_default_imsi(
+mms_connman_ofono_default_imsi(
     MMSConnMan* cm)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(cm);
-    mms_ofono_connman_wait_valid(self);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(cm);
+    mms_connman_ofono_wait_valid(self);
     if (self->default_modem &&
         self->default_modem->simmgr &&
         self->default_modem->simmgr->imsi &&
@@ -166,11 +166,11 @@ mms_ofono_connman_default_imsi(
  */
 static
 void
-mms_ofono_connman_connection_gone(
+mms_connman_ofono_connection_gone(
     gpointer arg,
     GObject* connection)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(arg);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
     GHashTableIter it;
     gpointer value;
     g_hash_table_iter_init(&it, self->modems);
@@ -191,13 +191,13 @@ mms_ofono_connman_connection_gone(
  */
 static
 MMSConnection*
-mms_ofono_connman_open_connection(
+mms_connman_ofono_open_connection(
     MMSConnMan* cm,
     const char* imsi,
     gboolean user_request)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(cm);
-    MMSOfonoModem* modem = mms_ofono_connman_modem_for_imsi(self, imsi);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(cm);
+    MMSOfonoModem* modem = mms_connman_ofono_modem_for_imsi(self, imsi);
     if (modem) {
         OfonoConnCtx* ctx = ofono_connmgr_get_context_for_type(modem->connmgr,
             OFONO_CONNCTX_TYPE_MMS);
@@ -205,10 +205,10 @@ mms_ofono_connman_open_connection(
             if (modem->conn) {
                 mms_connection_ref(modem->conn);
             } else {
-                modem->conn = mms_ofono_connection_new(modem->simmgr, ctx,
+                modem->conn = mms_connection_ofono_new(modem->simmgr, ctx,
                     user_request);
                 g_object_weak_ref(G_OBJECT(modem->conn),
-                    mms_ofono_connman_connection_gone, self);
+                    mms_connman_ofono_connection_gone, self);
             }
             if (!ctx->active) {
                 ofono_connctx_activate(ctx);
@@ -223,8 +223,8 @@ mms_ofono_connman_open_connection(
 
 static
 void
-mms_ofono_connman_select_default_modem(
-    MMSOfonoConnMan* self)
+mms_connman_ofono_select_default_modem(
+    MMSConnManOfono* self)
 {
     MMSOfonoModem* context = NULL;
     GHashTableIter iter;
@@ -257,13 +257,13 @@ mms_ofono_simmgr_changed(
     OfonoSimMgr* sender,
     void* arg)
 {
-    mms_ofono_connman_select_default_modem(MMS_OFONO_CONNMAN(arg));
+    mms_connman_ofono_select_default_modem(MMS_CONNMAN_OFONO(arg));
 }
 
 static
 void
-mms_ofono_connman_add_modem(
-    MMSOfonoConnMan* self,
+mms_connman_ofono_add_modem(
+    MMSConnManOfono* self,
     OfonoModem* modem)
 {
     MMSOfonoModem* context = g_new0(MMSOfonoModem,1);
@@ -282,58 +282,58 @@ mms_ofono_connman_add_modem(
 
 static
 void
-mms_ofono_connman_modem_added(
+mms_connman_ofono_modem_added(
     OfonoManager* manager,
     OfonoModem* modem,
     void* arg)
 {
     if (manager->valid) {
-        MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(arg);
+        MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
         MMS_ASSERT(manager == self->manager);
-        mms_ofono_connman_add_modem(self, modem);
-        mms_ofono_connman_select_default_modem(self);
+        mms_connman_ofono_add_modem(self, modem);
+        mms_connman_ofono_select_default_modem(self);
     }
 }
 
 static
 void
-mms_ofono_connman_modem_removed(
+mms_connman_ofono_modem_removed(
     OfonoManager* manager,
     const char* path,
     void* arg)
 {
     if (manager->valid) {
-        MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(arg);
+        MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
         MMS_ASSERT(manager == self->manager);
         g_hash_table_remove(self->modems, path);
-        mms_ofono_connman_select_default_modem(self);
+        mms_connman_ofono_select_default_modem(self);
     }
 }
 
 static
 void
-mms_ofono_connman_init_modems(
-    MMSOfonoConnMan* self)
+mms_connman_ofono_init_modems(
+    MMSConnManOfono* self)
 {
     guint i;
     GPtrArray* modems = ofono_manager_get_modems(self->manager);
     for (i=0; i<modems->len; i++) {
-        mms_ofono_connman_add_modem(self, OFONO_MODEM(modems->pdata[i]));
+        mms_connman_ofono_add_modem(self, OFONO_MODEM(modems->pdata[i]));
     }
-    mms_ofono_connman_select_default_modem(self);
+    mms_connman_ofono_select_default_modem(self);
     g_ptr_array_unref(modems);
 }
 
 static
 void
-mms_ofono_connman_valid_changed(
+mms_connman_ofono_valid_changed(
     OfonoManager* manager,
     void* arg)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(arg);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
     MMS_ASSERT(manager == self->manager);
     if (manager->valid) {
-        mms_ofono_connman_init_modems(self);
+        mms_connman_ofono_init_modems(self);
     } else {
         self->default_modem = NULL;
         g_hash_table_remove_all(self->modems);
@@ -346,18 +346,18 @@ mms_ofono_connman_valid_changed(
 MMSConnMan*
 mms_connman_ofono_new()
 {
-    MMSOfonoConnMan* self = g_object_new(MMS_TYPE_OFONO_CONNMAN, NULL);
+    MMSConnManOfono* self = g_object_new(MMS_TYPE_CONNMAN_OFONO, NULL);
     self->manager = ofono_manager_new();
     self->manager_handler_id[MANAGER_HANDLER_VALID_CHANGED] =
         ofono_manager_add_valid_changed_handler(self->manager,
-            mms_ofono_connman_valid_changed, self);
+            mms_connman_ofono_valid_changed, self);
     self->manager_handler_id[MANAGER_HANDLER_MODEM_ADDED] =
         ofono_manager_add_modem_added_handler(self->manager,
-            mms_ofono_connman_modem_added, self);
+            mms_connman_ofono_modem_added, self);
     self->manager_handler_id[MANAGER_HANDLER_MODEM_REMOVED] =
         ofono_manager_add_modem_removed_handler(self->manager,
-            mms_ofono_connman_modem_removed, self);
-    if (self->manager->valid) mms_ofono_connman_init_modems(self);
+            mms_connman_ofono_modem_removed, self);
+    if (self->manager->valid) mms_connman_ofono_init_modems(self);
     return &self->cm;
 }
 
@@ -388,10 +388,10 @@ mms_ofono_modem_cleanup(
  */
 static
 void
-mms_ofono_connman_dispose(
+mms_connman_ofono_dispose(
     GObject* object)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(object);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(object);
     MMS_VERBOSE_("");
     self->default_modem = NULL;
     g_hash_table_remove_all(self->modems);
@@ -401,7 +401,7 @@ mms_ofono_connman_dispose(
         ofono_manager_unref(self->manager);
         self->manager = NULL;
     }
-    G_OBJECT_CLASS(mms_ofono_connman_parent_class)->dispose(object);
+    G_OBJECT_CLASS(mms_connman_ofono_parent_class)->dispose(object);
 }
 
 /**
@@ -409,13 +409,13 @@ mms_ofono_connman_dispose(
  */
 static
 void
-mms_ofono_connman_finalize(
+mms_connman_ofono_finalize(
     GObject* object)
 {
-    MMSOfonoConnMan* self = MMS_OFONO_CONNMAN(object);
+    MMSConnManOfono* self = MMS_CONNMAN_OFONO(object);
     MMS_VERBOSE_("");
     g_hash_table_destroy(self->modems);
-    G_OBJECT_CLASS(mms_ofono_connman_parent_class)->finalize(object);
+    G_OBJECT_CLASS(mms_connman_ofono_parent_class)->finalize(object);
 }
 
 /**
@@ -423,14 +423,14 @@ mms_ofono_connman_finalize(
  */
 static
 void
-mms_ofono_connman_class_init(
-    MMSOfonoConnManClass* klass)
+mms_connman_ofono_class_init(
+    MMSConnManOfonoClass* klass)
 {
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
-    klass->fn_default_imsi = mms_ofono_connman_default_imsi;
-    klass->fn_open_connection = mms_ofono_connman_open_connection;
-    object_class->dispose = mms_ofono_connman_dispose;
-    object_class->finalize = mms_ofono_connman_finalize;
+    klass->fn_default_imsi = mms_connman_ofono_default_imsi;
+    klass->fn_open_connection = mms_connman_ofono_open_connection;
+    object_class->dispose = mms_connman_ofono_dispose;
+    object_class->finalize = mms_connman_ofono_finalize;
 }
 
 /**
@@ -438,8 +438,8 @@ mms_ofono_connman_class_init(
  */
 static
 void
-mms_ofono_connman_init(
-    MMSOfonoConnMan* self)
+mms_connman_ofono_init(
+    MMSConnManOfono* self)
 {
     self->modems = g_hash_table_new_full(g_str_hash, g_str_equal,
         g_free, mms_ofono_modem_cleanup);
