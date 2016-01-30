@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -43,11 +43,12 @@ char*
 mms_send(
     char* files[],
     int count,
+    const char* imsi,
     const char* to,
     const char* subject,
     int flags)
 {
-    char* imsi = NULL;
+    char* imsi_out = NULL;
     GError* error = NULL;
     OrgNemomobileMmsEngine* proxy =
         org_nemomobile_mms_engine_proxy_new_for_bus_sync(
@@ -80,9 +81,9 @@ mms_send(
             char** to_list = g_strsplit(to, ",", 0);
             const char* none = NULL;
             if (!org_nemomobile_mms_engine_call_send_message_sync(proxy,
-                0, "", (const gchar* const*)to_list, &none, &none, subject,
+                0, imsi, (const gchar* const*)to_list, &none, &none, subject,
                 flags & MMS_SEND_REQUEST_PROTOCOL_FLAGS,
-                parts, &imsi, NULL, &error)) {
+                parts, &imsi_out, NULL, &error)) {
                 /* D-Bus error */
                 fprintf(stderr, "%s\n", error->message);
                 g_error_free(error);
@@ -97,7 +98,7 @@ mms_send(
         fprintf(stderr, "%s\n", error->message);
         g_error_free(error);
     }
-    return imsi;
+    return imsi_out;
 }
 
 int main(int argc, char* argv[])
@@ -105,10 +106,13 @@ int main(int argc, char* argv[])
     int ret = RET_ERR_CMDLINE;
     gboolean ok, verbose = FALSE, dr = FALSE, rr = FALSE;
     GError* error = NULL;
+    char* imsi = "";
     char* subject = "";
     GOptionEntry entries[] = {
         { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
           "Enable verbose output", NULL },
+        { "imsi", 'i', 0, G_OPTION_ARG_STRING, &imsi,
+          "Select the SIM card", "IMSI" },
         { "subject", 's', 0, G_OPTION_ARG_STRING, &subject,
           "Set message subject", "TEXT" },
         { "delivery-report", 'd', 0, G_OPTION_ARG_NONE, &dr,
@@ -123,14 +127,14 @@ int main(int argc, char* argv[])
     if (ok) {
         if (argc > 2) {
             int flags = 0;
-            char* imsi;
+            char* res;
             if (verbose) flags |= MMS_SEND_FLAG_VERBOSE;
             if (dr) flags |= MMS_SEND_REQUEST_DELIVERY_REPORT;
             if (rr) flags |= MMS_SEND_REQUEST_READ_REPORT;
-            imsi = mms_send(argv+2, argc-2, argv[1], subject, flags);
-            if (imsi) {
-                if (verbose) printf("%s\n", imsi);
-                g_free(imsi);
+            res = mms_send(argv+2, argc-2, imsi, argv[1], subject, flags);
+            if (res) {
+                if (verbose) printf("%s\n", res);
+                g_free(res);
                 ret = RET_OK;
             }
         } else {
