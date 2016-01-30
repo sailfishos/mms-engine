@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,11 +14,24 @@
 
 #include "mms_connman.h"
 
+/* Logging */
+#define MMS_LOG_MODULE_NAME mms_connman_log
+#include "mms_lib_log.h"
+
 G_DEFINE_TYPE(MMSConnMan, mms_connman, G_TYPE_OBJECT);
 #define MMS_CONNMAN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_CONNMAN, MMSConnMan))
 #define MMS_CONNMAN_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), \
     MMS_TYPE_CONNMAN, MMSConnManClass))
+
+enum {
+    MMS_CONNMAN_SIGNAL_DONE,
+    MMS_CONNMAN_SIGNAL_COUNT
+};
+
+#define MMS_CONNMAN_SIGNAL_DONE_NAME "connman-done"
+
+static guint mms_connman_sig[MMS_CONNMAN_SIGNAL_COUNT] = { 0 };
 
 MMSConnMan*
 mms_connman_ref(
@@ -35,6 +48,36 @@ mms_connman_unref(
     if (cm) g_object_unref(MMS_CONNMAN(cm));
 }
 
+gulong
+mms_connman_add_done_callback(
+    MMSConnMan* cm,
+    mms_connman_event_fn fn,
+    void* param)
+{
+    if (cm && fn) {
+        return g_signal_connect_data(cm, MMS_CONNMAN_SIGNAL_DONE_NAME,
+            G_CALLBACK(fn), param, NULL, 0);
+    }
+    return 0;
+}
+
+void
+mms_connman_remove_callback(
+    MMSConnMan* cm,
+    gulong handler_id)
+{
+    if (cm && handler_id) g_signal_handler_disconnect(cm, handler_id);
+}
+
+static
+void
+mms_connman_finalize(
+    GObject* object)
+{
+    MMS_ASSERT(!MMS_CONNMAN(object)->busy);
+    G_OBJECT_CLASS(mms_connman_parent_class)->finalize(object);
+}
+
 /**
  * Per class initializer
  */
@@ -43,6 +86,11 @@ void
 mms_connman_class_init(
     MMSConnManClass* klass)
 {
+    G_OBJECT_CLASS(klass)->finalize = mms_connman_finalize;
+    mms_connman_sig[MMS_CONNMAN_SIGNAL_DONE] =
+        g_signal_new(MMS_CONNMAN_SIGNAL_DONE_NAME,
+            G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+            0, NULL, NULL, NULL, G_TYPE_NONE, 0);
 }
 
 /**
@@ -89,6 +137,22 @@ mms_connman_open_connection(
         }
     }
     return NULL;
+}
+
+void
+mms_connman_busy_update(
+    MMSConnMan* cm,
+    int change)
+{
+    MMS_ASSERT(change);
+    if (cm && change) {
+        cm->busy += change;
+        MMS_VERBOSE("busy count %d", cm->busy);
+        MMS_ASSERT(cm->busy >= 0);
+        if (cm->busy < 1) {
+            g_signal_emit(cm, mms_connman_sig[MMS_CONNMAN_SIGNAL_DONE], 0);
+        }
+    }
 }
 
 /*

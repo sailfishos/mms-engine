@@ -18,6 +18,11 @@ include ../mms-lib/Config.mak
 
 PKGS = gio-unix-2.0 gio-2.0 libglibutil
 LIB_PKGS = libwspcodec gmime-2.6 libgofono libsoup-2.4 dconf
+
+ifdef MMS_CONNMAN_NEMO
+LIB_PKGS += libgofonoext
+endif
+
 LIB_PKGS += $(RESIZE_PKG) $(PKGS)
 
 #
@@ -58,8 +63,13 @@ MMS_LIB_RELEASE_LIB = $(MMS_LIB_BUILD_DIR)/release/$(MMS_LIB_LIB)
 # mms-connman
 #
 
-MMS_CONNMAN_LIB = libmms-connman-ofono.a
-MMS_CONNMAN_DIR = ../mms-connman-ofono
+ifdef MMS_CONNMAN_NEMO
+MMS_CONNMAN = nemo
+else
+MMS_CONNMAN = ofono
+endif
+MMS_CONNMAN_LIB = libmms-connman-$(MMS_CONNMAN).a
+MMS_CONNMAN_DIR = ../mms-connman-$(MMS_CONNMAN)
 MMS_CONNMAN_BUILD_DIR = $(MMS_CONNMAN_DIR)/build
 MMS_CONNMAN_DEBUG_LIB = $(MMS_CONNMAN_BUILD_DIR)/debug/$(MMS_CONNMAN_LIB)
 MMS_CONNMAN_RELEASE_LIB = $(MMS_CONNMAN_BUILD_DIR)/release/$(MMS_CONNMAN_LIB)
@@ -110,6 +120,10 @@ endif
 
 ifdef MMS_ENGINE_VERSION
 CFLAGS += -DMMS_ENGINE_VERSION="$(MMS_ENGINE_VERSION)"
+endif
+
+ifdef MMS_CONNMAN_NEMO
+CFLAGS += -DMMS_CONNMAN_NEMO
 endif
 
 DEBUG_CFLAGS = $(DEBUG_FLAGS) $(DEBUG_DEFS) $(CFLAGS)

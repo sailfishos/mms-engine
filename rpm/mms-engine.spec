@@ -21,9 +21,12 @@ BuildRequires: pkgconfig(glib-2.0) >= 2.32
 BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
 BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 1.0.5
+BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil)
 #BuildRequires: pkgconfig(ImageMagick)
 BuildRequires:  pkgconfig(Qt5Gui)
+Requires: libgofono >= 1.0.5
+Requires: libgofonoext >= 1.0.4
 
 %define src mms-engine
 %define exe mms-engine
@@ -52,7 +55,7 @@ MMS command line utilities
 %setup -q -n %{name}-%{version}
 
 %build
-make -C %{src} KEEP_SYMBOLS=1 MMS_ENGINE_VERSION="%{version}" release
+make -C %{src} KEEP_SYMBOLS=1 MMS_CONNMAN_NEMO=1 MMS_ENGINE_VERSION="%{version}" release
 make -C mms-dump KEEP_SYMBOLS=1 release
 make -C mms-send KEEP_SYMBOLS=1 release
 

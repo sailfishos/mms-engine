@@ -2,16 +2,6 @@ TEMPLATE = app
 CONFIG += link_pkgconfig
 PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf
 PKGCONFIG += libwspcodec libgofono libglibutil
-DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
-MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
-MMS_CONNMAN = mms-connman-ofono
-MMS_CONNMAN_DIR = $$_PRO_FILE_PWD_/../$$MMS_CONNMAN
-MMS_HANDLER_DIR = $$_PRO_FILE_PWD_/../mms-handler-dbus
-MMS_SETTINGS_DIR = $$_PRO_FILE_PWD_/../mms-settings-dconf
-INCLUDEPATH += $$MMS_CONNMAN_DIR/include
-INCLUDEPATH += $$MMS_LIB_DIR/include
-INCLUDEPATH += $$MMS_HANDLER_DIR/include
-INCLUDEPATH += $$MMS_SETTINGS_DIR/include
 QMAKE_CFLAGS += -Wno-unused-parameter
 
 include(../mms-lib/mms-lib-config.pri)
@@ -20,6 +10,25 @@ ResizeImageMagick {
   CONFIG -= qt
   PKGCONFIG += ImageMagick
 }
+
+ConnManNemo {
+  PKGCONFIG += libgofonoext
+  DEFINES += MMS_CONNMAN_NEMO
+  MMS_CONNMAN = mms-connman-nemo
+} else {
+  MMS_CONNMAN = mms-connman-ofono
+}
+
+DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
+MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
+MMS_HANDLER_DIR = $$_PRO_FILE_PWD_/../mms-handler-dbus
+MMS_SETTINGS_DIR = $$_PRO_FILE_PWD_/../mms-settings-dconf
+MMS_CONNMAN_DIR = $$_PRO_FILE_PWD_/../$$MMS_CONNMAN
+
+INCLUDEPATH += $$MMS_LIB_DIR/include
+INCLUDEPATH += $$MMS_HANDLER_DIR/include
+INCLUDEPATH += $$MMS_SETTINGS_DIR/include
+INCLUDEPATH += $$MMS_CONNMAN_DIR/include
 
 SOURCES += \
   main.c \

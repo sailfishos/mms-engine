@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -44,6 +44,7 @@ struct mms_dispatcher {
     guint next_run_id;
     guint network_idle_id;
     gulong handler_done_id;
+    gulong connman_done_id;
     gulong connection_changed_id;
     gboolean started;
 };
@@ -302,8 +303,8 @@ mms_dispatcher_is_active(
     MMSDispatcher* disp)
 {
     return disp && (mms_connection_is_active(disp->connection) ||
-        mms_handler_busy(disp->handler) || disp->active_task ||
-        !g_queue_is_empty(disp->tasks));
+        mms_handler_busy(disp->handler) || mms_connman_busy(disp->cm) ||
+        disp->active_task || !g_queue_is_empty(disp->tasks));
 }
 
 /**
@@ -360,18 +361,24 @@ mms_dispatcher_pick_next_task(
             MMSTask* task = entry->data;
             if ((task->state == MMS_TASK_STATE_NEED_CONNECTION ||
                  task->state == MMS_TASK_STATE_NEED_USER_CONNECTION)) {
+                /* Closing the connection may take some time. If connection
+                 * is still around, we will have to wait. */
                 mms_dispatcher_close_connection(disp);
-                disp->connection = mms_connman_open_connection(
-                    disp->cm, task->imsi, FALSE);
-                if (disp->connection) {
-                    MMS_ASSERT(!disp->connection_changed_id);
-                    disp->connection_changed_id =
-                        mms_connection_add_state_change_handler(disp->connection,
-                            mms_dispatcher_connection_state_changed, disp);
-                    g_queue_delete_link(disp->tasks, entry);
-                    return task;
-                } else {
-                    mms_task_network_unavailable(task, FALSE);
+                if (!disp->connection) {
+                    disp->connection = mms_connman_open_connection(disp->cm,
+                        task->imsi, FALSE);
+                    if (disp->connection) {
+                        MMS_ASSERT(!disp->connection_changed_id);
+                        disp->connection_changed_id =
+                            mms_connection_add_state_change_handler(
+                                disp->connection,
+                                mms_dispatcher_connection_state_changed,
+                                disp);
+                        g_queue_delete_link(disp->tasks, entry);
+                        return task;
+                    } else {
+                        mms_task_network_unavailable(task, FALSE);
+                    }
                 }
             }
         }
@@ -668,7 +675,21 @@ mms_dispatcher_handler_done(
 }
 
 /**
- * Creates the dispatcher object. Caller must clal mms_dispatcher_unref
+ * Connman state callback
+ */
+static
+void
+mms_dispatcher_connman_done(
+    MMSConnMan* cm,
+    void* param)
+{
+    MMSDispatcher* disp = param;
+    MMS_VERBOSE("Connman is inactive");
+    mms_dispatcher_check_if_done(disp);
+}
+
+/**
+ * Creates the dispatcher object. Caller must call mms_dispatcher_unref
  * when it no longer needs it.
  */
 MMSDispatcher*
@@ -689,6 +710,8 @@ mms_dispatcher_new(
         mms_dispatcher_delegate_task_state_changed;
     disp->handler_done_id = mms_handler_add_done_callback(handler,
         mms_dispatcher_handler_done, disp);
+    disp->connman_done_id = mms_connman_add_done_callback(cm,
+        mms_dispatcher_connman_done, disp);
     return disp;
 }
 
@@ -705,6 +728,7 @@ mms_dispatcher_finalize(
     char* msg_dir = g_strconcat(root_dir, "/" MMS_MESSAGE_DIR "/", NULL);
     MMS_VERBOSE_("");
     mms_handler_remove_callback(disp->handler, disp->handler_done_id);
+    mms_connman_remove_callback(disp->cm, disp->connman_done_id);
     mms_dispatcher_drop_connection(disp);
     while ((task = g_queue_pop_head(disp->tasks)) != NULL) {
         task->delegate = NULL;

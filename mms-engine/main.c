@@ -17,10 +17,15 @@
 #include <glib-unix.h>
 
 #include "mms_engine.h"
-#include "mms_connman_ofono_log.h"
 #include "mms_lib_log.h"
 #include "mms_lib_util.h"
 #include "mms_settings.h"
+
+#ifdef MMS_CONNMAN_NEMO
+#  include "mms_connman_nemo_log.h"
+#else
+#  include "mms_connman_ofono_log.h"
+#endif
 
 #define RET_OK  (0)
 #define RET_ERR (1)
