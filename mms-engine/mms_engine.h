@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,12 +18,7 @@
 
 #include <gio/gio.h>
 #include "mms_settings.h"
-
-#ifdef MMS_ENGINE_VERSION
-#  define MMS_STRING__(x) #x
-#  define MMS_STRING_(x) MMS_STRING__(x)
-#  define MMS_VERSION_STRING MMS_STRING_(MMS_ENGINE_VERSION)
-#endif
+#include "mms_version.h"
 
 #define MMS_APP_LOG_PREFIX  "mms-engine"
 

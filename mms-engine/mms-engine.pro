@@ -34,7 +34,8 @@ SOURCES += \
   main.c \
   mms_engine.c
 HEADERS += \
-  mms_engine.h
+  mms_engine.h \
+  mms_version.h
 OTHER_FILES += \
   org.nemomobile.MmsEngine.push.conf \
   org.nemomobile.MmsEngine.dbus.conf \
