@@ -2,8 +2,9 @@ TEMPLATE = subdirs
 CONFIG += ordered
 SUBDIRS += \
   mms-lib \
+  mms-connman-nemo \
+  mms-connman-ofono \
   mms-handler-dbus \
-  mms-ofono \
   mms-settings-dconf \
   mms-engine \
   mms-dump \

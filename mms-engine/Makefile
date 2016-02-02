@@ -2,7 +2,7 @@
 
 .PHONY: all debug release clean cleaner
 .PHONY: mms_lib_debug_lib mms_lib_release_lib
-.PHONY: mms_ofono_debug_lib mms_ofono_release_lib
+.PHONY: mms_connman_debug_lib mms_connman_release_lib
 .PHONY: mms_handler_debug_lib mms_handler_release_lib
 .PHONY: mms_settings_debug_lib mms_settings_release_lib
 
@@ -18,6 +18,11 @@ include ../mms-lib/Config.mak
 
 PKGS = gio-unix-2.0 gio-2.0 libglibutil
 LIB_PKGS = libwspcodec gmime-2.6 libgofono libsoup-2.4 dconf
+
+ifdef MMS_CONNMAN_NEMO
+LIB_PKGS += libgofonoext
+endif
+
 LIB_PKGS += $(RESIZE_PKG) $(PKGS)
 
 #
@@ -55,14 +60,19 @@ MMS_LIB_DEBUG_LIB = $(MMS_LIB_BUILD_DIR)/debug/$(MMS_LIB_LIB)
 MMS_LIB_RELEASE_LIB = $(MMS_LIB_BUILD_DIR)/release/$(MMS_LIB_LIB)
 
 #
-# mms-ofono
+# mms-connman
 #
 
-MMS_OFONO_LIB = libmms-ofono.a
-MMS_OFONO_DIR = ../mms-ofono
-MMS_OFONO_BUILD_DIR = $(MMS_OFONO_DIR)/build
-MMS_OFONO_DEBUG_LIB = $(MMS_OFONO_BUILD_DIR)/debug/$(MMS_OFONO_LIB)
-MMS_OFONO_RELEASE_LIB = $(MMS_OFONO_BUILD_DIR)/release/$(MMS_OFONO_LIB)
+ifdef MMS_CONNMAN_NEMO
+MMS_CONNMAN = nemo
+else
+MMS_CONNMAN = ofono
+endif
+MMS_CONNMAN_LIB = libmms-connman-$(MMS_CONNMAN).a
+MMS_CONNMAN_DIR = ../mms-connman-$(MMS_CONNMAN)
+MMS_CONNMAN_BUILD_DIR = $(MMS_CONNMAN_DIR)/build
+MMS_CONNMAN_DEBUG_LIB = $(MMS_CONNMAN_BUILD_DIR)/debug/$(MMS_CONNMAN_LIB)
+MMS_CONNMAN_RELEASE_LIB = $(MMS_CONNMAN_BUILD_DIR)/release/$(MMS_CONNMAN_LIB)
 
 #
 # mms-handler-dbus
@@ -96,7 +106,7 @@ DEBUG_DEFS = -DDEBUG
 RELEASE_DEFS =
 WARN = -Wall
 CFLAGS = -fPIC $(shell pkg-config --cflags $(PKGS)) -I. -I$(GEN_DIR) \
- -I$(MMS_LIB_DIR)/include -I$(MMS_OFONO_DIR)/include \
+ -I$(MMS_LIB_DIR)/include -I$(MMS_CONNMAN_DIR)/include \
  -I$(MMS_HANDLER_DIR)/include -I$(MMS_SETTINGS_DIR)/include -MMD
 
 ifndef KEEP_SYMBOLS
@@ -112,18 +122,22 @@ ifdef MMS_ENGINE_VERSION
 CFLAGS += -DMMS_ENGINE_VERSION="$(MMS_ENGINE_VERSION)"
 endif
 
+ifdef MMS_CONNMAN_NEMO
+CFLAGS += -DMMS_CONNMAN_NEMO
+endif
+
 DEBUG_CFLAGS = $(DEBUG_FLAGS) $(DEBUG_DEFS) $(CFLAGS)
 RELEASE_CFLAGS = $(RELEASE_FLAGS) $(RELEASE_DEFS) $(CFLAGS)
 
 LIBS = $(shell pkg-config --libs $(LIB_PKGS)) -lmagic -ljpeg $(RESIZE_LIBS)
 DEBUG_LIBS = \
-  $(MMS_OFONO_DEBUG_LIB) \
+  $(MMS_CONNMAN_DEBUG_LIB) \
   $(MMS_HANDLER_DEBUG_LIB) \
   $(MMS_SETTINGS_DEBUG_LIB) \
   $(MMS_LIB_DEBUG_LIB) \
   $(LIBS)
 RELEASE_LIBS = \
-  $(MMS_OFONO_RELEASE_LIB) \
+  $(MMS_CONNMAN_RELEASE_LIB) \
   $(MMS_HANDLER_RELEASE_LIB) \
   $(MMS_SETTINGS_RELEASE_LIB) \
   $(MMS_LIB_RELEASE_LIB) \
@@ -148,22 +162,22 @@ GEN_FILES = $(GEN_SRC:%=$(GEN_DIR)/%)
 
 DEBUG_DEPS = \
   mms_lib_debug_lib \
-  mms_ofono_debug_lib \
+  mms_connman_debug_lib \
   mms_handler_debug_lib \
   mms_settings_debug_lib
 RELEASE_DEPS = \
   mms_lib_release_lib \
-  mms_ofono_release_lib \
+  mms_connman_release_lib \
   mms_handler_release_lib \
   mms_settings_release_lib
 DEBUG_EXE_DEPS = \
   $(MMS_LIB_DEBUG_LIB) \
-  $(MMS_OFONO_DEBUG_LIB) \
+  $(MMS_CONNMAN_DEBUG_LIB) \
   $(MMS_HANDLER_DEBUG_LIB) \
   $(MMS_SETTINGS_DEBUG_LIB)
 RELEASE_EXE_DEPS = \
   $(MMS_LIB_RELEASE_LIB) \
-  $(MMS_OFONO_RELEASE_LIB) \
+  $(MMS_CONNMAN_RELEASE_LIB) \
   $(MMS_HANDLER_RELEASE_LIB) \
   $(MMS_SETTINGS_RELEASE_LIB)
 DEPS = $(DEBUG_OBJS:%.o=%.d) $(RELEASE_OBJS:%.o=%.d)
@@ -194,7 +208,7 @@ clean:
 
 cleaner: clean
 	make -C $(MMS_LIB_DIR) $(SUBMAKE_OPTS) clean
-	make -C $(MMS_OFONO_DIR) $(SUBMAKE_OPTS) clean
+	make -C $(MMS_CONNMAN_DIR) $(SUBMAKE_OPTS) clean
 	make -C $(MMS_HANDLER_DIR) $(SUBMAKE_OPTS) clean
 	make -C $(MMS_SETTINGS_DIR) $(SUBMAKE_OPTS) clean
 
@@ -213,11 +227,11 @@ mms_lib_debug_lib:
 mms_lib_release_lib:
 	make -C $(MMS_LIB_DIR) $(SUBMAKE_OPTS) release
 
-mms_ofono_debug_lib:
-	make -C $(MMS_OFONO_DIR) $(SUBMAKE_OPTS) debug
+mms_connman_debug_lib:
+	make -C $(MMS_CONNMAN_DIR) $(SUBMAKE_OPTS) debug
 
-mms_ofono_release_lib:
-	make -C $(MMS_OFONO_DIR) $(SUBMAKE_OPTS) release
+mms_connman_release_lib:
+	make -C $(MMS_CONNMAN_DIR) $(SUBMAKE_OPTS) release
 
 mms_handler_debug_lib:
 	make -C $(MMS_HANDLER_DIR) $(SUBMAKE_OPTS) debug
@@ -235,9 +249,9 @@ $(MMS_LIB_DEBUG_LIB): mms_lib_debug_lib
 
 $(MMS_LIB_RELEASE_LIB): mms_lib_release_lib
 
-$(MMS_OFONO_DEBUG_LIB): mms_ofono_debug_lib
+$(MMS_CONNMAN_DEBUG_LIB): mms_connman_debug_lib
 
-$(MMS_OFONO_RELEASE_LIB): mms_ofono_release_lib
+$(MMS_CONNMAN_RELEASE_LIB): mms_connman_release_lib
 
 $(MMS_HANDLER_DEBUG_LIB): mms_handler_debug_lib
 

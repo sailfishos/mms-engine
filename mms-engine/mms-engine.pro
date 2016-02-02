@@ -2,15 +2,6 @@ TEMPLATE = app
 CONFIG += link_pkgconfig
 PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf
 PKGCONFIG += libwspcodec libgofono libglibutil
-DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
-MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
-MMS_OFONO_DIR = $$_PRO_FILE_PWD_/../mms-ofono
-MMS_HANDLER_DIR = $$_PRO_FILE_PWD_/../mms-handler-dbus
-MMS_SETTINGS_DIR = $$_PRO_FILE_PWD_/../mms-settings-dconf
-INCLUDEPATH += $$MMS_OFONO_DIR/include
-INCLUDEPATH += $$MMS_LIB_DIR/include
-INCLUDEPATH += $$MMS_HANDLER_DIR/include
-INCLUDEPATH += $$MMS_SETTINGS_DIR/include
 QMAKE_CFLAGS += -Wno-unused-parameter
 
 include(../mms-lib/mms-lib-config.pri)
@@ -19,6 +10,25 @@ ResizeImageMagick {
   CONFIG -= qt
   PKGCONFIG += ImageMagick
 }
+
+ConnManNemo {
+  PKGCONFIG += libgofonoext
+  DEFINES += MMS_CONNMAN_NEMO
+  MMS_CONNMAN = mms-connman-nemo
+} else {
+  MMS_CONNMAN = mms-connman-ofono
+}
+
+DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
+MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
+MMS_HANDLER_DIR = $$_PRO_FILE_PWD_/../mms-handler-dbus
+MMS_SETTINGS_DIR = $$_PRO_FILE_PWD_/../mms-settings-dconf
+MMS_CONNMAN_DIR = $$_PRO_FILE_PWD_/../$$MMS_CONNMAN
+
+INCLUDEPATH += $$MMS_LIB_DIR/include
+INCLUDEPATH += $$MMS_HANDLER_DIR/include
+INCLUDEPATH += $$MMS_SETTINGS_DIR/include
+INCLUDEPATH += $$MMS_CONNMAN_DIR/include
 
 SOURCES += \
   main.c \
@@ -34,13 +44,13 @@ OTHER_FILES += \
 CONFIG(debug, debug|release) {
     DEFINES += DEBUG
     DESTDIR = $$_PRO_FILE_PWD_/build/debug
-    LIBS += $$MMS_OFONO_DIR/build/debug/libmms-ofono.a
+    LIBS += $$MMS_CONNMAN_DIR/build/debug/lib$${MMS_CONNMAN}.a
     LIBS += $$MMS_HANDLER_DIR/build/debug/libmms-handler-dbus.a
     LIBS += $$MMS_LIB_DIR/build/debug/libmms-lib.a
     LIBS += $$MMS_SETTINGS_DIR/build/debug/libmms-settings-dconf.a
 } else {
     DESTDIR = $$_PRO_FILE_PWD_/build/release
-    LIBS += $$MMS_OFONO_DIR/build/release/libmms-ofono.a
+    LIBS += $$MMS_CONNMAN_DIR/build/release/lib$${MMS_CONNMAN}.a
     LIBS += $$MMS_HANDLER_DIR/build/release/libmms-handler-dbus.a
     LIBS += $$MMS_LIB_DIR/build/release/libmms-lib.a
     LIBS += $$MMS_SETTINGS_DIR/build/release/libmms-settings-dconf.a

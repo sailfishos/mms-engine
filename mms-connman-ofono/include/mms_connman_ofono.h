@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -13,17 +13,15 @@
  *
  */
 
-#ifndef JOLLA_MMS_OFONO_LOG_H
-#define JOLLA_MMS_OFONO_LOG_H
+#ifndef JOLLA_MMS_CONNMAN_OFONO_H
+#define JOLLA_MMS_CONNMAN_OFONO_H
 
-#include "mms_log.h"
+#include "mms_connman.h"
 
-#define MMS_OFONO_LOG_MODULES(log) \
-    log(gofono_log)
+MMSConnMan*
+mms_connman_ofono_new(void);
 
-MMS_OFONO_LOG_MODULES(GLOG_MODULE_DECL)
-
-#endif /* JOLLA_MMS_OFONO_LOG_H */
+#endif /* JOLLA_MMS_CONNMAN_OFONO_H */
 
 /*
  * Local Variables:

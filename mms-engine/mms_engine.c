@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,10 +17,17 @@
 #include "mms_dispatcher.h"
 #include "mms_settings.h"
 #include "mms_lib_util.h"
-#include "mms_ofono_connman.h"
 #include "mms_handler_dbus.h"
 #include "mms_settings_dconf.h"
 #include "mms_log.h"
+
+#ifdef MMS_CONNMAN_NEMO
+#  include "mms_connman_nemo.h"
+#  define mms_connman_new() mms_connman_nemo_new()
+#else
+#  include "mms_connman_ofono.h"
+#  define mms_connman_new() mms_connman_ofono_new()
+#endif
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.h"
@@ -452,7 +459,7 @@ mms_engine_new(
     MMSLogModule* log_modules[],
     int log_count)
 {
-    MMSConnMan* cm = mms_connman_ofono_new();
+    MMSConnMan* cm = mms_connman_new();
     if (cm) {
         MMSEngine* mms = g_object_new(MMS_TYPE_ENGINE, NULL);
         MMSHandler* handler = mms_handler_dbus_new();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 #include <gofono_types.h>
 
 MMSConnection*
-mms_ofono_connection_new(
+mms_connection_ofono_new(
     OfonoSimMgr* sim,
     OfonoConnCtx* context,
     gboolean user_request);

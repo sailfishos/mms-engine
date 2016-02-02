@@ -16,13 +16,12 @@ CONFIG(debug, debug|release) {
 }
 
 SOURCES += \
-  src/mms_ofono_connection.c \
-  src/mms_ofono_connman.c
+  src/mms_connection_ofono.c \
+  src/mms_connman_ofono.c
 
 HEADERS += \
-  src/mms_ofono_connection.h \
-  src/mms_ofono_context.h
+  src/mms_connection_ofono.h
 
 HEADERS += \
-  include/mms_ofono_connman.h \
-  include/mms_ofono_log.h
+  include/mms_connman_ofono.h \
+  include/mms_connman_ofono_log.h

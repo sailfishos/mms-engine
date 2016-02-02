@@ -16,8 +16,8 @@ all: debug release
 #
 
 SRC = \
-  mms_ofono_connection.c \
-  mms_ofono_connman.c
+  mms_connection_ofono.c \
+  mms_connman_ofono.c
 
 #
 # Directories
@@ -82,7 +82,7 @@ $(RELEASE_OBJS): | $(RELEASE_BUILD_DIR)
 #
 # Rules
 #
-LIB = libmms-ofono.a
+LIB = libmms-connman-ofono.a
 DEBUG_LIB = $(DEBUG_BUILD_DIR)/$(LIB)
 RELEASE_LIB = $(RELEASE_BUILD_DIR)/$(LIB)
 

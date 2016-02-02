@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,6 +20,7 @@
 /* Instance */
 struct mms_connman {
     GObject object;
+    int busy;
 };
 
 /* Class */
@@ -32,6 +33,12 @@ typedef struct mms_connman_class {
 
 GType mms_connman_get_type(void);
 #define MMS_TYPE_CONNMAN (mms_connman_get_type())
+
+/* Connman event callback */
+typedef void
+(*mms_connman_event_fn)(
+    MMSConnMan* cm,
+    void* param);
 
 /* Reference counting */
 MMSConnMan*
@@ -59,6 +66,29 @@ mms_connman_open_connection(
     MMSConnMan* cm,
     const char* imsi,
     gboolean user_request);
+
+/**
+ * While busy flags is on, mms-engine shouldn't exit
+ */
+void
+mms_connman_busy_update(
+    MMSConnMan* cm,
+    int change);
+
+gulong
+mms_connman_add_done_callback(
+    MMSConnMan* cm,
+    mms_connman_event_fn fn,
+    void* param);
+
+void
+mms_connman_remove_callback(
+    MMSConnMan* cm,
+    gulong handler_id);
+
+#define mms_connman_busy(cm) ((cm) && ((cm)->busy > 0))
+#define mms_connman_busy_inc(cm) mms_connman_busy_update(cm,1)
+#define mms_connman_busy_dec(cm) mms_connman_busy_update(cm,-1)
 
 #endif /* JOLLA_MMS_CONNMAN_H */
 
