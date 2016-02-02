@@ -1,13 +1,15 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.41
+Version:  1.0.42
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
-URL:      https://github.com/nemomobile/mms-engine
+URL:      https://git.merproject.org/mer-core/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 Requires: dbus
 Requires: ofono
+Requires: libgofono >= 1.0.5
+Requires: libgofonoext >= 1.0.4
 #Requires: ImageMagick
 
 BuildRequires: python
@@ -23,10 +25,8 @@ BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 1.0.5
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil)
-#BuildRequires: pkgconfig(ImageMagick)
 BuildRequires:  pkgconfig(Qt5Gui)
-Requires: libgofono >= 1.0.5
-Requires: libgofonoext >= 1.0.4
+#BuildRequires: pkgconfig(ImageMagick)
 
 %define src mms-engine
 %define exe mms-engine
