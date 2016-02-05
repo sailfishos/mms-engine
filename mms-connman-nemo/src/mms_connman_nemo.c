@@ -16,17 +16,27 @@
 #include "mms_connman_nemo.h"
 #include "mms_connection_nemo.h"
 
+#include <gofono_simmgr.h>
+#include <gofono_modem.h>
+
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connman_log
 #include "mms_connman_nemo_log.h"
 MMS_LOG_MODULE_DEFINE("mms-connman-nemo");
 
+enum mm_event {
+    MM_EVENT_VALID,
+    MM_EVENT_VOICE_MODEM,
+    MM_EVENT_COUNT
+};
+
 typedef MMSConnManClass MMSConnManNemoClass;
 typedef struct mms_connman_nemo {
     MMSConnMan cm;
-    OfonoExtModemManager* mm;
     MMSConnection* conn;
-    gulong voice_sim_changed_id;
+    OfonoExtModemManager* mm;
+    OfonoSimMgr* default_sim;
+    gulong mm_event_id[MM_EVENT_COUNT];
 } MMSConnManNemo;
 
 G_DEFINE_TYPE(MMSConnManNemo, mms_connman_nemo, MMS_TYPE_CONNMAN)
@@ -34,7 +44,7 @@ G_DEFINE_TYPE(MMSConnManNemo, mms_connman_nemo, MMS_TYPE_CONNMAN)
 #define MMS_CONNMAN_NEMO(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_CONNMAN_NEMO, MMSConnManNemo))
 
-#define MMS_INIT_TIMEOUT_SEC (30)
+#define MMS_INIT_TIMEOUT_MS (30*1000)
 
 static
 gboolean
@@ -56,6 +66,36 @@ mms_connman_nemo_wait_valid_changed(
     }
 }
 
+static
+void
+mms_connman_nemo_check_default_sim(
+    MMSConnManNemo* self)
+{
+    const char* path = NULL;
+    if (self->mm->valid && self->mm->voice_modem) {
+        path = ofono_modem_path(self->mm->voice_modem);
+    }
+    if (g_strcmp0(path, ofono_simmgr_path(self->default_sim))) {
+        ofono_simmgr_unref(self->default_sim);
+        if (path) {
+            MMS_DEBUG("Default SIM at %s", path);
+            self->default_sim = ofono_simmgr_new(path);
+        } else {
+            MMS_DEBUG("No default SIM");
+            self->default_sim = NULL;
+        }
+    }
+}
+
+static
+void
+mms_connman_nemo_check_default_sim_cb(
+    OfonoExtModemManager* mm,
+    void* data)
+{
+    mms_connman_nemo_check_default_sim(MMS_CONNMAN_NEMO(data));
+}
+
 /**
  * Checks if OfonoExtModemManager is initialized and waits up to
  * MMS_INIT_TIMEOUT_SEC if necessary.
@@ -70,7 +110,7 @@ mms_connman_nemo_mm_valid(
     } else {
         /* That shouldn't take long */
         GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-        guint timeout_id = g_timeout_add(MMS_INIT_TIMEOUT_SEC*1000,
+        guint timeout_id = g_timeout_add(MMS_INIT_TIMEOUT_MS,
             mms_connman_nemo_wait_timeout, loop);
         gulong valid_id = ofonoext_mm_add_valid_changed_handler(self->mm,
             mms_connman_nemo_wait_valid_changed, loop);
@@ -91,9 +131,14 @@ mms_connman_nemo_default_imsi(
     MMSConnMan* cm)
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(cm);
-    if (mms_connman_nemo_mm_valid(self)) {
-        return g_strdup(self->mm->voice_imsi);
+    if (mms_connman_nemo_mm_valid(self) && self->default_sim &&
+        ofono_simmgr_wait_valid(self->default_sim, MMS_INIT_TIMEOUT_MS, 0) &&
+        self->default_sim /* Check it again */ &&
+        self->default_sim->imsi) {
+        MMS_DEBUG("Default IMSI %s", self->default_sim->imsi);
+        return g_strdup(self->default_sim->imsi);
     }
+    MMS_DEBUG("No default IMSI");
     return NULL;
 }
 
@@ -145,9 +190,26 @@ mms_connman_nemo_open_connection(
 MMSConnMan*
 mms_connman_nemo_new()
 {
-    MMSConnManNemo* self = g_object_new(MMS_TYPE_CONNMAN_NEMO, NULL);
-    self->mm = ofonoext_mm_new();
-    return &self->cm;
+    return g_object_new(MMS_TYPE_CONNMAN_NEMO, NULL);
+}
+
+/**
+ * First stage of deinitialization (release all references).
+ * May be called more than once in the lifetime of the object.
+ */
+static
+void
+mms_connman_nemo_dispose(
+    GObject* object)
+{
+    MMSConnManNemo* self = MMS_CONNMAN_NEMO(object);
+    if (self->default_sim) {
+        ofono_simmgr_unref(self->default_sim);
+        self->default_sim = NULL;
+    }
+    ofonoext_mm_remove_handlers(self->mm, self->mm_event_id,
+        G_N_ELEMENTS(self->mm_event_id));
+    G_OBJECT_CLASS(mms_connman_nemo_parent_class)->dispose(object);
 }
 
 /**
@@ -175,6 +237,7 @@ mms_connman_nemo_class_init(
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
     klass->fn_default_imsi = mms_connman_nemo_default_imsi;
     klass->fn_open_connection = mms_connman_nemo_open_connection;
+    object_class->dispose = mms_connman_nemo_dispose;
     object_class->finalize = mms_connman_nemo_finalize;
 }
 
@@ -186,6 +249,15 @@ void
 mms_connman_nemo_init(
     MMSConnManNemo* self)
 {
+    MMS_VERBOSE_("");
+    self->mm = ofonoext_mm_new();
+    self->mm_event_id[MM_EVENT_VALID] =
+        ofonoext_mm_add_valid_changed_handler(self->mm,
+            mms_connman_nemo_check_default_sim_cb, self);
+    self->mm_event_id[MM_EVENT_VOICE_MODEM] =
+        ofonoext_mm_add_voice_modem_changed_handler(self->mm,
+            mms_connman_nemo_check_default_sim_cb, self);
+    mms_connman_nemo_check_default_sim(self);
 }
 
 /*
