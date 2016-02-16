@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -66,6 +66,7 @@ struct mms_task_http_private {
     gsize bytes_sent;
     guint bytes_received;
     MMS_HTTP_STATE transaction_state;
+    MMS_CONNECTION_TYPE connection_type;
 };
 
 G_DEFINE_TYPE(MMSTaskHttp, mms_task_http, MMS_TYPE_TASK);
@@ -511,7 +512,10 @@ void
 mms_task_http_run(
     MMSTask* task)
 {
-    mms_task_set_state(task, MMS_TASK_STATE_NEED_CONNECTION);
+    MMSTaskHttp* http = MMS_TASK_HTTP(task);
+    mms_task_set_state(task,
+        (http->priv->connection_type == MMS_CONNECTION_TYPE_USER) ?
+        MMS_TASK_STATE_NEED_USER_CONNECTION : MMS_TASK_STATE_NEED_CONNECTION);
 }
 
 static
@@ -618,7 +622,8 @@ mms_task_http_alloc(
     const char* imsi,           /* IMSI associated with the message  */
     const char* uri,            /* NULL to use MMSC URL              */
     const char* receive_file,   /* File to write data to (optional)  */
-    const char* send_file)      /* File to read data from (optional) */
+    const char* send_file,      /* File to read data from (optional) */
+    MMS_CONNECTION_TYPE ct)
 {
     MMSTaskHttp* http = mms_task_alloc(type ? type : MMS_TYPE_TASK_HTTP,
         settings, handler, name, id, imsi);
@@ -626,6 +631,7 @@ mms_task_http_alloc(
     http->priv = priv;
     priv->uri = g_strdup(uri);
     priv->receive_file = receive_file; /* Always static, don't strdup */
+    priv->connection_type = ct;
     if (send_file) {
         priv->send_path = mms_task_file(&http->task, send_file);
         MMS_ASSERT(g_file_test(priv->send_path, G_FILE_TEST_IS_REGULAR));
@@ -643,7 +649,8 @@ mms_task_http_alloc_with_parent(
     const char* send_file)      /* File to read data from (optional) */
 {
     return mms_task_http_alloc(type, parent->settings, parent->handler,
-        name, parent->id, parent->imsi, uri, receive_file, send_file);
+        name, parent->id, parent->imsi, uri, receive_file, send_file,
+        MMS_CONNECTION_TYPE_AUTO);
 }
 
 /*

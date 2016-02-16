@@ -211,7 +211,7 @@ MMSConnection*
 mms_connection_ofono_new(
     OfonoSimMgr* sim,
     OfonoConnCtx* context,
-    gboolean user_request)
+    MMS_CONNECTION_TYPE type)
 {
     MMSConnectionOfono* self = g_object_new(MMS_TYPE_CONNECTION_OFONO, NULL);
     MMSConnection* conn = &self->connection;
@@ -220,7 +220,7 @@ mms_connection_ofono_new(
     MMS_ASSERT(sim->present);
     MMS_VERBOSE_("%p %s", self, sim->imsi);
 
-    conn->user_connection = user_request;
+    conn->type = type;
     conn->imsi = self->imsi = g_strdup(sim->imsi);
     self->sim = ofono_simmgr_ref(sim);
     self->context = ofono_connctx_ref(context);

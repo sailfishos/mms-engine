@@ -24,7 +24,7 @@ MMSConnection*
 mms_connection_nemo_new(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request);
+    MMS_CONNECTION_TYPE type);
 
 #endif /* JOLLA_MMS_CONNECTION_NEMO_H */
 

@@ -194,7 +194,7 @@ MMSConnection*
 mms_connman_ofono_open_connection(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request)
+    MMS_CONNECTION_TYPE type)
 {
     MMSConnManOfono* self = MMS_CONNMAN_OFONO(cm);
     MMSOfonoModem* modem = mms_connman_ofono_modem_for_imsi(self, imsi);
@@ -205,8 +205,8 @@ mms_connman_ofono_open_connection(
             if (modem->conn) {
                 mms_connection_ref(modem->conn);
             } else {
-                modem->conn = mms_connection_ofono_new(modem->simmgr, ctx,
-                    user_request);
+                modem->conn =
+                    mms_connection_ofono_new(modem->simmgr, ctx, type);
                 g_object_weak_ref(G_OBJECT(modem->conn),
                     mms_connman_ofono_connection_gone, self);
             }

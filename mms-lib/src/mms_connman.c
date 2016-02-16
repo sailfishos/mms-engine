@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -128,12 +129,12 @@ MMSConnection*
 mms_connman_open_connection(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request)
+    MMS_CONNECTION_TYPE type)
 {
     if (cm) {
         MMSConnManClass* klass = MMS_CONNMAN_GET_CLASS(cm);
         if (klass->fn_open_connection) {
-            return klass->fn_open_connection(cm, imsi, user_request);
+            return klass->fn_open_connection(cm, imsi, type);
         }
     }
     return NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -74,6 +74,12 @@ typedef enum mms_read_status {
     MMS_READ_STATUS_READ,           /* Message has been read */
     MMS_READ_STATUS_DELETED         /* Message deleted without reading */
 } MMSReadStatus;
+
+/* Connection type */
+typedef enum _MMS_CONNECTION_TYPE {
+    MMS_CONNECTION_TYPE_AUTO,       /* Internally requested connection */
+    MMS_CONNECTION_TYPE_USER        /* Connection requested by user */
+} MMS_CONNECTION_TYPE;
 
 /* Convenience macros */
 #define MMS_CAST(address,type,field) \

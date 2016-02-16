@@ -83,6 +83,7 @@ mms_connection_test_new(
             test->mmsc = g_strdup_printf("http://127.0.0.1:%hu", port);
         }
     }
+    test->type = MMS_CONNECTION_TYPE_AUTO;
     test->state = MMS_CONNECTION_STATE_OPENING;
     mms_connection_test_set_state(test, test->netif ?
         MMS_CONNECTION_STATE_OPEN : MMS_CONNECTION_STATE_FAILED);

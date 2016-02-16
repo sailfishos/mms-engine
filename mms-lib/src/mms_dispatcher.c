@@ -366,7 +366,9 @@ mms_dispatcher_pick_next_task(
                 mms_dispatcher_close_connection(disp);
                 if (!disp->connection) {
                     disp->connection = mms_connman_open_connection(disp->cm,
-                        task->imsi, FALSE);
+                        task->imsi,
+                        (task->state == MMS_TASK_STATE_NEED_USER_CONNECTION) ?
+                        MMS_CONNECTION_TYPE_USER : MMS_CONNECTION_TYPE_AUTO);
                     if (disp->connection) {
                         MMS_ASSERT(!disp->connection_changed_id);
                         disp->connection_changed_id =
@@ -543,7 +545,8 @@ mms_dispatcher_receive_message(
         if (pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND) {
             ok = mms_dispatcher_queue_and_unref_task(disp,
                 mms_task_retrieve_new(disp->settings, disp->handler,
-                    id, imsi, pdu, error));
+                    id, imsi, pdu, automatic ? MMS_CONNECTION_TYPE_AUTO :
+                    MMS_CONNECTION_TYPE_USER, error));
         }
         mms_message_free(pdu);
     } else {

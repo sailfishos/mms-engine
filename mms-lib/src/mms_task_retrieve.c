@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -119,6 +119,7 @@ mms_task_retrieve_new(
     const char* id,
     const char* imsi,
     const MMSPdu* pdu,
+    MMS_CONNECTION_TYPE ct,
     GError** error)
 {
     const time_t now = time(NULL);
@@ -127,8 +128,8 @@ mms_task_retrieve_new(
     MMS_ASSERT(pdu->transaction_id);
     if (pdu->ni.expiry > now) {
         MMSTaskRetrieve* retrieve = mms_task_http_alloc(
-            MMS_TYPE_TASK_RETRIEVE, settings, handler, "Retrieve",
-            id, imsi, pdu->ni.location, MMS_RETRIEVE_CONF_FILE, NULL);
+            MMS_TYPE_TASK_RETRIEVE, settings, handler, "Retrieve", id, imsi,
+            pdu->ni.location, MMS_RETRIEVE_CONF_FILE, NULL, ct);
         if (retrieve->http.task.deadline > pdu->ni.expiry) {
             retrieve->http.task.deadline = pdu->ni.expiry;
         }

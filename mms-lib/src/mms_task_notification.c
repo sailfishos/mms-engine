@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -121,7 +121,7 @@ mms_task_notification_done(
             /* Schedule the download task */
             if (!mms_task_queue_and_unref(task->delegate,
                  mms_task_retrieve_new(task->settings, task->handler,
-                 task->id, task->imsi, ind->pdu, NULL))) {
+                 task->id, task->imsi, ind->pdu, FALSE, NULL))) {
                 mms_handler_message_receive_state_changed(task->handler, id,
                     MMS_RECEIVE_STATE_DOWNLOAD_ERROR);
             }

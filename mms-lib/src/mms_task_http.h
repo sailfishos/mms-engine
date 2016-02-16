@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -61,7 +62,8 @@ mms_task_http_alloc(
     const char* imsi,           /* IMSI associated with the message  */
     const char* uri,            /* NULL to use MMSC URL              */
     const char* receive_file,   /* File to write data to (optional)  */
-    const char* send_file);     /* File to read data from (optional) */
+    const char* send_file,     /* File to read data from (optional) */
+    MMS_CONNECTION_TYPE ct);
 
 void*
 mms_task_http_alloc_with_parent(
