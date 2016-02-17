@@ -24,7 +24,7 @@ MMSConnection*
 mms_connection_ofono_new(
     OfonoSimMgr* sim,
     OfonoConnCtx* context,
-    gboolean user_request);
+    MMS_CONNECTION_TYPE type);
 
 #endif /* JOLLA_MMS_CONNECTION_OFONO_H */
 

@@ -166,7 +166,7 @@ MMSConnection*
 mms_connman_nemo_open_connection(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request)
+    MMS_CONNECTION_TYPE type)
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(cm);
     if (self->conn) {
@@ -178,7 +178,7 @@ mms_connman_nemo_open_connection(
             self->conn = NULL;
         }
     }
-    self->conn = mms_connection_nemo_new(cm, imsi, user_request);
+    self->conn = mms_connection_nemo_new(cm, imsi, type);
     g_object_weak_ref(G_OBJECT(self->conn),
         mms_connman_nemo_connection_weak_ref_notify, self);
     return self->conn;

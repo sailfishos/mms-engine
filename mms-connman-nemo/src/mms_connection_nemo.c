@@ -512,13 +512,13 @@ MMSConnection*
 mms_connection_nemo_new(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request)
+    MMS_CONNECTION_TYPE type)
 {
     MMSConnectionNemo* self = g_object_new(MMS_TYPE_CONNECTION_NEMO, NULL);
     MMSConnection* conn = &self->connection;
 
     MMS_VERBOSE_("%p %s", self, imsi);
-    conn->user_connection = user_request;
+    conn->type = type;
     conn->imsi = self->imsi = g_strdup(imsi);
     conn->state = MMS_CONNECTION_STATE_OPENING;
     self->mm = ofonoext_mm_new();

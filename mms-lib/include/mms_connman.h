@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,7 @@ typedef struct mms_connman_class {
     GObjectClass parent;
     char* (*fn_default_imsi)(MMSConnMan* cm);
     MMSConnection* (*fn_open_connection)(MMSConnMan* cm, const char* imsi,
-        gboolean user_request);
+        MMS_CONNECTION_TYPE type);
 } MMSConnManClass;
 
 GType mms_connman_get_type(void);
@@ -65,7 +66,7 @@ MMSConnection*
 mms_connman_open_connection(
     MMSConnMan* cm,
     const char* imsi,
-    gboolean user_request);
+    MMS_CONNECTION_TYPE type);
 
 /**
  * While busy flags is on, mms-engine shouldn't exit
