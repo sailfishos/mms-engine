@@ -18,11 +18,15 @@
 
 #include <gofono_connmgr.h>
 #include <gofono_connctx.h>
+#include <gofono_error.h>
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connection_log
 #include "mms_connman_nemo_log.h"
 MMS_LOG_MODULE_DEFINE("mms-connection-nemo");
+
+#define RETRY_DELAY_SEC (1)
+#define MAX_RETRY_COUNT (100)
 
 enum mm_handler_id {
     MM_HANDLER_VALID,
@@ -55,6 +59,8 @@ typedef struct mms_connection_nemo {
     gulong mm_handler_id[MM_HANDLER_COUNT];
     gulong context_handler_id[CONTEXT_HANDLER_COUNT];
     gulong connmgr_handler_id[CONNMGR_HANDLER_COUNT];
+    guint retry_id;
+    int retry_count;
     char* imsi;
     char* path;
 } MMSConnectionNemo;
@@ -159,6 +165,10 @@ void
 mms_connection_nemo_cancel(
     MMSConnectionNemo* self)
 {
+    if (self->retry_id) {
+        g_source_remove(self->retry_id);
+        self->retry_id = 0;
+    }
     if ((self->connection.state <= MMS_CONNECTION_STATE_OPENING &&
         mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_FAILED)) ||
         mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_CLOSED)) {
@@ -244,6 +254,20 @@ mms_connection_nemo_mms_center_changed(
 }
 
 static
+gboolean
+mms_connection_nemo_activate_retry(
+    gpointer arg)
+{
+    MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
+    OfonoConnCtx* context = self->context;
+    MMS_ASSERT(self->retry_id);
+    self->retry_id = 0;
+    MMS_DEBUG("Activating %s again", ofono_connctx_path(context));
+    ofono_connctx_activate(context);
+    return G_SOURCE_REMOVE;
+}
+
+static
 void
 mms_connection_nemo_activate_failed(
     OfonoConnCtx* context,
@@ -252,7 +276,17 @@ mms_connection_nemo_activate_failed(
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
     MMS_ASSERT(self->context == context);
-    mms_connection_nemo_cancel(self);
+    MMS_ASSERT(!self->retry_id);
+    if (error->domain == OFONO_ERROR &&
+        error->code == OFONO_ERROR_BUSY &&
+        self->retry_count < MAX_RETRY_COUNT) {
+        self->retry_count++;
+        MMS_DEBUG("Retry %d in %d sec", self->retry_count, RETRY_DELAY_SEC);
+        self->retry_id = g_timeout_add_seconds(RETRY_DELAY_SEC,
+            mms_connection_nemo_activate_retry, self);
+    } else {
+        mms_connection_nemo_cancel(self);
+    }
 }
 
 static
@@ -268,9 +302,6 @@ mms_connection_nemo_check_context(
         } else {
             OfonoConnMgr* connmgr = self->connmgr;
             if (ofono_connmgr_valid(connmgr) && connmgr->attached) {
-                self->context_handler_id[CONTEXT_HANDLER_ACTIVATE_FAILED] =
-                    ofono_connctx_add_activate_failed_handler(context,
-                    mms_connection_nemo_activate_failed, self);
                 MMS_DEBUG("Activate %s", ofono_connctx_path(context));
                 ofono_connctx_activate(context);
             }
@@ -333,6 +364,11 @@ mms_connection_nemo_setup_context(
     self->context_handler_id[CONTEXT_HANDLER_MMS_CENTER] =
         ofono_connctx_add_mms_center_changed_handler(context,
         mms_connection_nemo_mms_center_changed, self);
+
+    /* Will most likely need this one too */
+    self->context_handler_id[CONTEXT_HANDLER_ACTIVATE_FAILED] =
+        ofono_connctx_add_activate_failed_handler(context,
+        mms_connection_nemo_activate_failed, self);
 
     /* And start tracking the data registration state */
     self->connmgr_handler_id[CONNMGR_HANDLER_ATTACHED] =
@@ -546,11 +582,7 @@ mms_connection_nemo_close(
         MMS_DEBUG("Deactivate %s", ofono_connctx_path(context));
         ofono_connctx_deactivate(context);
     } else {
-        if (self->connection.state != MMS_CONNECTION_STATE_FAILED &&
-            self->connection.state != MMS_CONNECTION_STATE_CLOSED) {
-            MMS_DEBUG("Cancelling %s", self->connection.imsi);
-            mms_connection_nemo_cancel(self);
-        }
+        mms_connection_nemo_cancel(self);
     }
 }
 
@@ -567,6 +599,10 @@ mms_connection_nemo_dispose(
     MMS_VERBOSE_("%p %s", self, self->imsi);
     MMS_ASSERT(!mms_connection_is_active(&self->connection));
     mms_connection_nemo_disconnect(self);
+    if (self->retry_id) {
+        g_source_remove(self->retry_id);
+        self->retry_id = 0;
+    }
     if (self->context) {
         if (mms_connection_is_active(&self->connection) &&
             self->context->active) {
