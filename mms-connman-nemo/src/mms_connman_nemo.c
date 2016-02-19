@@ -37,6 +37,7 @@ typedef struct mms_connman_nemo {
     OfonoExtModemManager* mm;
     OfonoSimMgr* default_sim;
     gulong mm_event_id[MM_EVENT_COUNT];
+    gulong conn_change_id;
 } MMSConnManNemo;
 
 G_DEFINE_TYPE(MMSConnManNemo, mms_connman_nemo, MMS_TYPE_CONNMAN)
@@ -153,7 +154,43 @@ mms_connman_nemo_connection_weak_ref_notify(
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(arg);
     MMS_ASSERT(MMS_CONNECTION(connection) == self->conn);
+    MMS_VERBOSE_("%p", connection);
+    self->conn_change_id = 0;
     self->conn = NULL;
+}
+
+/**
+ * Drop current MMSConnection.
+ */
+static
+void
+mms_connman_nemo_drop_connection(
+    MMSConnManNemo* self)
+{
+    if (self->conn) {
+        MMS_VERBOSE_("%p", self->conn);
+        mms_connection_remove_handler(self->conn, self->conn_change_id);
+        self->conn_change_id = 0;
+        g_object_weak_unref(G_OBJECT(self->conn),
+            mms_connman_nemo_connection_weak_ref_notify, self);
+        self->conn = NULL;
+    }
+}
+
+/**
+ * MMSConnection state change notification.
+ */
+static
+void
+mms_connman_nemo_connection_state_changed(
+    MMSConnection* connection,
+    void* arg)
+{
+    MMSConnManNemo* self = MMS_CONNMAN_NEMO(arg);
+    MMS_ASSERT(connection == self->conn);
+    if (self->conn && !mms_connection_is_active(self->conn)) {
+        mms_connman_nemo_drop_connection(self);
+    }
 }
 
 /**
@@ -173,12 +210,13 @@ mms_connman_nemo_open_connection(
         if (!g_strcmp0(self->conn->imsi, imsi)) {
             return mms_connection_ref(self->conn);
         } else {
-            g_object_weak_unref(G_OBJECT(self->conn),
-                mms_connman_nemo_connection_weak_ref_notify, self);
-            self->conn = NULL;
+            mms_connman_nemo_drop_connection(self);
         }
     }
     self->conn = mms_connection_nemo_new(cm, imsi, type);
+    self->conn_change_id = mms_connection_add_state_change_handler(self->conn,
+        mms_connman_nemo_connection_state_changed, self);
+    MMS_ASSERT(mms_connection_is_active(self->conn));
     g_object_weak_ref(G_OBJECT(self->conn),
         mms_connman_nemo_connection_weak_ref_notify, self);
     return self->conn;
@@ -207,6 +245,7 @@ mms_connman_nemo_dispose(
         ofono_simmgr_unref(self->default_sim);
         self->default_sim = NULL;
     }
+    mms_connman_nemo_drop_connection(self);
     ofonoext_mm_remove_handlers(self->mm, self->mm_event_id,
         G_N_ELEMENTS(self->mm_event_id));
     G_OBJECT_CLASS(mms_connman_nemo_parent_class)->dispose(object);
