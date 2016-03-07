@@ -18,15 +18,11 @@
 
 #include <gofono_connmgr.h>
 #include <gofono_connctx.h>
-#include <gofono_error.h>
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connection_log
 #include "mms_connman_nemo_log.h"
 MMS_LOG_MODULE_DEFINE("mms-connection-nemo");
-
-#define RETRY_DELAY_SEC (1)
-#define MAX_RETRY_COUNT (100)
 
 enum mm_handler_id {
     MM_HANDLER_VALID,
@@ -59,8 +55,6 @@ typedef struct mms_connection_nemo {
     gulong mm_handler_id[MM_HANDLER_COUNT];
     gulong context_handler_id[CONTEXT_HANDLER_COUNT];
     gulong connmgr_handler_id[CONNMGR_HANDLER_COUNT];
-    guint retry_id;
-    int retry_count;
     char* imsi;
     char* path;
 } MMSConnectionNemo;
@@ -165,14 +159,11 @@ void
 mms_connection_nemo_cancel(
     MMSConnectionNemo* self)
 {
-    if (self->retry_id) {
-        g_source_remove(self->retry_id);
-        self->retry_id = 0;
-    }
-    if ((self->connection.state <= MMS_CONNECTION_STATE_OPENING &&
-        mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_FAILED)) ||
-        mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_CLOSED)) {
-        MMS_DEBUG("Cancelled %s", self->connection.imsi);
+    if (self->connection.state <= MMS_CONNECTION_STATE_OPENING &&
+        mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_FAILED)) {
+        MMS_DEBUG("Connection %s cancelled", self->connection.imsi);
+    } else {
+        mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_CLOSED);
     }
 }
 
@@ -254,20 +245,6 @@ mms_connection_nemo_mms_center_changed(
 }
 
 static
-gboolean
-mms_connection_nemo_activate_retry(
-    gpointer arg)
-{
-    MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    OfonoConnCtx* context = self->context;
-    MMS_ASSERT(self->retry_id);
-    self->retry_id = 0;
-    MMS_DEBUG("Activating %s again", ofono_connctx_path(context));
-    ofono_connctx_activate(context);
-    return G_SOURCE_REMOVE;
-}
-
-static
 void
 mms_connection_nemo_activate_failed(
     OfonoConnCtx* context,
@@ -276,17 +253,7 @@ mms_connection_nemo_activate_failed(
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
     MMS_ASSERT(self->context == context);
-    MMS_ASSERT(!self->retry_id);
-    if (error->domain == OFONO_ERROR &&
-        error->code == OFONO_ERROR_BUSY &&
-        self->retry_count < MAX_RETRY_COUNT) {
-        self->retry_count++;
-        MMS_DEBUG("Retry %d in %d sec", self->retry_count, RETRY_DELAY_SEC);
-        self->retry_id = g_timeout_add_seconds(RETRY_DELAY_SEC,
-            mms_connection_nemo_activate_retry, self);
-    } else {
-        mms_connection_nemo_cancel(self);
-    }
+    mms_connection_nemo_cancel(self);
 }
 
 static
@@ -537,8 +504,7 @@ mms_connection_nemo_mm_valid_changed(
     OfonoExtModemManager* mm,
     void* arg)
 {
-    MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_VERBOSE_("%p %d", self, mm->valid);
+    MMS_VERBOSE_("%p %d", arg, mm->valid);
     if (mm->valid) {
         mms_connection_nemo_request_sim(arg);
     }
@@ -599,10 +565,6 @@ mms_connection_nemo_dispose(
     MMS_VERBOSE_("%p %s", self, self->imsi);
     MMS_ASSERT(!mms_connection_is_active(&self->connection));
     mms_connection_nemo_disconnect(self);
-    if (self->retry_id) {
-        g_source_remove(self->retry_id);
-        self->retry_id = 0;
-    }
     if (self->context) {
         if (mms_connection_is_active(&self->connection) &&
             self->context->active) {
