@@ -543,10 +543,18 @@ mms_dispatcher_receive_message(
     if (pdu) {
         MMS_ASSERT(pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND);
         if (pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND) {
+            const MMSConfig* config = disp->settings->config;
             ok = mms_dispatcher_queue_and_unref_task(disp,
                 mms_task_retrieve_new(disp->settings, disp->handler,
                     id, imsi, pdu, automatic ? MMS_CONNECTION_TYPE_AUTO :
                     MMS_CONNECTION_TYPE_USER, error));
+            if (config->keep_temp_files) {
+                char* dir = mms_message_dir(config, id);
+                mms_write_bytes(dir, MMS_NOTIFICATION_IND_FILE, bytes, NULL);
+                g_free(dir);
+            }
+        } else {
+            MMS_ERROR(error, MMS_LIB_ERROR_DECODE, "Inexpected MMS PDU type");
         }
         mms_message_free(pdu);
     } else {
