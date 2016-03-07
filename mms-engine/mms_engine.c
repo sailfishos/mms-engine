@@ -21,7 +21,7 @@
 #include "mms_settings_dconf.h"
 #include "mms_log.h"
 
-#ifdef MMS_CONNMAN_NEMO
+#ifdef SAILFISH
 #  include "mms_connman_nemo.h"
 #  define mms_connman_new() mms_connman_nemo_new()
 #else

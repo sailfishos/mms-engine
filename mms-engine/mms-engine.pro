@@ -13,7 +13,7 @@ ResizeImageMagick {
 
 ConnManNemo {
   PKGCONFIG += libgofonoext
-  DEFINES += MMS_CONNMAN_NEMO
+  DEFINES += SAILFISH
   MMS_CONNMAN = mms-connman-nemo
 } else {
   MMS_CONNMAN = mms-connman-ofono
