@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,10 +15,6 @@
 
 #ifndef JOLLA_MMS_ERROR_H
 #define JOLLA_MMS_ERROR_H
-
-#ifndef JOLLA_MMS_LOG_H
-#  error mms_log.h must be included before mms_error.h
-#endif
 
 #include "mms_lib_util.h"
 
@@ -37,7 +34,7 @@ mms_error_valist(
     const char* format,
     va_list va);
 
-#ifdef MMS_LOG_VARARGS
+#ifdef __GNUC__
 #  define MMS_ERROR(error,code,format,args...) \
     mms_error(MMS_LOG_MODULE_CURRENT, error, code, format, ##args)
 #else
@@ -48,7 +45,7 @@ static inline void mms_error_static(GError** error, MMSLibError code,   \
     mms_error_valist(MMS_LOG_MODULE_CURRENT, error, code, format, va);  \
     va_end(va);                                                         \
 }
-#endif /* MMS_LOG_VARARGS */
+#endif /* __GNUC__ */
 
 #endif /* JOLLA_MMS_ERROR_H */
 
