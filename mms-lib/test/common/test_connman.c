@@ -38,6 +38,27 @@ G_DEFINE_TYPE(MMSConnManTest, mms_connman_test, MMS_TYPE_CONNMAN);
 #define MMS_CONNMAN_TEST(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_CONNMAN_TEST, MMSConnManTest))
 
+static
+gboolean
+mms_connman_test_busy_cb(
+    gpointer data)
+{
+    MMSConnManTest* test = MMS_CONNMAN_TEST(data);
+    mms_connman_busy_dec(&test->cm);
+    mms_connman_ref(&test->cm);
+    return G_SOURCE_REMOVE;
+}
+
+static
+void
+mms_connman_test_make_busy(
+    MMSConnManTest* test)
+{
+    mms_connman_ref(&test->cm);
+    mms_connman_busy_inc(&test->cm);
+    g_idle_add(mms_connman_test_busy_cb, test);
+}
+
 void
 mms_connman_test_set_port(
     MMSConnMan* cm,
@@ -74,6 +95,7 @@ mms_connman_test_close_connection(
     MMSConnManTest* test = MMS_CONNMAN_TEST(cm);
     if (test->conn) {
         MMS_DEBUG("Closing connection...");
+        mms_connman_test_make_busy(test);
         mms_connection_close(test->conn);
         mms_connection_unref(test->conn);
         test->conn = NULL;
@@ -111,6 +133,7 @@ mms_connman_test_open_connection(
     if (test->offline) {
         return NULL;
     } else {
+        mms_connman_test_make_busy(test);
         test->conn = mms_connection_test_new(imsi, test->port, test->proxy);
         if (test->connect_fn) test->connect_fn(test->connect_param);
         return mms_connection_ref(test->conn);

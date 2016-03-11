@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -30,10 +30,8 @@ typedef struct mms_handler_test {
     MMSDispatcher* dispatcher;
     mms_handler_test_prenotify_fn prenotify_fn;
     mms_handler_test_postnotify_fn postnotify_fn;
-    mms_handler_test_msgreceived_fn msgreceived_fn;
     void* prenotify_data;
     void* postnotify_data;
-    void* msgreceived_data;
 } MMSHandlerTest;
 
 typedef enum mms_handler_record_type {
@@ -83,6 +81,19 @@ struct mms_handler_message_received_call {
     mms_handler_message_received_complete_fn cb;
     void* param;
 };
+
+enum mms_handler_signal {
+    SIGNAL_MESSAGE_RECEIVED,
+    SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED,
+    SIGNAL_MESSAGE_SEND_STATE_CHANGED,
+    SIGNAL_COUNT
+};
+
+#define SIGNAL_MESSAGE_RECEIVED_NAME                "message-received"
+#define SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED_NAME   "receive-state-changed"
+#define SIGNAL_MESSAGE_SEND_STATE_CHANGED_NAME      "send-state-changed"
+
+static guint mms_handler_test_signals[SIGNAL_COUNT] = { 0 };
 
 G_DEFINE_TYPE(MMSHandlerTest, mms_handler_test, MMS_TYPE_HANDLER);
 #define MMS_TYPE_HANDLER_TEST (mms_handler_test_get_type())
@@ -569,9 +580,8 @@ mms_handler_test_message_received(
         recv->msg = mms_message_ref(msg);
         mms_handler_busy_inc(handler);
 
-        if (test->msgreceived_fn) {
-            test->msgreceived_fn(handler, msg, test->msgreceived_data);
-        }
+        g_signal_emit(handler, mms_handler_test_signals[
+            SIGNAL_MESSAGE_RECEIVED], 0, msg);
 
         call->handler = mms_handler_ref(handler);
         call->msg = mms_message_ref(msg);
@@ -596,6 +606,8 @@ mms_handler_test_message_receive_state_changed(
     if (recv) {
         recv->state = state;
         MMS_DEBUG("Message %s receive state %d", id, state);
+        g_signal_emit(handler, mms_handler_test_signals[
+            SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED], 0, id, state);
         return TRUE;
     } else {
         MMS_ERR("No such incoming message: %s", id);
@@ -641,6 +653,8 @@ mms_handler_test_message_send_state_changed(
         } else {
             MMS_DEBUG("Message %s send state %d", id, state);
         }
+        g_signal_emit(handler, mms_handler_test_signals[
+            SIGNAL_MESSAGE_SEND_STATE_CHANGED], 0, id, state, details);
         return TRUE;
     } else {
         MMS_ERR("No such outbound message: %s", id);
@@ -768,6 +782,21 @@ mms_handler_test_class_init(
     klass->fn_read_report = mms_handler_test_read_report;
     klass->fn_read_report_send_status =
         mms_handler_test_read_report_send_status;
+    mms_handler_test_signals[SIGNAL_MESSAGE_RECEIVED] =
+        g_signal_new(SIGNAL_MESSAGE_RECEIVED_NAME,
+            G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+            0, NULL, NULL, NULL, G_TYPE_NONE,
+            1, G_TYPE_POINTER);
+    mms_handler_test_signals[SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED] =
+        g_signal_new(SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED_NAME,
+            G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+            0, NULL, NULL, NULL, G_TYPE_NONE,
+            2, G_TYPE_POINTER, G_TYPE_INT);
+    mms_handler_test_signals[SIGNAL_MESSAGE_SEND_STATE_CHANGED] =
+        g_signal_new(SIGNAL_MESSAGE_SEND_STATE_CHANGED_NAME,
+            G_OBJECT_CLASS_TYPE(klass), G_SIGNAL_RUN_FIRST,
+            0, NULL, NULL, NULL, G_TYPE_NONE,
+            3, G_TYPE_POINTER, G_TYPE_INT, G_TYPE_POINTER);
 }
 
 static
@@ -819,16 +848,34 @@ mms_handler_test_set_postnotify_fn(
     test->postnotify_data = user_data;
 }
 
-void
-mms_handler_test_set_msgreceived_fn(
+gulong
+mms_handler_test_add_msgreceived_fn(
     MMSHandler* handler,
     mms_handler_test_msgreceived_fn cb,
     void* user_data)
 {
-    MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
-    MMS_ASSERT(!test->msgreceived_fn);
-    test->msgreceived_fn = cb;
-    test->msgreceived_data = user_data;
+    return g_signal_connect(handler, SIGNAL_MESSAGE_RECEIVED_NAME,
+         G_CALLBACK(cb), user_data);
+}
+
+gulong
+mms_handler_test_add_send_state_fn(
+    MMSHandler* handler,
+    mms_handler_test_send_state_fn cb,
+    void* user_data)
+{
+    return g_signal_connect(handler, SIGNAL_MESSAGE_SEND_STATE_CHANGED_NAME,
+         G_CALLBACK(cb), user_data);
+}
+
+gulong
+mms_handler_test_add_receive_state_fn(
+    MMSHandler* handler,
+    mms_handler_test_receive_state_fn cb,
+    void* user_data)
+{
+    return g_signal_connect(handler, SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED_NAME,
+         G_CALLBACK(cb), user_data);
 }
 
 void
@@ -843,8 +890,6 @@ mms_handler_test_reset(
     test->prenotify_data = NULL;
     test->postnotify_fn = NULL;
     test->postnotify_data = NULL;
-    test->msgreceived_fn = NULL;
-    test->msgreceived_data = NULL;
 }
 
 /*

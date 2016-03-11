@@ -5,7 +5,8 @@
 
 TESTS="test_media_type test_mms_codec test_delivery_ind \
 test_read_ind test_read_report test_resize test_retrieve \
-test_retrieve_cancel test_retrieve_no_proxy test_send"
+test_retrieve_cancel test_retrieve_no_proxy test_retrieve_order \
+test_send"
 FLAVOR="release"
 
 pushd `dirname $0` > /dev/null

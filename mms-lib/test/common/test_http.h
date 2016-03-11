@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,6 +37,22 @@ test_http_unref(
 guint
 test_http_get_port(
     TestHttp* http);
+
+void
+test_http_add_response(
+    TestHttp* http,
+    GMappedFile* file,
+    const char* content_type,
+    int status);
+
+guint
+test_http_get_post_count(
+    TestHttp* http);
+
+GBytes*
+test_http_get_post_data_at(
+    TestHttp* http,
+    guint index);
 
 GBytes*
 test_http_get_post_data(

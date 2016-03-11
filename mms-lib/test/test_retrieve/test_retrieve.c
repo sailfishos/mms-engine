@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -76,6 +76,7 @@ typedef struct test {
     GMappedFile* retrieve_conf;
     GMainLoop* loop;
     guint timeout_id;
+    gulong msgreceived_id;
     TestHttp* http;
     int ret;
 } Test;
@@ -500,6 +501,7 @@ test_finish(
     }
     MMS_INFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
     mms_handler_test_reset(test->handler);
+    g_signal_handler_disconnect(test->handler, test->msgreceived_id);
     g_main_loop_quit(test->loop);
 }
 
@@ -627,8 +629,9 @@ test_init(
                 mms_handler_test_defer_receive(test->handler, test->disp);
             }
             mms_handler_test_set_prenotify_fn(test->handler, test_notify, test);
-            mms_handler_test_set_msgreceived_fn(test->handler,
-                test_msgreceived, test);
+            test->msgreceived_id =
+                mms_handler_test_add_msgreceived_fn(test->handler,
+                    test_msgreceived, test);
             mms_settings_unref(settings);
             test->ret = RET_ERR;
             ok = TRUE;

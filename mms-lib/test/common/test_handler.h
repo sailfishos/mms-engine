@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -116,6 +116,21 @@ typedef void
     MMSMessage* msg,
     void* user_data);
 
+typedef void
+(*mms_handler_test_receive_state_fn)(
+    MMSHandler* handler,
+    const char* id,
+    MMS_RECEIVE_STATE state,
+    void* user_data);
+
+typedef void
+(*mms_handler_test_send_state_fn)(
+    MMSHandler* handler,
+    const char* id,
+    MMS_SEND_STATE state,
+    const char* details,
+    void* user_data);
+
 void
 mms_handler_test_set_prenotify_fn(
     MMSHandler* handler,
@@ -128,10 +143,22 @@ mms_handler_test_set_postnotify_fn(
     mms_handler_test_postnotify_fn cb,
     void* user_data);
 
-void
-mms_handler_test_set_msgreceived_fn(
+gulong
+mms_handler_test_add_msgreceived_fn(
     MMSHandler* handler,
     mms_handler_test_msgreceived_fn cb,
+    void* user_data);
+
+gulong
+mms_handler_test_add_send_state_fn(
+    MMSHandler* handler,
+    mms_handler_test_send_state_fn cb,
+    void* user_data);
+
+gulong
+mms_handler_test_add_receive_state_fn(
+    MMSHandler* handler,
+    mms_handler_test_receive_state_fn cb,
     void* user_data);
 
 void
