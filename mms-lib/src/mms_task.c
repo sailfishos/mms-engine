@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,6 +34,14 @@ G_DEFINE_TYPE(MMSTask, mms_task, G_TYPE_OBJECT);
     (G_TYPE_CHECK_INSTANCE_CAST((obj), MMS_TYPE_TASK, MMSTask))
 #define MMS_TASK_GET_CLASS(obj)  \
     (G_TYPE_INSTANCE_GET_CLASS((obj), MMS_TYPE_TASK, MMSTaskClass))
+
+/*
+ * mms_task_order is copied to MMSTask->order and incremented every
+ * time a new task is created. It's reset to zero after all tasks have
+ * finished, in order to avoid overflow.
+ */
+static int mms_task_order;
+static int mms_task_count;
 
 static
 void
@@ -119,6 +127,11 @@ mms_task_finalize(
     MMS_VERBOSE_("%p", task);
     MMS_ASSERT(!task->delegate);
     MMS_ASSERT(!task->wakeup_id);
+    MMS_ASSERT(mms_task_count > 0);
+    if (!(--mms_task_count)) {
+        MMS_VERBOSE("Last task is gone");
+        mms_task_order = 0;
+    }
     if (task->id) {
         if (!task_config(task)->keep_temp_files) {
             char* dir = mms_task_dir(task);
@@ -151,6 +164,8 @@ mms_task_init(
     MMSTask* task)
 {
     MMS_VERBOSE_("%p", task);
+    mms_task_count++;
+    task->order = mms_task_order++;
 }
 
 void*

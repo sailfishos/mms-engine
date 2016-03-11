@@ -37,6 +37,12 @@ typedef enum _MMS_TASK_STATE {
     MMS_TASK_STATE_COUNT                 /* Number of valid states */
 } MMS_TASK_STATE;
 
+/* Task priority */
+typedef enum _MMS_TASK_PRIORITY {
+    MMS_TASK_PRIORITY_NORMAL,            /* Default priority */
+    MMS_TASK_PRIORITY_POST_PROCESS       /* Post-processing priority */
+} MMS_TASK_PRIORITY;
+
 /* Delegate (one per task) */
 typedef struct mms_task MMSTask;
 typedef struct mms_task_delegate MMSTaskDelegate;
@@ -54,6 +60,8 @@ struct mms_task_delegate {
 /* Task object */
 struct mms_task {
     GObject parent;                      /* Parent object */
+    MMS_TASK_PRIORITY priority;          /* Task priority */
+    int order;                           /* Task creation order */
     char* name;                          /* Task name for debug purposes */
     char* id;                            /* Database record ID */
     char* imsi;                          /* Associated subscriber identity */

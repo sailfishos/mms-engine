@@ -308,6 +308,85 @@ mms_dispatcher_is_active(
 }
 
 /**
+ * Task queue sort callback. Defines the order in which tasks are executed.
+ * Returns 0 if the tasks are equal, a negative value if the first task
+ * comes before the second, and a positive value if the second task comes
+ * before the first.
+ */
+static
+gint
+mms_dispatcher_sort_cb(
+    gconstpointer v1,
+    gconstpointer v2,
+    gpointer user_data)
+{
+    const MMSTask* task1 = v1;
+    const MMSTask* task2 = v2;
+    MMSDispatcher* disp = user_data;
+    gboolean connection_is_open =
+        mms_connection_state(disp->connection) == MMS_CONNECTION_STATE_OPEN;
+
+    MMS_ASSERT(task1);
+    MMS_ASSERT(task2);
+    if (task1 == task2) {
+        return 0;
+    }
+    /* Don't interfere with the task transmiting the data */
+    if (task1->state != task2->state && connection_is_open) {
+        if (task1->state == MMS_TASK_STATE_TRANSMITTING) return -1;
+        if (task2->state == MMS_TASK_STATE_TRANSMITTING) return 1;
+
+    }
+    /* Compare priorities */
+    if (task1->priority != task2->priority) {
+        return task2->priority - task1->priority;
+    }
+    /* Prefer to reuse the existing connection */
+    if (task1->state != task2->state && connection_is_open) {
+        gboolean task1_wants_this_connection =
+           (task1->state == MMS_TASK_STATE_NEED_CONNECTION ||
+            task1->state == MMS_TASK_STATE_NEED_USER_CONNECTION) &&
+            !strcmp(task1->imsi, disp->connection->imsi);
+        gboolean task2_wants_this_connection =
+           (task2->state == MMS_TASK_STATE_NEED_CONNECTION ||
+            task2->state == MMS_TASK_STATE_NEED_USER_CONNECTION) &&
+            !strcmp(task2->imsi, disp->connection->imsi);
+        if (task1_wants_this_connection != task2_wants_this_connection) {
+            if (task1_wants_this_connection) return -1;
+            if (task2_wants_this_connection) return 1;
+        }
+    }
+    /* Immediately runnable tasks first */
+    if (task1->state != task2->state) {
+        gboolean runnable1 =
+            task1->state == MMS_TASK_STATE_READY ||
+            task1->state == MMS_TASK_STATE_DONE;
+        gboolean runnable2 =
+            task2->state == MMS_TASK_STATE_READY ||
+            task2->state == MMS_TASK_STATE_DONE;
+        if (runnable1 != runnable2) {
+            if (runnable1) return -1;
+            if (runnable2) return 1;
+        }
+    }
+    /* Followed by the tasks that want network connection */
+    if (task1->state != task2->state) {
+        gboolean task1_wants_connection =
+            task1->state == MMS_TASK_STATE_NEED_CONNECTION ||
+            task1->state == MMS_TASK_STATE_NEED_USER_CONNECTION;
+        gboolean task2_wants_connection =
+            task2->state == MMS_TASK_STATE_NEED_CONNECTION ||
+            task2->state == MMS_TASK_STATE_NEED_USER_CONNECTION;
+        if (task1_wants_connection != task2_wants_connection) {
+            if (task1_wants_connection) return -1;
+            if (task2_wants_connection) return 1;
+        }
+    }
+    /* Otherwise follow the creation order */
+    return task1->order - task2->order;
+}
+
+/**
  * Picks the next task for processing. Reference is passed to the caller.
  * Caller must eventually dereference the task or place it back to the queue.
  */
@@ -316,87 +395,55 @@ MMSTask*
 mms_dispatcher_pick_next_task(
     MMSDispatcher* disp)
 {
-    GList* entry;
-    gboolean connection_in_use = FALSE;
-
-    /* Check the current connection */
-    if (disp->connection) {
-
-        /* Don't interfere with the task transmiting the data */
-        for (entry = disp->tasks->head; entry; entry = entry->next) {
-            MMSTask* task = entry->data;
-            if (task->state == MMS_TASK_STATE_TRANSMITTING) {
-                MMS_ASSERT(!strcmp(task->imsi, disp->connection->imsi));
-                return NULL;
-            }
-        }
-
-        /* Look for another task that has use for the existing connection
-         * before we close it */
-        for (entry = disp->tasks->head; entry; entry = entry->next) {
-            MMSTask* task = entry->data;
-            if (task->state == MMS_TASK_STATE_NEED_CONNECTION ||
-                task->state == MMS_TASK_STATE_NEED_USER_CONNECTION) {
-                 if (!strcmp(task->imsi, disp->connection->imsi)) {
-                     if (mms_connection_state(disp->connection) ==
-                         MMS_CONNECTION_STATE_OPEN) {
-                        /* Found a task that can use this connection */
-                        g_queue_delete_link(disp->tasks, entry);
-                        mms_dispatcher_network_idle_cancel(disp);
-                        return task;
-                     }
-                     connection_in_use = TRUE;
-                 }
-            }
-        }
-    }
-
-    if (connection_in_use) {
-        /* Connection is needed but isn't open yet, make sure that network
-         * inactivity timer is off while connection is being established */
-        mms_dispatcher_network_idle_cancel(disp);
-    } else {
-        /* Then look for a task that needs any sort of network connection */
-        for (entry = disp->tasks->head; entry; entry = entry->next) {
-            MMSTask* task = entry->data;
-            if ((task->state == MMS_TASK_STATE_NEED_CONNECTION ||
-                 task->state == MMS_TASK_STATE_NEED_USER_CONNECTION)) {
-                /* Closing the connection may take some time. If connection
-                 * is still around, we will have to wait. */
+    g_queue_sort(disp->tasks, mms_dispatcher_sort_cb, disp);
+    if (disp->tasks->head) {
+        MMSTask* task = disp->tasks->head->data;
+        switch (task->state) {
+        case MMS_TASK_STATE_READY:
+        case MMS_TASK_STATE_DONE:
+            g_queue_delete_link(disp->tasks, disp->tasks->head);
+            return task;
+        case MMS_TASK_STATE_NEED_CONNECTION:
+        case MMS_TASK_STATE_NEED_USER_CONNECTION:
+            if (disp->connection &&
+                strcmp(task->imsi, disp->connection->imsi)) {
+                /* Wrong connection, close it */
                 mms_dispatcher_close_connection(disp);
-                if (!disp->connection) {
-                    disp->connection = mms_connman_open_connection(disp->cm,
-                        task->imsi,
+            }
+            if (!disp->connection) {
+                /* No connection, request it */
+                disp->connection =
+                    mms_connman_open_connection(disp->cm, task->imsi,
                         (task->state == MMS_TASK_STATE_NEED_USER_CONNECTION) ?
                         MMS_CONNECTION_TYPE_USER : MMS_CONNECTION_TYPE_AUTO);
-                    if (disp->connection) {
-                        MMS_ASSERT(!disp->connection_changed_id);
-                        disp->connection_changed_id =
-                            mms_connection_add_state_change_handler(
-                                disp->connection,
-                                mms_dispatcher_connection_state_changed,
-                                disp);
-                        g_queue_delete_link(disp->tasks, entry);
-                        return task;
-                    } else {
-                        mms_task_network_unavailable(task, FALSE);
-                    }
-                }
+                 if (disp->connection) {
+                     MMS_ASSERT(!disp->connection_changed_id);
+                     disp->connection_changed_id =
+                         mms_connection_add_state_change_handler(
+                             disp->connection,
+                             mms_dispatcher_connection_state_changed,
+                             disp);
+                 }
             }
+            if (disp->connection) {
+                if (!strcmp(task->imsi, disp->connection->imsi) &&
+                    mms_connection_is_open(disp->connection)) {
+                    /* Connection can be used by this task */
+                    g_queue_delete_link(disp->tasks, disp->tasks->head);
+                    return task;
+                }
+            } else {
+                /* Most likely, mms_connman_open_connection hasn't found
+                 * the requested SIM card */
+                mms_task_network_unavailable(task, FALSE);
+            }
+            break;
+        default:
+            break;
         }
     }
 
-    /* Finally look for a runnable task that doesn't need network */
-    for (entry = disp->tasks->head; entry; entry = entry->next) {
-        MMSTask* task = entry->data;
-        if (task->state == MMS_TASK_STATE_READY ||
-            task->state == MMS_TASK_STATE_DONE) {
-            g_queue_delete_link(disp->tasks, entry);
-            return task;
-        }
-    }
-
-    /* Nothing found, we are done for now */
+    /* Nothing to do at this point */
     return NULL;
 }
 
@@ -420,11 +467,11 @@ mms_dispatcher_run(
 
         case MMS_TASK_STATE_NEED_CONNECTION:
         case MMS_TASK_STATE_NEED_USER_CONNECTION:
-            MMS_ASSERT(disp->connection);
-            if (mms_connection_is_open(disp->connection)) {
-                /* Connection is already active, send/receive the data */
-                mms_task_transmit(task, disp->connection);
-            }
+            /* mms_dispatcher_pick_next_task() has checked that the right
+             * connection is active, we can send/receive the data */
+            MMS_ASSERT(mms_connection_is_open(disp->connection));
+            MMS_ASSERT(!strcmp(task->imsi, disp->connection->imsi));
+            mms_task_transmit(task, disp->connection);
             break;
 
         default:

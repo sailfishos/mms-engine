@@ -357,6 +357,7 @@ mms_task_decode_new(
         if (dec->map) {
             dec->transaction_id = g_strdup(transaction_id);
             dec->file = g_strdup(file);
+            dec->task.priority = MMS_TASK_PRIORITY_POST_PROCESS;
             return &dec->task;
         } else if (error) {
             MMS_ERR("%s", MMS_ERRMSG(error));
