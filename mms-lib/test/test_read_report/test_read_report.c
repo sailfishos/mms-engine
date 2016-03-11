@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,6 +16,7 @@
 #include "test_connman.h"
 #include "test_handler.h"
 #include "test_http.h"
+#include "test_util.h"
 
 #include "mms_log.h"
 #include "mms_codec.h"
@@ -253,15 +254,12 @@ int main(int argc, char* argv[])
     options = g_option_context_new("[TEST] - MMS read report test");
     g_option_context_add_main_entries(options, entries, NULL);
     if (g_option_context_parse(options, &argc, &argv, &error)) {
+        const char* test = "test_read_report";
         MMSConfig config;
-        char* tmpd = g_mkdtemp(g_strdup("/tmp/test_read_report_XXXXXX"));
-        char* msgdir = g_strconcat(tmpd, "/msg", NULL);
+        TestDirs dirs;
 
         mms_lib_init(argv[0]);
-        mms_lib_default_config(&config);
-        config.idle_secs = 0;
-        config.root_dir = tmpd;
-        mms_log_default.name = "test_read_report";
+        mms_log_default.name = test;
         if (verbose) {
             mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
         } else {
@@ -272,7 +270,10 @@ int main(int argc, char* argv[])
             mms_log_stdout_timestamp = FALSE;
         }
 
-        MMS_VERBOSE("Temporary directory %s", tmpd);
+        test_dirs_init(&dirs, test);
+        mms_lib_default_config(&config);
+        config.idle_secs = 0;
+        config.root_dir = dirs.root;
         if (argc < 2) {
             ret = test_read_report(&config, NULL, debug);
         } else {
@@ -282,11 +283,7 @@ int main(int argc, char* argv[])
                 if (ret == RET_OK && test_status != RET_OK) ret = test_status;
             }
         }
-        rmdir(msgdir);
-        rmdir(tmpd);
-        remove(tmpd);
-        g_free(tmpd);
-        g_free(msgdir);
+        test_dirs_cleanup(&dirs, TRUE);
         mms_lib_deinit();
     } else {
         fprintf(stderr, "%s\n", MMS_ERRMSG(error));

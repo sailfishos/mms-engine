@@ -16,6 +16,7 @@
 #include "test_connman.h"
 #include "test_handler.h"
 #include "test_http.h"
+#include "test_util.h"
 
 #include "mms_log.h"
 #include "mms_codec.h"
@@ -528,17 +529,12 @@ int main(int argc, char* argv[])
     options = g_option_context_new("[TEST] - MMS send test");
     g_option_context_add_main_entries(options, entries, NULL);
     if (g_option_context_parse(options, &argc, &argv, NULL) && argc < 3) {
+        const char* test = "test_send";
+        const char* testcase = (argc == 2) ? argv[1] : NULL;
         MMSConfig config;
-        const char* test_name = (argc == 2) ? argv[1] : NULL;
-        char* tmpd = g_mkdtemp(g_strdup("/tmp/test_send_XXXXXX"));
-        MMS_VERBOSE("Temporary directory %s", tmpd);
+        TestDirs dirs;
 
-        mms_lib_default_config(&config);
-        config.keep_temp_files = keep_temp;
-        config.root_dir = tmpd;
-        config.idle_secs = 0;
-
-        mms_log_set_type(MMS_LOG_TYPE_STDOUT, "test_send");
+        mms_log_set_type(MMS_LOG_TYPE_STDOUT, test);
         if (verbose) {
             mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
         } else {
@@ -548,9 +544,14 @@ int main(int argc, char* argv[])
             mms_log_stdout_timestamp = FALSE;
         }
 
-        ret = test_run(&config, test_name, debug);
-        remove(tmpd);
-        g_free(tmpd);
+        test_dirs_init(&dirs, test);
+        mms_lib_default_config(&config);
+        config.keep_temp_files = keep_temp;
+        config.root_dir = dirs.root;
+        config.idle_secs = 0;
+
+        ret = test_run(&config, testcase, debug);
+        test_dirs_cleanup(&dirs, !keep_temp);
     } else {
         printf("Usage: test_send [-v] [TEST]\n");
         ret = RET_ERR;

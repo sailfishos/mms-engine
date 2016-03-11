@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,6 +16,7 @@
 #include "test_connman.h"
 #include "test_handler.h"
 #include "test_http.h"
+#include "test_util.h"
 
 #include "mms_log.h"
 #include "mms_codec.h"
@@ -227,10 +229,11 @@ int main(int argc, char* argv[])
 {
     int ret;
     MMSConfig config;
+    const char* test = "test_retrieve_no_proxy";
 
     mms_lib_init(argv[0]);
     mms_lib_default_config(&config);
-    mms_log_default.name = "test_retrieve_no_proxy";
+    mms_log_default.name = test;
 
     if (argc > 1 && !strcmp(argv[1], "-v")) {
         mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
@@ -239,19 +242,19 @@ int main(int argc, char* argv[])
         mms_log_default.level = MMS_LOGLEVEL_INFO;
         mms_task_decode_log.level =
         mms_task_retrieve_log.level =
+        mms_task_http_log.level =
         mms_task_notification_log.level = MMS_LOGLEVEL_NONE;
         mms_log_stdout_timestamp = FALSE;
     }
 
     if (argc == 1) {
-        char* tmpd = g_mkdtemp(g_strdup("/tmp/test_retrieve_XXXXXX"));
-        MMS_VERBOSE("Temporary directory %s", tmpd);
-        config.root_dir = tmpd;
+        TestDirs dirs;
+        test_dirs_init(&dirs, test);
+        config.root_dir = dirs.root;
         config.idle_secs = 0;
         config.attic_enabled = TRUE;
         ret = test_retrieve_no_proxy(&config);
-        remove(tmpd);
-        g_free(tmpd);
+        test_dirs_cleanup(&dirs, TRUE);
     } else {
         printf("Usage: test_retrieve [-v] [TEST]\n");
         ret = RET_ERR;

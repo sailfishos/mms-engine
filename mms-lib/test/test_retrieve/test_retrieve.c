@@ -16,6 +16,7 @@
 #include "test_connman.h"
 #include "test_handler.h"
 #include "test_http.h"
+#include "test_util.h"
 
 #include "mms_codec.h"
 #include "mms_file_util.h"
@@ -758,18 +759,12 @@ int main(int argc, char* argv[])
     options = g_option_context_new("[TEST] - MMS retrieve test");
     g_option_context_add_main_entries(options, entries, NULL);
     if (g_option_context_parse(options, &argc, &argv, &error)) {
+        const char* test = "test_retrieve";
         MMSConfig config;
-        char* tmpd = g_mkdtemp(g_strdup("/tmp/test_retrieve_XXXXXX"));
-        char* msgdir = g_strconcat(tmpd, "/msg", NULL);
- 
-        mms_lib_init(argv[0]);
-        mms_lib_default_config(&config);
-        config.root_dir = tmpd;
-        config.keep_temp_files = keep_temp;
-        config.idle_secs = 0;
-        config.attic_enabled = TRUE;
+        TestDirs dirs;
 
-        mms_log_set_type(MMS_LOG_TYPE_STDOUT, "test_retrieve");
+        mms_lib_init(argv[0]);
+        mms_log_set_type(MMS_LOG_TYPE_STDOUT, test);
         if (verbose) {
             mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
         } else {
@@ -781,7 +776,13 @@ int main(int argc, char* argv[])
             mms_log_stdout_timestamp = FALSE;
         }
 
-        MMS_VERBOSE("Temporary directory %s", tmpd);
+        test_dirs_init(&dirs, test);
+        mms_lib_default_config(&config);
+        config.root_dir = dirs.root;
+        config.keep_temp_files = keep_temp;
+        config.idle_secs = 0;
+        config.attic_enabled = TRUE;
+
         if (argc < 2) {
             ret = test_retrieve(&config, NULL, debug);
         } else {
@@ -792,10 +793,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        rmdir(msgdir);
-        rmdir(tmpd);
-        g_free(msgdir);
-        g_free(tmpd);
+        test_dirs_cleanup(&dirs, !keep_temp);
         mms_lib_deinit();
     } else {
         fprintf(stderr, "%s\n", MMS_ERRMSG(error));

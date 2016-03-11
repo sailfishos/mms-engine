@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +15,7 @@
 
 #include "test_connman.h"
 #include "test_handler.h"
+#include "test_util.h"
 
 #include "mms_file_util.h"
 #include "mms_lib_log.h"
@@ -232,11 +234,12 @@ int main(int argc, char* argv[])
 {
     int ret;
     MMSConfig config;
-    const char* test_name = NULL;
+    const char* test = "test_read_ind";
+    const char* testcase = NULL;
 
     mms_lib_init(argv[0]);
     mms_lib_default_config(&config);
-    mms_log_default.name = "test_read_ind";
+    mms_log_default.name = test;
 
     if (argc > 1 && !strcmp(argv[1], "-v")) {
         mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
@@ -249,18 +252,17 @@ int main(int argc, char* argv[])
     }
 
     if (argc == 2 && argv[1][0] != '-') {
-        test_name = argv[1];
+        testcase = argv[1];
     }
 
-    if (argc == 1 || test_name) {
-        char* tmpd = g_mkdtemp(g_strdup("/tmp/test_read_ind_XXXXXX"));
-        MMS_VERBOSE("Temporary directory %s", tmpd);
-        config.root_dir = tmpd;
+    if (argc == 1 || testcase) {
+        TestDirs dirs;
+        test_dirs_init(&dirs, test);
+        config.root_dir = dirs.root;
         config.idle_secs = 0;
         config.attic_enabled = TRUE;
-        ret = test_run(&config, test_name);
-        remove(tmpd);
-        g_free(tmpd);
+        ret = test_run(&config, testcase);
+        test_dirs_cleanup(&dirs, TRUE);
     } else {
         printf("Usage: test_read_ind [-v] [TEST]\n");
         ret = RET_ERR;
