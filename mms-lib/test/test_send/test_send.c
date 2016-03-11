@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -54,6 +54,7 @@ typedef struct test_desc {
 } TestDesc;
 
 #define TEST_FLAG_CANCEL                  (0x1000)
+#define TEST_FLAG_NO_SIM                  (0x2000)
 #define TEST_FLAG_REQUEST_DELIVERY_REPORT MMS_SEND_FLAG_REQUEST_DELIVERY_REPORT
 #define TEST_FLAG_REQUEST_READ_REPORT     MMS_SEND_FLAG_REQUEST_READ_REPORT
 
@@ -61,7 +62,9 @@ typedef struct test_desc {
 #define TEST_DISPATCHER_FLAGS       (\
   TEST_FLAG_REQUEST_DELIVERY_REPORT |\
   TEST_FLAG_REQUEST_READ_REPORT     )
-#define TEST_PRIVATE_FLAGS                TEST_FLAG_CANCEL
+#define TEST_PRIVATE_FLAGS (\
+  TEST_FLAG_CANCEL         |\
+  TEST_FLAG_NO_SIM         )
 G_STATIC_ASSERT(!(TEST_PRIVATE_FLAGS & TEST_DISPATCHER_FLAGS));
 
 typedef struct test {
@@ -250,6 +253,22 @@ static const TestDesc send_tests[] = {
         MMS_SEND_STATE_TOO_BIG,
         NULL,
         NULL
+    },{
+        "NoSim",
+        NULL, 0,
+        0,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        TEST_FLAG_NO_SIM,
+        NULL,
+        NULL,
+        0,
+        MMS_SEND_STATE_SEND_ERROR,
+        NULL,
+        NULL
     }
 };
 
@@ -370,6 +389,9 @@ test_init(
             desc->resp_status);
         port = test_http_get_port(test->http);
         mms_connman_test_set_port(test->cm, port, TRUE);
+        if (desc->flags & TEST_FLAG_NO_SIM) {
+            mms_connman_test_set_default_imsi(test->cm, NULL);
+        }
         if (desc->flags & TEST_FLAG_CANCEL) {
             mms_connman_test_set_connect_callback(test->cm, test_cancel, test);
         }
@@ -427,11 +449,10 @@ test_run_once(
         char* imsi = desc->imsi ? g_strdup(desc->imsi) :
             mms_connman_default_imsi(test.cm);
         const char* id = mms_handler_test_send_new(test.handler, imsi);
-        char* imsi2 = mms_dispatcher_send_message(test.disp, id, imsi,
+        char* imsi2 = mms_dispatcher_send_message(test.disp, id, desc->imsi,
             desc->to, desc->cc, desc->bcc, desc->subject,
             desc->flags & TEST_DISPATCHER_FLAGS, test.parts,
             desc->nparts, &error);
-        MMS_ASSERT(imsi2 && (!desc->imsi || !strcmp(desc->imsi, imsi2)));
         test.id = g_strdup(id);
         if (imsi2 && (!desc->imsi || !strcmp(desc->imsi, imsi2)) &&
             mms_dispatcher_start(test.disp)) {
@@ -441,8 +462,11 @@ test_run_once(
             }
             test.ret = RET_OK;
             g_main_loop_run(test.loop);
+        } else if (!imsi2 && (desc->flags & TEST_FLAG_NO_SIM)) {
+            MMS_INFO("OK: %s", desc->name);
+            test.ret = RET_OK;
         } else {
-            MMS_INFO("%s FAILED", desc->name);
+            MMS_INFO("FAILED: %s", desc->name);
         }
         g_free(imsi);
         g_free(imsi2);
