@@ -468,6 +468,7 @@ test_run_once(
         } else {
             MMS_INFO("FAILED: %s", desc->name);
         }
+        if (error) g_error_free(error);
         g_free(imsi);
         g_free(imsi2);
         test_finalize(&test);
