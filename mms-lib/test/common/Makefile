@@ -134,6 +134,9 @@ test_banner:
 test: test_banner debug
 	@$(DEBUG_EXE)
 
+valgrind: test_banner debug
+	G_DEBUG=gc-friendly G_SLICE=always-malloc valgrind --tool=memcheck --leak-check=full --show-possibly-lost=no $(DEBUG_EXE)
+
 mms_lib_debug_lib:
 	@$(MMS_LIB_MAKE) debug
 
