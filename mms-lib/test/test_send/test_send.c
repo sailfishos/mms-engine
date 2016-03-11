@@ -542,7 +542,8 @@ int main(int argc, char* argv[])
         if (verbose) {
             mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
         } else {
-            mms_task_send_log.level = MMS_LOGLEVEL_NONE;
+            mms_task_send_log.level =
+            mms_dispatcher_log.level = MMS_LOGLEVEL_NONE;
             mms_log_default.level = MMS_LOGLEVEL_INFO;
             mms_log_stdout_timestamp = FALSE;
         }
