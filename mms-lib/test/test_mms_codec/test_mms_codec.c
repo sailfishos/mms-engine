@@ -29,7 +29,8 @@ test_file(
 {
     GError* error = NULL;
     char* path = g_strconcat(DATA_DIR, file, NULL);
-    GMappedFile* map = g_mapped_file_new(path, FALSE, &error);
+    const char* fname = g_file_test(path, G_FILE_TEST_EXISTS) ? path : file;
+    GMappedFile* map = g_mapped_file_new(fname, FALSE, &error);
     g_free(path);
     if (map) {
         struct mms_message* msg = g_new0(struct mms_message, 1);
