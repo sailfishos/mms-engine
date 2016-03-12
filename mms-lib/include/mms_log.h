@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -79,10 +79,10 @@
 #  define MMS_WARN_                 GWARN_
 #  define MMS_INFO                  GINFO
 #  define MMS_INFO_                 GINFO_
-#  define MMS_DEBUG                 MMS_DEBUG
-#  define MMS_DEBUG_                MMS_DEBUG_
-#  define MMS_VERBOSE               MMS_VERBOSE
-#  define MMS_VERBOSE_              MMS_VERBOSE_
+#  define MMS_DEBUG                 GDEBUG
+#  define MMS_DEBUG_                GDEBUG_
+#  define MMS_VERBOSE               GVERBOSE
+#  define MMS_VERBOSE_              GVERBOSE_
 #endif /* GLOG_VARARGS */
 
 #endif /* JOLLA_MMS_LOG_H */
