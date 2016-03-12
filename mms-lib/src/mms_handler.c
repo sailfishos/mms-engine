@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -142,7 +142,7 @@ mms_handler_message_notify_cancel(
     if (h && call) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_notify_cancel) {
-            return klass->fn_message_notify_cancel(h, call);
+            klass->fn_message_notify_cancel(h, call);
         }
         MMS_ERR("mms_handler_message_notify_cancel not implemented");
     }
@@ -162,7 +162,7 @@ mms_handler_message_received(
         }
         MMS_ERR("mms_handler_message_received not implemented");
     }
-    return FALSE;
+    return NULL;
 }
 
 void
@@ -173,7 +173,7 @@ mms_handler_message_received_cancel(
     if (h && call) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_received_cancel) {
-            return klass->fn_message_received_cancel(h, call);
+            klass->fn_message_received_cancel(h, call);
         }
         MMS_ERR("mms_handler_message_notify_cancel not implemented");
     }
