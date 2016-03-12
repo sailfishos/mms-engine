@@ -143,8 +143,9 @@ mms_handler_message_notify_cancel(
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_notify_cancel) {
             klass->fn_message_notify_cancel(h, call);
+        } else {
+            MMS_ERR("mms_handler_message_notify_cancel not implemented");
         }
-        MMS_ERR("mms_handler_message_notify_cancel not implemented");
     }
 }
 
@@ -174,8 +175,9 @@ mms_handler_message_received_cancel(
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_received_cancel) {
             klass->fn_message_received_cancel(h, call);
+        } else {
+            MMS_ERR("mms_handler_message_notify_cancel not implemented");
         }
-        MMS_ERR("mms_handler_message_notify_cancel not implemented");
     }
 }
 
