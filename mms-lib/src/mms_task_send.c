@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,7 +29,7 @@ MMS_LOG_MODULE_DEFINE2("mms-task-send", MMS_TASK_HTTP_LOG);
 typedef MMSTaskHttpClass MMSTaskSendClass;
 typedef MMSTaskHttp MMSTaskSend;
 
-G_DEFINE_TYPE(MMSTaskSend, mms_task_send, MMS_TYPE_TASK_HTTP);
+G_DEFINE_TYPE(MMSTaskSend, mms_task_send, MMS_TYPE_TASK_HTTP)
 #define MMS_TYPE_TASK_SEND (mms_task_send_get_type())
 #define MMS_TASK_SEND(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_TASK_SEND, MMSTaskSend))
@@ -144,10 +144,12 @@ mms_task_send_init(
 /* Create MMS send task */
 MMSTask*
 mms_task_send_new(
-    MMSTask* parent)
+    MMSTask* parent,
+    MMSTransferList* transfers)
 {
-    return mms_task_http_alloc_with_parent(MMS_TYPE_TASK_SEND, parent, "Send",
-        NULL, MMS_SEND_CONF_FILE, MMS_SEND_REQ_FILE);
+    return mms_task_http_alloc_with_parent(MMS_TYPE_TASK_SEND, parent,
+        transfers, MMS_TRANSFER_TYPE_SEND, NULL, MMS_SEND_CONF_FILE,
+        MMS_SEND_REQ_FILE);
 }
 
 /*

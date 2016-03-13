@@ -37,6 +37,16 @@ typedef enum _MMS_TASK_STATE {
     MMS_TASK_STATE_COUNT                 /* Number of valid states */
 } MMS_TASK_STATE;
 
+/*
+ * Transfer types which double as task names. These are part of the D-Bus API,
+ * don't change them just because you don't like them
+ */
+#define MMS_TRANSFER_TYPE_ACK           "Ack"
+#define MMS_TRANSFER_TYPE_NOTIFY_RESP   "NotifyResp"
+#define MMS_TRANSFER_TYPE_READ_REPORT   "ReadReport"
+#define MMS_TRANSFER_TYPE_RETRIEVE      "Retrieve"
+#define MMS_TRANSFER_TYPE_SEND          "Send"
+
 /* Task priority */
 typedef enum _MMS_TASK_PRIORITY {
     MMS_TASK_PRIORITY_NORMAL,            /* Default priority */
@@ -176,6 +186,7 @@ MMSTask*
 mms_task_notification_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* imsi,
     GBytes* bytes,
     GError** error);
@@ -184,6 +195,7 @@ MMSTask*
 mms_task_retrieve_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const MMSPdu* pdu,
@@ -193,24 +205,28 @@ mms_task_retrieve_new(
 MMSTask*
 mms_task_decode_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* transaction_id,
     const char* file);
 
 MMSTask*
 mms_task_notifyresp_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* transaction_id,
     MMSNotifyStatus status);
 
 MMSTask*
 mms_task_ack_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* transaction_id);
 
 MMSTask*
 mms_task_read_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const char* message_id,
@@ -228,6 +244,7 @@ MMSTask*
 mms_task_encode_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const char* to,
@@ -241,7 +258,8 @@ mms_task_encode_new(
 
 MMSTask*
 mms_task_send_new(
-    MMSTask* parent);
+    MMSTask* parent,
+    MMSTransferList* transfers);
 
 #endif /* JOLLA_MMS_TASK_H */
 

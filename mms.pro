@@ -6,6 +6,7 @@ SUBDIRS += \
   mms-connman-ofono \
   mms-handler-dbus \
   mms-settings-dconf \
+  mms-transfer-list-dbus \
   mms-engine \
   mms-dump \
   mms-send

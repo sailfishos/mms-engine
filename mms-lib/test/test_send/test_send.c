@@ -369,7 +369,7 @@ test_init(
     if (!desc->resp_file || test->resp_file) {
         int i;
         guint port;
-        MMSSettings* settings = mms_settings_default_new(config);
+        MMSSettings* set = mms_settings_default_new(config);
         test->parts = g_new0(MMSAttachmentInfo, desc->nparts);
         test->files = g_new0(char*, desc->nparts);
         for (i=0; i<desc->nparts; i++) {
@@ -382,7 +382,7 @@ test_init(
         test->desc = desc;
         test->cm = mms_connman_test_new();
         test->handler = mms_handler_test_new();
-        test->disp = mms_dispatcher_new(settings, test->cm, test->handler);
+        test->disp = mms_dispatcher_new(set, test->cm, test->handler, NULL);
         test->loop = g_main_loop_new(NULL, FALSE);
         test->delegate.fn_done = test_done;
         mms_dispatcher_set_delegate(test->disp, &test->delegate);
@@ -400,10 +400,10 @@ test_init(
             MMSSettingsSimData sim_settings;
             mms_settings_sim_data_default(&sim_settings);
             sim_settings.size_limit = desc->size_limit;
-            mms_settings_set_sim_defaults(settings, NULL);
-            mms_settings_set_sim_defaults(settings, &sim_settings);
+            mms_settings_set_sim_defaults(set, NULL);
+            mms_settings_set_sim_defaults(set, &sim_settings);
         }
-        mms_settings_unref(settings);
+        mms_settings_unref(set);
         test->ret = RET_ERR;
         ok = TRUE;
     }

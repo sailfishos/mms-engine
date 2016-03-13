@@ -19,6 +19,7 @@
 #include "mms_lib_util.h"
 #include "mms_handler_dbus.h"
 #include "mms_settings_dconf.h"
+#include "mms_transfer_list_dbus.h"
 #include "mms_log.h"
 
 #include <gutil_misc.h>
@@ -472,6 +473,7 @@ mms_engine_new(
         MMSEngine* mms = g_object_new(MMS_TYPE_ENGINE, NULL);
         MMSHandler* handler = mms_handler_dbus_new();
         MMSSettings* settings = mms_settings_dconf_new(config);
+        MMSTransferList* txlist = mms_transfer_list_dbus_new();
 
         if (flags & MMS_ENGINE_FLAG_OVERRIDE_USER_AGENT) {
             settings->flags |= MMS_SETTINGS_FLAG_OVERRIDE_USER_AGENT;
@@ -494,8 +496,9 @@ mms_engine_new(
             settings->sim_defaults.data.max_pixels = override->max_pixels;
         }
 
-        mms->dispatcher = mms_dispatcher_new(settings, cm, handler);
+        mms->dispatcher = mms_dispatcher_new(settings, cm, handler, txlist);
         mms_handler_unref(handler);
+        mms_transfer_list_unref(txlist);
         mms_dispatcher_set_delegate(mms->dispatcher,
             &mms->dispatcher_delegate);
 

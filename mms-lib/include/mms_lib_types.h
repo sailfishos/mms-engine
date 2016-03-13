@@ -60,6 +60,7 @@ typedef struct mms_handler MMSHandler;
 typedef struct mms_connman MMSConnMan;
 typedef struct mms_dispatcher MMSDispatcher;
 typedef struct mms_connection MMSConnection;
+typedef struct mms_transfer_list MMSTransferList;
 typedef struct mms_message MMSPdu;
 typedef struct _mms_message MMSMessage;
 typedef struct _mms_attachment MMSAttachment;

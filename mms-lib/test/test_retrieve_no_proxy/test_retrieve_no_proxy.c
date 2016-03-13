@@ -143,10 +143,10 @@ test_init(
         char* port_string;
         char* push_data;
         gsize push_len;
-        MMSSettings* settings = mms_settings_default_new(config);
+        MMSSettings* set = mms_settings_default_new(config);
         test->cm = mms_connman_test_new();
         test->handler = mms_handler_test_new();
-        test->disp = mms_dispatcher_new(settings, test->cm, test->handler);
+        test->disp = mms_dispatcher_new(set, test->cm, test->handler, NULL);
         test->loop = g_main_loop_new(NULL, FALSE);
         test->timeout_id = g_timeout_add_seconds(10, test_timeout, test);
         test->delegate.fn_done = test_done;
@@ -166,7 +166,7 @@ test_init(
 
         g_free(push_data);
         g_free(port_string);
-        mms_settings_unref(settings);
+        mms_settings_unref(set);
         test->ret = RET_ERR;
         ok = TRUE;
     } else {

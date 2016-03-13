@@ -17,6 +17,9 @@
 #include "mms_connection.h"
 #include "mms_settings.h"
 #include "mms_file_util.h"
+#include "mms_transfer_list.h"
+
+#include <gutil_misc.h>
 
 #ifndef _WIN32
 #  include <sys/ioctl.h>
@@ -44,6 +47,15 @@ typedef enum _mms_http_state {
 
 #define MMS_HTTP_MAX_CHUNK (4046)
 
+/* Soup message signals */
+enum mms_http_soup_message_signals {
+    MMS_SOUP_MESSAGE_SIGNAL_WROTE_HEADERS,
+    MMS_SOUP_MESSAGE_SIGNAL_WROTE_CHUNK,
+    MMS_SOUP_MESSAGE_SIGNAL_GOT_HEADERS,
+    MMS_SOUP_MESSAGE_SIGNAL_GOT_CHUNK,
+    MMS_SOUP_MESSAGE_SIGNAL_COUNT
+};
+
 /* Transfer context */
 typedef struct mms_http_transfer {
     MMSConnection* connection;
@@ -51,6 +63,11 @@ typedef struct mms_http_transfer {
     SoupMessage* message;
     int receive_fd;
     int send_fd;
+    guint bytes_sent;
+    guint bytes_received;
+    guint bytes_to_send;
+    guint bytes_to_receive;
+    gulong msg_signal_id[MMS_SOUP_MESSAGE_SIGNAL_COUNT];
 } MMSHttpTransfer;
 
 /* Private state */
@@ -59,12 +76,8 @@ struct mms_task_http_priv {
     char* uri;
     char* send_path;
     char* receive_path;
-    const char* receive_file;
-    gulong wrote_headers_signal_id;
-    gulong wrote_chunk_signal_id;
-    gulong got_chunk_signal_id;
-    gsize bytes_sent;
-    guint bytes_received;
+    char* receive_file;
+    char* transfer_type;
     MMS_HTTP_STATE transaction_state;
     MMS_CONNECTION_TYPE connection_type;
 };
@@ -184,7 +197,7 @@ mms_http_transfer_new(
 {
     SoupURI* soup_uri = mms_http_uri_parse(uri);
     if (soup_uri) {
-        MMSHttpTransfer* tx = g_new(MMSHttpTransfer, 1);
+        MMSHttpTransfer* tx = g_new0(MMSHttpTransfer, 1);
         tx->session = mms_http_create_session(cfg, connection);
         tx->message = soup_message_new_from_uri(method, soup_uri);
         tx->connection = mms_connection_ref(connection);
@@ -211,6 +224,8 @@ mms_http_transfer_free(
     MMSHttpTransfer* tx)
 {
     if (tx) {
+        gutil_disconnect_handlers(tx->message, tx->msg_signal_id,
+            G_N_ELEMENTS(tx->msg_signal_id));
         soup_session_abort(tx->session);
         g_object_unref(tx->session);
         g_object_unref(tx->message);
@@ -218,6 +233,36 @@ mms_http_transfer_free(
         if (tx->receive_fd >= 0) close(tx->receive_fd);
         if (tx->send_fd >= 0) close(tx->send_fd);
         g_free(tx);
+    }
+}
+
+static
+void
+mms_task_http_send_progress(
+    MMSTaskHttp* http)
+{
+    MMSTaskHttpPriv* priv = http->priv;
+    MMSHttpTransfer* tx = priv->tx;
+    if (tx) {
+        MMS_ASSERT(tx->bytes_sent <= tx->bytes_to_send);
+        mms_transfer_list_transfer_send_progress(http->transfers,
+            http->task.id, priv->transfer_type, tx->bytes_sent,
+            tx->bytes_to_send);
+    }
+}
+
+static
+void
+mms_task_http_receive_progress(
+    MMSTaskHttp* http)
+{
+    MMSTaskHttpPriv* priv = http->priv;
+    MMSHttpTransfer* tx = priv->tx;
+    if (tx) {
+        MMS_ASSERT(tx->bytes_received <= tx->bytes_to_receive);
+        mms_transfer_list_transfer_receive_progress(http->transfers,
+            http->task.id, priv->transfer_type, tx->bytes_received,
+            tx->bytes_to_receive);
     }
 }
 
@@ -232,6 +277,20 @@ mms_task_http_set_state(
     if (priv->transaction_state != new_state &&
         priv->transaction_state != MMS_HTTP_DONE) {
         MMSTaskHttpClass* klass = MMS_TASK_HTTP_GET_CLASS(http);
+        const gboolean is_active = (new_state == MMS_HTTP_ACTIVE);
+
+        /* Notify interested parties about transfer state changes */
+        if (is_active != (priv->transaction_state == MMS_HTTP_ACTIVE)) {
+            if (is_active) {
+                mms_transfer_list_transfer_started(http->transfers,
+                    http->task.id, priv->transfer_type);
+                mms_task_http_send_progress(http);
+            } else {
+                mms_transfer_list_transfer_finished(http->transfers,
+                    http->task.id, priv->transfer_type);
+            }
+        }
+
         priv->transaction_state = new_state;
         switch (new_state) {
         case MMS_HTTP_ACTIVE:
@@ -256,19 +315,6 @@ mms_task_http_finish_transfer(
 {
     MMSTaskHttpPriv* priv = http->priv;
     if (priv->tx) {
-        SoupMessage* msg = priv->tx->message;
-        if (priv->wrote_headers_signal_id) {
-            g_signal_handler_disconnect(msg, priv->wrote_headers_signal_id);
-            priv->wrote_headers_signal_id = 0;
-        }
-        if (priv->wrote_chunk_signal_id) {
-            g_signal_handler_disconnect(msg, priv->wrote_chunk_signal_id);
-            priv->wrote_chunk_signal_id = 0;
-        }
-        if (priv->got_chunk_signal_id) {
-            g_signal_handler_disconnect(msg, priv->got_chunk_signal_id);
-            priv->got_chunk_signal_id = 0;
-        }
         mms_http_transfer_free(priv->tx);
         priv->tx = NULL;
     }
@@ -286,13 +332,14 @@ mms_task_http_finished(
     if (priv->tx && priv->tx->session == session) {
         MMS_HTTP_STATE next_http_state;
         MMSTask* task = &http->task;
+        MMSHttpTransfer* tx = priv->tx;
         SoupStatus http_status = msg->status_code;
 
 #if MMS_LOG_DEBUG
-        if (priv->bytes_received) {
+        if (tx->bytes_received) {
             MMS_DEBUG("HTTP status %u [%s] %u byte(s)", msg->status_code,
                 soup_message_headers_get_content_type(msg->response_headers,
-                NULL), priv->bytes_received);
+                NULL), tx->bytes_received);
         } else {
             MMS_DEBUG("HTTP status %u (%s)", msg->status_code,
                 soup_status_get_phrase(msg->status_code));
@@ -334,20 +381,45 @@ mms_task_http_write_next_chunk(
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
 #if MMS_LOG_VERBOSE
-    if (priv->bytes_sent) MMS_VERBOSE("%d bytes sent", (int)priv->bytes_sent);
+    if (tx->bytes_sent) {
+        MMS_VERBOSE("%u bytes sent", tx->bytes_sent);
+    }
 #endif
     MMS_ASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
         void* chunk = g_malloc(MMS_HTTP_MAX_CHUNK);
         int nbytes = read(tx->send_fd, chunk, MMS_HTTP_MAX_CHUNK);
         if (nbytes > 0) {
-            priv->bytes_sent += nbytes;
+            tx->bytes_sent += nbytes;
             soup_message_body_append_take(msg->request_body, chunk, nbytes);
+            mms_task_http_send_progress(http);
             return;
         }
         g_free(chunk);
     }
     soup_message_body_complete(msg->request_body);
+}
+
+static
+void
+mms_task_http_got_headers(
+    SoupMessage* msg,
+    MMSTaskHttp* http)
+{
+    MMSTaskHttpPriv* priv = http->priv;
+    MMSHttpTransfer* tx = priv->tx;
+    MMS_ASSERT(tx && tx->message == msg);
+    if (tx && tx->message == msg) {
+        MMS_ASSERT(!tx->bytes_received);
+        tx->bytes_to_receive = (guint)soup_message_headers_get_content_length(
+            msg->response_headers);
+#if MMS_LOG_VERBOSE
+        if (tx->bytes_to_receive) {
+            MMS_VERBOSE("Receiving %u bytes", tx->bytes_to_receive);
+        }
+#endif
+        mms_task_http_receive_progress(http);
+    }
 }
 
 static
@@ -361,9 +433,11 @@ mms_task_http_got_chunk(
     MMSHttpTransfer* tx = priv->tx;
     MMS_ASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
-        priv->bytes_received += buf->length;
-        MMS_VERBOSE("%u bytes received", priv->bytes_received);
-        if (write(tx->receive_fd, buf->data, buf->length) != (int)buf->length) {
+        tx->bytes_received += buf->length;
+        MMS_VERBOSE("%u bytes received", tx->bytes_received);
+        if (write(tx->receive_fd, buf->data, buf->length) == (int)buf->length) {
+            mms_task_http_receive_progress(http);
+        } else {
             MMS_ERR("Write error: %s", strerror(errno));
             mms_task_http_finish_transfer(http);
             mms_task_http_set_state(http, MMS_HTTP_PAUSED, 0);
@@ -384,7 +458,6 @@ mms_task_http_start(
     MMSTaskHttpPriv* priv = http->priv;
     MMS_ASSERT(mms_connection_is_open(connection));
     mms_task_http_finish_transfer(http);
-    priv->bytes_sent = 0;
 
     /* Open the files */
     if (priv->send_path) {
@@ -426,11 +499,13 @@ mms_task_http_start(
             connection, priv->send_path ? SOUP_METHOD_POST : SOUP_METHOD_GET,
             uri, receive_fd, send_fd);
         if (priv->tx) {
-            SoupMessage* msg = priv->tx->message;
+            MMSHttpTransfer* tx = priv->tx;
+            SoupMessage* msg = tx->message;
             soup_message_body_set_accumulate(msg->response_body, FALSE);
 
             /* If we have data to send */
             if (priv->send_path) {
+                tx->bytes_to_send = bytes_to_send;
                 soup_message_headers_set_content_type(
                     msg->request_headers,
                     MMS_CONTENT_TYPE, NULL);
@@ -439,18 +514,21 @@ mms_task_http_start(
                     bytes_to_send);
 
                 /* Connect the signals */
-                priv->wrote_headers_signal_id =
+                tx->msg_signal_id[MMS_SOUP_MESSAGE_SIGNAL_WROTE_HEADERS] =
                     g_signal_connect(msg, "wrote_headers",
                     G_CALLBACK(mms_task_http_write_next_chunk), http);
-                priv->wrote_chunk_signal_id =
+                tx->msg_signal_id[MMS_SOUP_MESSAGE_SIGNAL_WROTE_CHUNK] =
                     g_signal_connect(msg, "wrote_chunk",
                     G_CALLBACK(mms_task_http_write_next_chunk), http);
             }
 
             /* If we expect to receive data */
             if (priv->receive_path) {
-                priv->got_chunk_signal_id =
-                    g_signal_connect(msg, "got-chunk",
+                tx->msg_signal_id[MMS_SOUP_MESSAGE_SIGNAL_GOT_HEADERS] =
+                    g_signal_connect(msg, "got_headers",
+                    G_CALLBACK(mms_task_http_got_headers), http);
+                tx->msg_signal_id[MMS_SOUP_MESSAGE_SIGNAL_GOT_CHUNK] =
+                    g_signal_connect(msg, "got_chunk",
                     G_CALLBACK(mms_task_http_got_chunk), http);
             }
 
@@ -478,7 +556,6 @@ mms_task_http_start(
             g_object_ref(msg);
             soup_session_queue_message(priv->tx->session, msg,
                 mms_task_http_finished, http);
-
             return TRUE;
         }
     }
@@ -566,17 +643,18 @@ mms_task_http_finalize(
     GObject* object)
 {
     MMSTaskHttp* http = MMS_TASK_HTTP(object);
-    MMS_ASSERT(!http->priv->tx);
-    MMS_ASSERT(!http->priv->got_chunk_signal_id);
-    MMS_ASSERT(!http->priv->wrote_headers_signal_id);
-    MMS_ASSERT(!http->priv->wrote_chunk_signal_id);
+    MMSTaskHttpPriv* priv = http->priv;
+    MMS_ASSERT(!priv->tx);
     if (!task_config(&http->task)->keep_temp_files) {
-        mms_remove_file_and_dir(http->priv->send_path);
-        mms_remove_file_and_dir(http->priv->receive_path);
+        mms_remove_file_and_dir(priv->send_path);
+        mms_remove_file_and_dir(priv->receive_path);
     }
-    g_free(http->priv->uri);
-    g_free(http->priv->send_path);
-    g_free(http->priv->receive_path);
+    g_free(priv->uri);
+    g_free(priv->transfer_type);
+    g_free(priv->send_path);
+    g_free(priv->receive_path);
+    g_free(priv->receive_file);
+    mms_transfer_list_unref(http->transfers);
     G_OBJECT_CLASS(mms_task_http_parent_class)->finalize(object);
 }
 
@@ -619,7 +697,8 @@ mms_task_http_alloc(
     GType type,                 /* Zero for MMS_TYPE_TASK_HTTP       */
     MMSSettings* settings,      /* Settings                          */
     MMSHandler* handler,        /* MMS handler                       */
-    const char* name,           /* Task name                         */
+    MMSTransferList* transfers, /* Transfer list                     */
+    const char* name,           /* Task name (and transfer type)     */
     const char* id,             /* Database message id               */
     const char* imsi,           /* IMSI associated with the message  */
     const char* uri,            /* NULL to use MMSC URL              */
@@ -630,8 +709,10 @@ mms_task_http_alloc(
     MMSTaskHttp* http = mms_task_alloc(type ? type : MMS_TYPE_TASK_HTTP,
         settings, handler, name, id, imsi);
     MMSTaskHttpPriv* priv = http->priv;
+    http->transfers = mms_transfer_list_ref(transfers);
     priv->uri = g_strdup(uri);
-    priv->receive_file = receive_file; /* Always static, don't strdup */
+    priv->receive_file = g_strdup(receive_file);
+    priv->transfer_type = g_strdup(name);
     priv->connection_type = ct;
     if (send_file) {
         priv->send_path = mms_task_file(&http->task, send_file);
@@ -644,14 +725,15 @@ void*
 mms_task_http_alloc_with_parent(
     GType type,                 /* Zero for MMS_TYPE_TASK_HTTP       */
     MMSTask* parent,            /* Parent task                       */
+    MMSTransferList* transfers, /* Transfer list                     */
     const char* name,           /* Task name                         */
     const char* uri,            /* NULL to use MMSC URL              */
     const char* receive_file,   /* File to write data to (optional)  */
     const char* send_file)      /* File to read data from (optional) */
 {
     return mms_task_http_alloc(type, parent->settings, parent->handler,
-        name, parent->id, parent->imsi, uri, receive_file, send_file,
-        MMS_CONNECTION_TYPE_AUTO);
+        transfers, name, parent->id, parent->imsi, uri, receive_file,
+        send_file, MMS_CONNECTION_TYPE_AUTO);
 }
 
 /*

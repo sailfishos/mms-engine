@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 #include "mms_handler.h"
 #include "mms_message.h"
 #include "mms_file_util.h"
+#include "mms_transfer_list.h"
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_task_decode_log
@@ -29,12 +30,13 @@ MMS_LOG_MODULE_DEFINE2("mms-task-decode", MMS_TASK_LOG);
 typedef MMSTaskClass MMSTaskDecodeClass;
 typedef struct mms_task_decode {
     MMSTask task;
+    MMSTransferList* transfers;
     GMappedFile* map;
     char* transaction_id;
     char* file;
 } MMSTaskDecode;
 
-G_DEFINE_TYPE(MMSTaskDecode, mms_task_decode, MMS_TYPE_TASK);
+G_DEFINE_TYPE(MMSTaskDecode, mms_task_decode, MMS_TYPE_TASK)
 #define MMS_TYPE_TASK_DECODE (mms_task_decode_get_type())
 #define MMS_TASK_DECODE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_TASK_DECODE, MMSTaskDecode))
@@ -268,7 +270,8 @@ mms_task_decode_process_pdu(
                 if (msg) {
                     /* Successfully received and decoded MMS message */
                     mms_task_queue_and_unref(task->delegate,
-                        mms_task_ack_new(task, dec->transaction_id));
+                        mms_task_ack_new(task, dec->transfers,
+                            dec->transaction_id));
                     mms_task_queue_and_unref(task->delegate,
                         mms_task_publish_new(task->settings,
                             task->handler, msg));
@@ -293,7 +296,7 @@ mms_task_decode_process_pdu(
 
     /* Tell MMS server that we didn't understand this PDU */
     mms_task_queue_and_unref(task->delegate,
-        mms_task_notifyresp_new(task, dec->transaction_id,
+        mms_task_notifyresp_new(task, dec->transfers, dec->transaction_id,
             MMS_MESSAGE_NOTIFY_STATUS_UNRECOGNISED));
     mms_handler_message_receive_state_changed(task->handler, task->id,
         MMS_RECEIVE_STATE_DECODING_ERROR);
@@ -319,6 +322,7 @@ mms_task_decode_finalize(
     if (!task_config(&dec->task)->keep_temp_files) {
         mms_remove_file_and_dir(dec->file);
     }
+    mms_transfer_list_unref(dec->transfers);
     g_mapped_file_unref(dec->map);
     g_free(dec->transaction_id);
     g_free(dec->file);
@@ -345,6 +349,7 @@ mms_task_decode_init(
 MMSTask*
 mms_task_decode_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* transaction_id,
     const char* file)
 {
@@ -355,6 +360,7 @@ mms_task_decode_new(
         GError* error = NULL;
         dec->map = g_mapped_file_new(file, FALSE, &error);
         if (dec->map) {
+            dec->transfers = mms_transfer_list_ref(transfers);
             dec->transaction_id = g_strdup(transaction_id);
             dec->file = g_strdup(file);
             dec->task.priority = MMS_TASK_PRIORITY_POST_PROCESS;

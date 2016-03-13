@@ -18,6 +18,7 @@
 #include "mms_settings.h"
 #include "mms_connection.h"
 #include "mms_connman.h"
+#include "mms_transfer_list.h"
 #include "mms_file_util.h"
 #include "mms_codec.h"
 #include "mms_util.h"
@@ -39,6 +40,7 @@ struct mms_dispatcher {
     MMSHandler* handler;
     MMSConnMan* cm;
     MMSConnection* connection;
+    MMSTransferList* transfers;
     MMSDispatcherDelegate* delegate;
     GQueue* tasks;
     guint next_run_id;
@@ -570,7 +572,7 @@ mms_dispatcher_handle_push(
 {
     return mms_dispatcher_queue_and_unref_task(disp,
         mms_task_notification_new(disp->settings, disp->handler,
-            imsi, push, error));
+            disp->transfers, imsi, push, error));
 }
 
 /**
@@ -593,8 +595,9 @@ mms_dispatcher_receive_message(
             const MMSConfig* config = disp->settings->config;
             ok = mms_dispatcher_queue_and_unref_task(disp,
                 mms_task_retrieve_new(disp->settings, disp->handler,
-                    id, imsi, pdu, automatic ? MMS_CONNECTION_TYPE_AUTO :
-                    MMS_CONNECTION_TYPE_USER, error));
+                    disp->transfers, id, imsi, pdu, automatic ?
+                    MMS_CONNECTION_TYPE_AUTO : MMS_CONNECTION_TYPE_USER,
+                    error));
             if (config->keep_temp_files) {
                 char* dir = mms_message_dir(config, id);
                 mms_write_bytes(dir, MMS_NOTIFICATION_IND_FILE, bytes, NULL);
@@ -624,7 +627,7 @@ mms_dispatcher_send_read_report(
     GError** error)
 {
     return mms_dispatcher_queue_and_unref_task(disp,
-        mms_task_read_new(disp->settings, disp->handler,
+        mms_task_read_new(disp->settings, disp->handler, disp->transfers,
             id, imsi, message_id, to, status, error));
 }
 
@@ -652,8 +655,8 @@ mms_dispatcher_send_message(
     }
     if (imsi) {
         if (mms_dispatcher_queue_and_unref_task(disp,
-            mms_task_encode_new(disp->settings, disp->handler, id, imsi,
-            to, cc, bcc, subject, flags, parts, nparts, error))) {
+            mms_task_encode_new(disp->settings, disp->handler, disp->transfers,
+            id, imsi, to, cc, bcc, subject, flags, parts, nparts, error))) {
             return default_imsi ? default_imsi : g_strdup(imsi);
         }
     } else {
@@ -754,7 +757,8 @@ MMSDispatcher*
 mms_dispatcher_new(
     MMSSettings* settings,
     MMSConnMan* cm,
-    MMSHandler* handler)
+    MMSHandler* handler,
+    MMSTransferList* transfers)
 {
     MMSDispatcher* disp = g_new0(MMSDispatcher, 1);
     disp->ref_count = 1;
@@ -762,6 +766,7 @@ mms_dispatcher_new(
     disp->tasks = g_queue_new();
     disp->handler = mms_handler_ref(handler);
     disp->cm = mms_connman_ref(cm);
+    disp->transfers = mms_transfer_list_ref(transfers);
     disp->task_delegate.fn_task_queue =
         mms_dispatcher_delegate_task_queue;
     disp->task_delegate.fn_task_state_changed =
@@ -794,6 +799,7 @@ mms_dispatcher_finalize(
         mms_task_unref(task);
     }
     g_queue_free(disp->tasks);
+    mms_transfer_list_unref(disp->transfers);
     mms_settings_unref(disp->settings);
     mms_handler_unref(disp->handler);
     mms_connman_unref(disp->cm);

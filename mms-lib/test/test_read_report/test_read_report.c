@@ -148,7 +148,7 @@ test_init(
     test->desc = desc;
     test->cm = mms_connman_test_new();
     test->handler = mms_handler_test_new();
-    test->disp = mms_dispatcher_new(settings, test->cm, test->handler);
+    test->disp = mms_dispatcher_new(settings, test->cm, test->handler, NULL);
     test->loop = g_main_loop_new(NULL, FALSE);
     test->delegate.fn_done = test_done;
     mms_dispatcher_set_delegate(test->disp, &test->delegate);
