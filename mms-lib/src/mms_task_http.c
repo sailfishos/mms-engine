@@ -54,7 +54,7 @@ typedef struct mms_http_transfer {
 } MMSHttpTransfer;
 
 /* Private state */
-struct mms_task_http_private {
+struct mms_task_http_priv {
     MMSHttpTransfer* tx;
     char* uri;
     char* send_path;
@@ -69,7 +69,7 @@ struct mms_task_http_private {
     MMS_CONNECTION_TYPE connection_type;
 };
 
-G_DEFINE_TYPE(MMSTaskHttp, mms_task_http, MMS_TYPE_TASK);
+G_DEFINE_TYPE(MMSTaskHttp, mms_task_http, MMS_TYPE_TASK)
 #define MMS_TYPE_TASK_HTTP (mms_task_http_get_type())
 #define MMS_TASK_HTTP(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_TASK_HTTP, MMSTaskHttp))
@@ -228,7 +228,7 @@ mms_task_http_set_state(
     MMS_HTTP_STATE new_state,
     SoupStatus ss)
 {
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     if (priv->transaction_state != new_state &&
         priv->transaction_state != MMS_HTTP_DONE) {
         MMSTaskHttpClass* klass = MMS_TASK_HTTP_GET_CLASS(http);
@@ -254,7 +254,7 @@ void
 mms_task_http_finish_transfer(
     MMSTaskHttp* http)
 {
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     if (priv->tx) {
         SoupMessage* msg = priv->tx->message;
         if (priv->wrote_headers_signal_id) {
@@ -282,7 +282,7 @@ mms_task_http_finished(
     gpointer user_data)
 {
     MMSTaskHttp* http = user_data;
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     if (priv->tx && priv->tx->session == session) {
         MMS_HTTP_STATE next_http_state;
         MMSTask* task = &http->task;
@@ -331,7 +331,7 @@ mms_task_http_write_next_chunk(
     SoupMessage* msg,
     MMSTaskHttp* http)
 {
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
 #if MMS_LOG_VERBOSE
     if (priv->bytes_sent) MMS_VERBOSE("%d bytes sent", (int)priv->bytes_sent);
@@ -357,7 +357,7 @@ mms_task_http_got_chunk(
     SoupBuffer* buf,
     MMSTaskHttp* http)
 {
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
     MMS_ASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
@@ -381,7 +381,7 @@ mms_task_http_start(
     int send_fd = -1;
     int receive_fd = -1;
     guint bytes_to_send = 0;
-    MMSTaskHttpPrivate* priv = http->priv;
+    MMSTaskHttpPriv* priv = http->priv;
     MMS_ASSERT(mms_connection_is_open(connection));
     mms_task_http_finish_transfer(http);
     priv->bytes_sent = 0;
@@ -577,7 +577,6 @@ mms_task_http_finalize(
     g_free(http->priv->uri);
     g_free(http->priv->send_path);
     g_free(http->priv->receive_path);
-    g_free(http->priv);
     G_OBJECT_CLASS(mms_task_http_parent_class)->finalize(object);
 }
 
@@ -591,6 +590,7 @@ mms_task_http_class_init(
 {
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
     MMSTaskClass* task_class = &klass->task;
+    g_type_class_add_private(klass, sizeof(MMSTaskHttpPriv));
     task_class->fn_run = mms_task_http_run;
     task_class->fn_transmit = mms_task_http_transmit;
     task_class->fn_network_unavailable = mms_task_http_network_unavailable;
@@ -605,8 +605,10 @@ mms_task_http_class_init(
 static
 void
 mms_task_http_init(
-    MMSTaskHttp* up)
+    MMSTaskHttp*  http)
 {
+    http->priv = G_TYPE_INSTANCE_GET_PRIVATE(http, MMS_TYPE_TASK_HTTP,
+        MMSTaskHttpPriv);
 }
 
 /**
@@ -627,8 +629,7 @@ mms_task_http_alloc(
 {
     MMSTaskHttp* http = mms_task_alloc(type ? type : MMS_TYPE_TASK_HTTP,
         settings, handler, name, id, imsi);
-    MMSTaskHttpPrivate* priv = g_new0(MMSTaskHttpPrivate, 1);
-    http->priv = priv;
+    MMSTaskHttpPriv* priv = http->priv;
     priv->uri = g_strdup(uri);
     priv->receive_file = receive_file; /* Always static, don't strdup */
     priv->connection_type = ct;

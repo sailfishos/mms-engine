@@ -21,6 +21,8 @@
 #include "mms_settings_dconf.h"
 #include "mms_log.h"
 
+#include <gutil_misc.h>
+
 #ifdef SAILFISH
 #  include "mms_connman_nemo.h"
 #  define mms_connman_new() mms_connman_nemo_new()
@@ -31,6 +33,21 @@
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.h"
+
+/* Signals D-Bus proxy */
+enum mms_engine_dbus_methods {
+    MMS_ENGINE_METHOD_SEND_MESSAGE,
+    MMS_ENGINE_METHOD_PUSH,
+    MMS_ENGINE_METHOD_PUSH_NOTIFY,
+    MMS_ENGINE_METHOD_CANCEL,
+    MMS_ENGINE_METHOD_RECEIVE_MESSAGE,
+    MMS_ENGINE_METHOD_SEND_READ_REPORT,
+    MMS_ENGINE_METHOD_SET_LOG_LEVEL,
+    MMS_ENGINE_METHOD_SET_LOG_TYPE,
+    MMS_ENGINE_METHOD_GET_VERSION,
+    MMS_ENGINE_METHOD_MIGRATE_SETTINGS,
+    MMS_ENGINE_METHOD_COUNT
+};
 
 struct mms_engine {
     GObject parent;
@@ -48,20 +65,11 @@ struct mms_engine {
     gboolean stop_requested;
     gboolean keep_running;
     guint start_timeout_id;
-    gulong send_message_id;
-    gulong push_signal_id;
-    gulong push_notify_signal_id;
-    gulong receive_signal_id;
-    gulong read_report_signal_id;
-    gulong cancel_signal_id;
-    gulong set_log_level_signal_id;
-    gulong set_log_type_signal_id;
-    gulong get_version_signal_id;
-    gulong migrate_settings_signal_id;
+    gulong proxy_signal_id[MMS_ENGINE_METHOD_COUNT];
 };
 
 typedef GObjectClass MMSEngineClass;
-G_DEFINE_TYPE(MMSEngine, mms_engine, G_TYPE_OBJECT);
+G_DEFINE_TYPE(MMSEngine, mms_engine, G_TYPE_OBJECT)
 #define MMS_TYPE_ENGINE (mms_engine_get_type())
 #define MMS_ENGINE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
         MMS_TYPE_ENGINE, MMSEngine))
@@ -501,34 +509,34 @@ mms_engine_new(
         mms->log_modules = log_modules;
         mms->log_count = log_count;
         mms->proxy = org_nemomobile_mms_engine_skeleton_new();
-        mms->send_message_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_SEND_MESSAGE] =
             g_signal_connect(mms->proxy, "handle-send-message",
             G_CALLBACK(mms_engine_handle_send_message), mms);
-        mms->push_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_PUSH] =
             g_signal_connect(mms->proxy, "handle-push",
             G_CALLBACK(mms_engine_handle_push), mms);
-        mms->push_notify_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_PUSH_NOTIFY] =
             g_signal_connect(mms->proxy, "handle-push-notify",
             G_CALLBACK(mms_engine_handle_push_notify), mms);
-        mms->cancel_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_CANCEL] =
             g_signal_connect(mms->proxy, "handle-cancel",
             G_CALLBACK(mms_engine_handle_cancel), mms);
-        mms->receive_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_RECEIVE_MESSAGE] =
             g_signal_connect(mms->proxy, "handle-receive-message",
             G_CALLBACK(mms_engine_handle_receive_message), mms);
-        mms->read_report_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_SEND_READ_REPORT] =
             g_signal_connect(mms->proxy, "handle-send-read-report",
             G_CALLBACK(mms_engine_handle_send_read_report), mms);
-        mms->set_log_level_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_SET_LOG_LEVEL] =
             g_signal_connect(mms->proxy, "handle-set-log-level",
             G_CALLBACK(mms_engine_handle_set_log_level), mms);
-        mms->set_log_type_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_SET_LOG_TYPE] =
             g_signal_connect(mms->proxy, "handle-set-log-type",
             G_CALLBACK(mms_engine_handle_set_log_type), mms);
-        mms->get_version_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_GET_VERSION] =
             g_signal_connect(mms->proxy, "handle-get-version",
             G_CALLBACK(mms_engine_handle_get_version), mms);
-        mms->migrate_settings_signal_id =
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_MIGRATE_SETTINGS] =
             g_signal_connect(mms->proxy, "handle-migrate-settings",
             G_CALLBACK(mms_engine_handle_migrate_settings), mms);
 
@@ -645,37 +653,29 @@ void
 mms_engine_dispose(
     GObject* object)
 {
-    MMSEngine* e = MMS_ENGINE(object);
-    MMS_VERBOSE_("%p", e);
-    MMS_ASSERT(!e->loop);
-    mms_engine_unregister(e);
-    mms_engine_start_timeout_cancel(e);
-    if (e->proxy) {
-        g_signal_handler_disconnect(e->proxy, e->send_message_id);
-        g_signal_handler_disconnect(e->proxy, e->push_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->push_notify_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->receive_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->read_report_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->cancel_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->set_log_level_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->set_log_type_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->get_version_signal_id);
-        g_signal_handler_disconnect(e->proxy, e->migrate_settings_signal_id);
-        g_object_unref(e->proxy);
-        e->proxy = NULL;
+    MMSEngine* mms = MMS_ENGINE(object);
+    MMS_VERBOSE_("%p", mms);
+    MMS_ASSERT(!mms->loop);
+    mms_engine_unregister(mms);
+    mms_engine_start_timeout_cancel(mms);
+    if (mms->proxy) {
+        gutil_disconnect_handlers(mms->proxy, mms->proxy_signal_id,
+            G_N_ELEMENTS(mms->proxy_signal_id));
+        g_object_unref(mms->proxy);
+        mms->proxy = NULL;
     }
-    if (e->dispatcher) {
-        mms_dispatcher_set_delegate(e->dispatcher, NULL);
-        mms_dispatcher_unref(e->dispatcher);
-        e->dispatcher = NULL;
+    if (mms->dispatcher) {
+        mms_dispatcher_set_delegate(mms->dispatcher, NULL);
+        mms_dispatcher_unref(mms->dispatcher);
+        mms->dispatcher = NULL;
     }
-    if (e->settings) {
-        mms_settings_unref(e->settings);
-        e->settings = NULL;
+    if (mms->settings) {
+        mms_settings_unref(mms->settings);
+        mms->settings = NULL;
     }
-    if (e->cm) {
-        mms_connman_unref(e->cm);
-        e->cm = NULL;
+    if (mms->cm) {
+        mms_connman_unref(mms->cm);
+        mms->cm = NULL;
     }
     G_OBJECT_CLASS(mms_engine_parent_class)->dispose(object);
 }

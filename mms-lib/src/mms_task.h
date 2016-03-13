@@ -45,6 +45,7 @@ typedef enum _MMS_TASK_PRIORITY {
 
 /* Delegate (one per task) */
 typedef struct mms_task MMSTask;
+typedef struct mms_task_priv MMSTaskPriv;
 typedef struct mms_task_delegate MMSTaskDelegate;
 struct mms_task_delegate {
     /* Submits new task to the queue */
@@ -60,6 +61,7 @@ struct mms_task_delegate {
 /* Task object */
 struct mms_task {
     GObject parent;                      /* Parent object */
+    MMSTaskPriv* priv;                   /* Private data */
     MMS_TASK_PRIORITY priority;          /* Task priority */
     int order;                           /* Task creation order */
     char* name;                          /* Task name for debug purposes */
@@ -69,10 +71,7 @@ struct mms_task {
     MMSHandler* handler;                 /* Message database interface */
     MMSTaskDelegate* delegate;           /* Observer */
     MMS_TASK_STATE state;                /* Task state */
-    time_t last_run_time;                /* Last run time */
     time_t deadline;                     /* Task deadline */
-    time_t wakeup_time;                  /* Wake up time (if sleeping) */
-    guint wakeup_id;                     /* ID of the wakeup source */
     int flags;                           /* Flags: */
 
 #define MMS_TASK_FLAG_CANCELLED (0x01)   /* Task has been cancelled */

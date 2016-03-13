@@ -28,7 +28,12 @@ MMS_LOG_MODULE_DEFINE("mms-task");
 
 #define MMS_TASK_DEFAULT_LIFETIME (600)
 
-G_DEFINE_TYPE(MMSTask, mms_task, G_TYPE_OBJECT);
+struct mms_task_priv {
+    guint wakeup_id;                     /* ID of the wakeup source */
+    time_t wakeup_time;                  /* Wake up time (if sleeping) */
+};
+
+G_DEFINE_TYPE(MMSTask, mms_task, G_TYPE_OBJECT)
 
 #define MMS_TASK(obj) \
     (G_TYPE_CHECK_INSTANCE_CAST((obj), MMS_TYPE_TASK, MMSTask))
@@ -56,8 +61,9 @@ gboolean
 mms_task_wakeup_callback(
     gpointer data)
 {
-    MMSTask* task = data;
-    task->wakeup_id = 0;
+    MMSTask* task = MMS_TASK(data);
+    MMSTaskPriv* priv = task->priv;
+    priv->wakeup_id = 0;
     MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
     mms_task_set_state(task, MMS_TASK_STATE_READY);
     return FALSE;
@@ -68,14 +74,15 @@ mms_task_schedule_wakeup(
     MMSTask* task,
     unsigned int secs)
 {
+    MMSTaskPriv* priv = task->priv;
     const time_t now = time(NULL);
     if (!secs) secs = task->settings->config->retry_secs;
 
     /* Cancel the previous sleep */
-    if (task->wakeup_id) {
+    if (priv->wakeup_id) {
         MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
-        g_source_remove(task->wakeup_id);
-        task->wakeup_id = 0;
+        g_source_remove(priv->wakeup_id);
+        priv->wakeup_id = 0;
     }
 
     if (now < task->deadline) {
@@ -83,15 +90,15 @@ mms_task_schedule_wakeup(
         const unsigned int max_secs = task->deadline - now;
         if (secs > max_secs) secs = max_secs;
         /* Schedule wakeup */
-        task->wakeup_time = now + secs;
-        task->wakeup_id = g_timeout_add_seconds_full(G_PRIORITY_DEFAULT,
+        priv->wakeup_time = now + secs;
+        priv->wakeup_id = g_timeout_add_seconds_full(G_PRIORITY_DEFAULT,
             secs, mms_task_wakeup_callback, mms_task_ref(task),
             mms_task_wakeup_free);
-        MMS_ASSERT(task->wakeup_id);
+        MMS_ASSERT(priv->wakeup_id);
         MMS_VERBOSE("%s sleeping for %u sec", task->name, secs);
     }
 
-    return (task->wakeup_id > 0);
+    return (priv->wakeup_id > 0);
 }
 
 gboolean
@@ -109,10 +116,11 @@ void
 mms_task_cancel_cb(
     MMSTask* task)
 {
-    if (task->wakeup_id) {
+    MMSTaskPriv* priv = task->priv;
+    if (priv->wakeup_id) {
         MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
-        g_source_remove(task->wakeup_id);
-        task->wakeup_id = 0;
+        g_source_remove(priv->wakeup_id);
+        priv->wakeup_id = 0;
     }
     task->flags |= MMS_TASK_FLAG_CANCELLED;
     mms_task_set_state(task, MMS_TASK_STATE_DONE);
@@ -126,7 +134,7 @@ mms_task_finalize(
     MMSTask* task = MMS_TASK(object);
     MMS_VERBOSE_("%p", task);
     MMS_ASSERT(!task->delegate);
-    MMS_ASSERT(!task->wakeup_id);
+    MMS_ASSERT(!task->priv->wakeup_id);
     MMS_ASSERT(mms_task_count > 0);
     if (!(--mms_task_count)) {
         MMS_VERBOSE("Last task is gone");
@@ -155,6 +163,7 @@ mms_task_class_init(
     MMSTaskClass* klass)
 {
     klass->fn_cancel = mms_task_cancel_cb;
+    g_type_class_add_private(klass, sizeof(MMSTaskPriv));
     G_OBJECT_CLASS(klass)->finalize = mms_task_finalize;
 }
 
@@ -166,6 +175,7 @@ mms_task_init(
     MMS_VERBOSE_("%p", task);
     mms_task_count++;
     task->order = mms_task_order++;
+    task->priv = G_TYPE_INSTANCE_GET_PRIVATE(task, MMS_TYPE_TASK, MMSTaskPriv);
 }
 
 void*
@@ -215,7 +225,6 @@ mms_task_run(
 {
     MMS_ASSERT(task->state == MMS_TASK_STATE_READY);
     MMS_TASK_GET_CLASS(task)->fn_run(task);
-    time(&task->last_run_time);
     MMS_ASSERT(task->state != MMS_TASK_STATE_READY);
 }
 
@@ -227,7 +236,6 @@ mms_task_transmit(
     MMS_ASSERT(task->state == MMS_TASK_STATE_NEED_CONNECTION ||
                task->state == MMS_TASK_STATE_NEED_USER_CONNECTION);
     MMS_TASK_GET_CLASS(task)->fn_transmit(task, connection);
-    time(&task->last_run_time);
     MMS_ASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
                task->state != MMS_TASK_STATE_NEED_USER_CONNECTION);
 }
@@ -245,7 +253,6 @@ mms_task_network_unavailable(
         MMS_ASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
                    task->state != MMS_TASK_STATE_NEED_USER_CONNECTION &&
                    task->state != MMS_TASK_STATE_TRANSMITTING);
-        time(&task->last_run_time);
     }
 }
 
@@ -262,11 +269,12 @@ mms_task_set_state(
     MMSTask* task,
     MMS_TASK_STATE state)
 {
+    MMSTaskPriv* priv = task->priv;
     if (task->state != state) {
         MMS_DEBUG("%s %s -> %s", task->name,
             mms_task_state_name(task->state),
             mms_task_state_name(state));
-        if (state == MMS_TASK_STATE_SLEEP && !task->wakeup_id) {
+        if (state == MMS_TASK_STATE_SLEEP && !priv->wakeup_id) {
             const unsigned int secs = task_config(task)->retry_secs;
             if (!mms_task_schedule_wakeup(task, secs)) {
                 MMS_DEBUG("%s SLEEP -> DONE (no time left)", task->name);

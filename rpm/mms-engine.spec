@@ -10,6 +10,7 @@ Requires: dbus
 Requires: ofono
 Requires: libgofono >= 1.0.11
 Requires: libgofonoext >= 1.0.4
+Requires: libglibutil >= 1.0.5
 #Requires: ImageMagick
 
 BuildRequires: python
@@ -24,7 +25,7 @@ BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
 BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 1.0.11
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
-BuildRequires: pkgconfig(libglibutil)
+BuildRequires: pkgconfig(libglibutil) >= 1.0.5
 BuildRequires:  pkgconfig(Qt5Gui)
 #BuildRequires: pkgconfig(ImageMagick)
 

@@ -32,10 +32,10 @@
 #endif
 
 /* HTTP task object */
-typedef struct mms_task_http_private MMSTaskHttpPrivate;
+typedef struct mms_task_http_priv MMSTaskHttpPriv;
 typedef struct mms_task_http {
     MMSTask task;                   /* Parent object */
-    MMSTaskHttpPrivate* priv;       /* Private state */
+    MMSTaskHttpPriv* priv;          /* Private data */
 } MMSTaskHttp;
 
 typedef struct mms_task_http_class {
