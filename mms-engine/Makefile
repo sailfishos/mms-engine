@@ -4,6 +4,7 @@
 .PHONY: mms_lib_debug_lib mms_lib_release_lib
 .PHONY: mms_connman_debug_lib mms_connman_release_lib
 .PHONY: mms_handler_debug_lib mms_handler_release_lib
+.PHONY: mms_transfers_debug_lib mms_transfers_release_lib
 .PHONY: mms_settings_debug_lib mms_settings_release_lib
 
 #
@@ -85,6 +86,16 @@ MMS_HANDLER_DEBUG_LIB = $(MMS_HANDLER_BUILD_DIR)/debug/$(MMS_HANDLER_LIB)
 MMS_HANDLER_RELEASE_LIB = $(MMS_HANDLER_BUILD_DIR)/release/$(MMS_HANDLER_LIB)
 
 #
+# mms-transfer-list-dbus
+#
+
+MMS_TRANSFERS_LIB = libmms-transfer-list-dbus.a
+MMS_TRANSFERS_DIR = ../mms-transfer-list-dbus
+MMS_TRANSFERS_BUILD_DIR = $(MMS_TRANSFERS_DIR)/build
+MMS_TRANSFERS_DEBUG_LIB = $(MMS_TRANSFERS_BUILD_DIR)/debug/$(MMS_TRANSFERS_LIB)
+MMS_TRANSFERS_RELEASE_LIB = $(MMS_TRANSFERS_BUILD_DIR)/release/$(MMS_TRANSFERS_LIB)
+
+#
 # mms-settings-dconf
 #
 
@@ -108,8 +119,8 @@ WARN = -Wall
 BASE_FLAGS = -fPIC $(CFLAGS)
 FULL_CFLAGS = $(BASE_FLAGS) -I. -I$(GEN_DIR) -I$(MMS_LIB_DIR)/include \
  -I$(MMS_CONNMAN_DIR)/include -I$(MMS_HANDLER_DIR)/include \
- -I$(MMS_SETTINGS_DIR)/include -MMD -MP \
- $(shell pkg-config --cflags $(PKGS))
+ -I$(MMS_SETTINGS_DIR)/include -I$(MMS_TRANSFERS_DIR)/include \
+ -MMD -MP $(shell pkg-config --cflags $(PKGS))
 
 ifndef KEEP_SYMBOLS
 KEEP_SYMBOLS = 0
@@ -137,12 +148,14 @@ LIBS = $(shell pkg-config --libs $(LIB_PKGS)) -lmagic -ljpeg $(RESIZE_LIBS)
 DEBUG_LIBS = \
   $(MMS_CONNMAN_DEBUG_LIB) \
   $(MMS_HANDLER_DEBUG_LIB) \
+  $(MMS_TRANSFERS_DEBUG_LIB) \
   $(MMS_SETTINGS_DEBUG_LIB) \
   $(MMS_LIB_DEBUG_LIB) \
   $(LIBS)
 RELEASE_LIBS = \
   $(MMS_CONNMAN_RELEASE_LIB) \
   $(MMS_HANDLER_RELEASE_LIB) \
+  $(MMS_TRANSFERS_RELEASE_LIB) \
   $(MMS_SETTINGS_RELEASE_LIB) \
   $(MMS_LIB_RELEASE_LIB) \
   $(LIBS)
@@ -168,21 +181,25 @@ DEBUG_DEPS = \
   mms_lib_debug_lib \
   mms_connman_debug_lib \
   mms_handler_debug_lib \
+  mms_transfers_debug_lib \
   mms_settings_debug_lib
 RELEASE_DEPS = \
   mms_lib_release_lib \
   mms_connman_release_lib \
   mms_handler_release_lib \
+  mms_transfers_release_lib \
   mms_settings_release_lib
 DEBUG_EXE_DEPS = \
   $(MMS_LIB_DEBUG_LIB) \
   $(MMS_CONNMAN_DEBUG_LIB) \
   $(MMS_HANDLER_DEBUG_LIB) \
+  $(MMS_TRANSFERS_DEBUG_LIB) \
   $(MMS_SETTINGS_DEBUG_LIB)
 RELEASE_EXE_DEPS = \
   $(MMS_LIB_RELEASE_LIB) \
   $(MMS_CONNMAN_RELEASE_LIB) \
   $(MMS_HANDLER_RELEASE_LIB) \
+  $(MMS_TRANSFERS_RELEASE_LIB) \
   $(MMS_SETTINGS_RELEASE_LIB)
 DEPS = $(DEBUG_OBJS:%.o=%.d) $(RELEASE_OBJS:%.o=%.d)
 ifneq ($(MAKECMDGOALS),clean)
@@ -214,6 +231,7 @@ cleaner: clean
 	make -C $(MMS_LIB_DIR) $(SUBMAKE_OPTS) clean
 	make -C $(MMS_CONNMAN_DIR) $(SUBMAKE_OPTS) clean
 	make -C $(MMS_HANDLER_DIR) $(SUBMAKE_OPTS) clean
+	make -C $(MMS_TRANSFERS_DIR) $(SUBMAKE_OPTS) clean
 	make -C $(MMS_SETTINGS_DIR) $(SUBMAKE_OPTS) clean
 
 $(GEN_DIR):
@@ -243,6 +261,12 @@ mms_handler_debug_lib:
 mms_handler_release_lib:
 	make -C $(MMS_HANDLER_DIR) $(SUBMAKE_OPTS) release
 
+mms_transfers_debug_lib:
+	make -C $(MMS_TRANSFERS_DIR) $(SUBMAKE_OPTS) debug
+
+mms_transfers_release_lib:
+	make -C $(MMS_TRANSFERS_DIR) $(SUBMAKE_OPTS) release
+
 mms_settings_debug_lib:
 	make -C $(MMS_SETTINGS_DIR) $(SUBMAKE_OPTS) debug
 
@@ -260,6 +284,10 @@ $(MMS_CONNMAN_RELEASE_LIB): mms_connman_release_lib
 $(MMS_HANDLER_DEBUG_LIB): mms_handler_debug_lib
 
 $(MMS_HANDLER_RELEASE_LIB): mms_handler_release_lib
+
+$(MMS_TRANSFERS_DEBUG_LIB): mms_transfers_debug_lib
+
+$(MMS_TRANSFERS_RELEASE_LIB): mms_transfers_release_lib
 
 $(MMS_SETTINGS_DEBUG_LIB): mms_settings_debug_lib
 

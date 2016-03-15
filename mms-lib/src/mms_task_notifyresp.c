@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -49,14 +50,15 @@ mms_task_notifyresp_encode(
 MMSTask*
 mms_task_notifyresp_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* tx_id,
     MMSNotifyStatus ns)
 {
     const char* file = mms_task_notifyresp_encode(task_config(parent),
         parent->id, tx_id, ns);
     if (file) {
-        return mms_task_http_alloc_with_parent(0, parent, "NotifyResp",
-            NULL, NULL, file);
+        return mms_task_http_alloc_with_parent(0, parent, transfers,
+            MMS_TRANSFER_TYPE_NOTIFY_RESP, NULL, NULL, file);
     }
     return NULL;
 }

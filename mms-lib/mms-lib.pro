@@ -50,6 +50,7 @@ SOURCES += \
   src/mms_task_read.c \
   src/mms_task_retrieve.c \
   src/mms_task_send.c \
+  src/mms_transfer_list.c \
   src/mms_util.c
 
 HEADERS += \
@@ -72,4 +73,5 @@ HEADERS += \
   include/mms_lib_util.h \
   include/mms_log.h \
   include/mms_message.h \
-  include/mms_settings.h
+  include/mms_settings.h \
+  include/mms_transfer_list.h

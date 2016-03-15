@@ -250,7 +250,7 @@ test_init(
     test->desc = desc;
     test->cm = mms_connman_test_new();
     test->handler = mms_handler_test_new();
-    test->disp = mms_dispatcher_new(settings, test->cm, test->handler);
+    test->disp = mms_dispatcher_new(settings, test->cm, test->handler, NULL);
     test->loop = g_main_loop_new(NULL, FALSE);
     if (!debug) {
         test->timeout_id = g_timeout_add_seconds(TEST_TIMEOUT,

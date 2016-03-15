@@ -67,9 +67,10 @@ mms_task_retrieve_done(
     MMS_RECEIVE_STATE state =
         (SOUP_STATUS_IS_SUCCESSFUL(status) &&
          mms_task_queue_and_unref(task->delegate,
-            mms_task_decode_new(task, retrieve->transaction_id, path))) ?
-                MMS_RECEIVE_STATE_DECODING :
-                MMS_RECEIVE_STATE_DOWNLOAD_ERROR;
+            mms_task_decode_new(task, http->transfers,
+                retrieve->transaction_id, path))) ?
+                    MMS_RECEIVE_STATE_DECODING :
+                    MMS_RECEIVE_STATE_DOWNLOAD_ERROR;
     mms_handler_message_receive_state_changed(http->task.handler,
         http->task.id, state);
 }
@@ -116,6 +117,7 @@ MMSTask*
 mms_task_retrieve_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const MMSPdu* pdu,
@@ -128,8 +130,9 @@ mms_task_retrieve_new(
     MMS_ASSERT(pdu->transaction_id);
     if (pdu->ni.expiry > now) {
         MMSTaskRetrieve* retrieve = mms_task_http_alloc(
-            MMS_TYPE_TASK_RETRIEVE, settings, handler, "Retrieve", id, imsi,
-            pdu->ni.location, MMS_RETRIEVE_CONF_FILE, NULL, ct);
+            MMS_TYPE_TASK_RETRIEVE, settings, handler, transfers,
+            MMS_TRANSFER_TYPE_RETRIEVE, id, imsi, pdu->ni.location,
+            MMS_RETRIEVE_CONF_FILE, NULL, ct);
         if (retrieve->http.task.deadline > pdu->ni.expiry) {
             retrieve->http.task.deadline = pdu->ni.expiry;
         }

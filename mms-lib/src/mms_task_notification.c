@@ -18,6 +18,7 @@
 #include "mms_codec.h"
 #include "mms_handler.h"
 #include "mms_file_util.h"
+#include "mms_transfer_list.h"
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_task_notification_log
@@ -32,9 +33,10 @@ typedef struct mms_task_notification {
     MMSPdu* pdu;
     GBytes* push;
     MMSHandlerMessageNotifyCall* notify;
+    MMSTransferList* transfers;
 } MMSTaskNotification;
 
-G_DEFINE_TYPE(MMSTaskNotification, mms_task_notification, MMS_TYPE_TASK);
+G_DEFINE_TYPE(MMSTaskNotification, mms_task_notification, MMS_TYPE_TASK)
 #define MMS_TYPE_TASK_NOTIFICATION (mms_task_notification_get_type())
 #define MMS_TASK_NOTIFICATION(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_TASK_NOTIFICATION, MMSTaskNotification))
@@ -67,8 +69,8 @@ mms_task_notification_reject(
 {
     mms_task_make_id(&ind->task);
     mms_task_queue_and_unref(ind->task.delegate,
-        mms_task_notifyresp_new(&ind->task, ind->pdu->transaction_id,
-            MMS_MESSAGE_NOTIFY_STATUS_REJECTED));
+        mms_task_notifyresp_new(&ind->task, ind->transfers,
+            ind->pdu->transaction_id, MMS_MESSAGE_NOTIFY_STATUS_REJECTED));
 }
 
 /**
@@ -120,8 +122,9 @@ mms_task_notification_done(
 
             /* Schedule the download task */
             if (!mms_task_queue_and_unref(task->delegate,
-                 mms_task_retrieve_new(task->settings, task->handler,
-                 task->id, task->imsi, ind->pdu, FALSE, NULL))) {
+                mms_task_retrieve_new(task->settings, task->handler,
+                ind->transfers, task->id, task->imsi, ind->pdu,
+                FALSE, NULL))) {
                 mms_handler_message_receive_state_changed(task->handler, id,
                     MMS_RECEIVE_STATE_DOWNLOAD_ERROR);
             }
@@ -341,6 +344,7 @@ mms_task_notification_finalize(
     MMS_ASSERT(!ind->notify);
     g_bytes_unref(ind->push);
     mms_message_free(ind->pdu);
+    mms_transfer_list_unref(ind->transfers);
     G_OBJECT_CLASS(mms_task_notification_parent_class)->finalize(object);
 }
 
@@ -372,6 +376,7 @@ MMSTask*
 mms_task_notification_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* imsi,
     GBytes* bytes,
     GError** error)
@@ -392,6 +397,7 @@ mms_task_notification_new(
 
         ind = mms_task_alloc(MMS_TYPE_TASK_NOTIFICATION,
             settings, handler, "Notification", NULL, imsi);
+        ind->transfers = mms_transfer_list_ref(transfers);
         ind->push = g_bytes_ref(bytes);
         ind->pdu = pdu;
         return &ind->task;

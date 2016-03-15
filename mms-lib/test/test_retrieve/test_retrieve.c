@@ -16,6 +16,7 @@
 #include "test_connman.h"
 #include "test_handler.h"
 #include "test_http.h"
+#include "test_transfer_list.h"
 #include "test_util.h"
 
 #include "mms_codec.h"
@@ -605,11 +606,13 @@ test_init(
         if (rc) test->retrieve_conf = g_mapped_file_new(rc, FALSE, &error);
         if (test->retrieve_conf || !rc) {
             MMSSettings* settings = mms_settings_default_new(config);
+            MMSTransferList* transfers = mms_transfer_list_test_new();
             g_mapped_file_ref(test->notification_ind);
             test->desc = desc;
             test->cm = mms_connman_test_new();
             test->handler = mms_handler_test_new();
-            test->disp = mms_dispatcher_new(settings, test->cm, test->handler);
+            test->disp = mms_dispatcher_new(settings, test->cm, test->handler,
+                transfers);
             test->loop = g_main_loop_new(NULL, FALSE);
             if (!debug) {
                 test->timeout_id = g_timeout_add_seconds(TEST_TIMEOUT,
@@ -633,6 +636,7 @@ test_init(
             test->msgreceived_id =
                 mms_handler_test_add_msgreceived_fn(test->handler,
                     test_msgreceived, test);
+            mms_transfer_list_unref(transfers);
             mms_settings_unref(settings);
             test->ret = RET_ERR;
             ok = TRUE;

@@ -36,6 +36,7 @@ typedef struct mms_task_http_priv MMSTaskHttpPriv;
 typedef struct mms_task_http {
     MMSTask task;                   /* Parent object */
     MMSTaskHttpPriv* priv;          /* Private data */
+    MMSTransferList* transfers;     /* Transfer list */
 } MMSTaskHttp;
 
 typedef struct mms_task_http_class {
@@ -57,18 +58,20 @@ mms_task_http_alloc(
     GType type,                 /* Zero for MMS_TYPE_TASK_HTTP       */
     MMSSettings* settings,      /* Settings                          */
     MMSHandler* handler,        /* MMS handler                       */
+    MMSTransferList* transfers, /* Transfer list                     */
     const char* name,           /* Task name                         */
     const char* id,             /* Database message id               */
     const char* imsi,           /* IMSI associated with the message  */
     const char* uri,            /* NULL to use MMSC URL              */
     const char* receive_file,   /* File to write data to (optional)  */
-    const char* send_file,     /* File to read data from (optional) */
+    const char* send_file,      /* File to read data from (optional) */
     MMS_CONNECTION_TYPE ct);
 
 void*
 mms_task_http_alloc_with_parent(
     GType type,                 /* Zero for MMS_TYPE_TASK_HTTP       */
     MMSTask* parent,            /* Parent task                       */
+    MMSTransferList* transfers, /* Transfer list                     */
     const char* name,           /* Task name                         */
     const char* uri,            /* NULL to use MMSC URL              */
     const char* receive_file,   /* File to write data to (optional)  */

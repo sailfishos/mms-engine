@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 #include "mms_settings.h"
 #include "mms_handler.h"
 #include "mms_file_util.h"
+#include "mms_transfer_list.h"
 #include "mms_util.h"
 #include "mms_codec.h"
 
@@ -43,6 +44,7 @@ typedef struct mms_task_encode {
     MMSAttachment** parts;
     int nparts;
     MMSEncodeJob* active_job;
+    MMSTransferList* transfers;
 } MMSTaskEncode;
 
 G_DEFINE_TYPE(MMSTaskEncode, mms_task_encode, MMS_TYPE_TASK);
@@ -322,7 +324,8 @@ mms_task_encode_job_done(
         MMS_VERBOSE_("Encoding completion state %d", job->state);
         enc->active_job = NULL;
         if (job->state == MMS_ENCODE_STATE_DONE) {
-            mms_task_queue_and_unref(task->delegate, mms_task_send_new(task));
+            mms_task_queue_and_unref(task->delegate,
+                mms_task_send_new(task, enc->transfers));
         } else {
             mms_handler_message_send_state_changed(task->handler, task->id,
                 (job->state == MMS_ENCODE_STATE_TOO_BIG) ?
@@ -374,24 +377,6 @@ mms_task_encode_cancel(
     MMSTaskEncode* enc = MMS_TASK_ENCODE(task);
     if (enc->active_job) g_cancellable_cancel(enc->active_job->cancellable);
     MMS_TASK_CLASS(mms_task_encode_parent_class)->fn_cancel(task);
-}
-
-static
-void
-mms_task_encode_finalize(
-    GObject* object)
-{
-    MMSTaskEncode* enc = MMS_TASK_ENCODE(object);
-    if (enc->parts) {
-        int i;
-        for (i=0; i<enc->nparts; i++) mms_attachment_unref(enc->parts[i]);
-        g_free(enc->parts);
-    }
-    g_free(enc->to);
-    g_free(enc->cc);
-    g_free(enc->bcc);
-    g_free(enc->subject);
-    G_OBJECT_CLASS(mms_task_encode_parent_class)->finalize(object);
 }
 
 static
@@ -564,6 +549,25 @@ mms_task_encode_prepare_address_list(
 
 static
 void
+mms_task_encode_finalize(
+    GObject* object)
+{
+    MMSTaskEncode* enc = MMS_TASK_ENCODE(object);
+    if (enc->parts) {
+        int i;
+        for (i=0; i<enc->nparts; i++) mms_attachment_unref(enc->parts[i]);
+        g_free(enc->parts);
+    }
+    g_free(enc->to);
+    g_free(enc->cc);
+    g_free(enc->bcc);
+    g_free(enc->subject);
+    mms_transfer_list_unref(enc->transfers);
+    G_OBJECT_CLASS(mms_task_encode_parent_class)->finalize(object);
+}
+
+static
+void
 mms_task_encode_class_init(
     MMSTaskEncodeClass* klass)
 {
@@ -584,6 +588,7 @@ MMSTask*
 mms_task_encode_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const char* to,
@@ -617,6 +622,7 @@ mms_task_encode_new(
                 enc->bcc = mms_task_encode_prepare_address_list(bcc);
                 enc->subject = g_strdup(subject);
                 enc->flags = flags;
+                enc->transfers = mms_transfer_list_ref(transfers);
 
                 MMS_ASSERT(!error || !*error);
                 g_free(dir);

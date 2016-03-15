@@ -23,12 +23,14 @@ DBUS_INTERFACE_DIR = $$_PRO_FILE_PWD_
 MMS_LIB_DIR = $$_PRO_FILE_PWD_/../mms-lib
 MMS_HANDLER_DIR = $$_PRO_FILE_PWD_/../mms-handler-dbus
 MMS_SETTINGS_DIR = $$_PRO_FILE_PWD_/../mms-settings-dconf
+MMS_TRANSFER_LIST_DIR = $$_PRO_FILE_PWD_/../mms-transfer-list-dbus
 MMS_CONNMAN_DIR = $$_PRO_FILE_PWD_/../$$MMS_CONNMAN
 
 INCLUDEPATH += $$MMS_LIB_DIR/include
 INCLUDEPATH += $$MMS_HANDLER_DIR/include
 INCLUDEPATH += $$MMS_SETTINGS_DIR/include
 INCLUDEPATH += $$MMS_CONNMAN_DIR/include
+INCLUDEPATH += $$MMS_TRANSFER_LIST_DIR/include
 
 SOURCES += \
   main.c \
@@ -47,12 +49,14 @@ CONFIG(debug, debug|release) {
     DESTDIR = $$_PRO_FILE_PWD_/build/debug
     LIBS += $$MMS_CONNMAN_DIR/build/debug/lib$${MMS_CONNMAN}.a
     LIBS += $$MMS_HANDLER_DIR/build/debug/libmms-handler-dbus.a
+    LIBS += $$MMS_TRANSFER_LIST_DIR/build/debug/libmms-transfer-list-dbus.a
     LIBS += $$MMS_LIB_DIR/build/debug/libmms-lib.a
     LIBS += $$MMS_SETTINGS_DIR/build/debug/libmms-settings-dconf.a
 } else {
     DESTDIR = $$_PRO_FILE_PWD_/build/release
     LIBS += $$MMS_CONNMAN_DIR/build/release/lib$${MMS_CONNMAN}.a
     LIBS += $$MMS_HANDLER_DIR/build/release/libmms-handler-dbus.a
+    LIBS += $$MMS_TRANSFER_LIST_DIR/build/release/libmms-transfer-list-dbus.a
     LIBS += $$MMS_LIB_DIR/build/release/libmms-lib.a
     LIBS += $$MMS_SETTINGS_DIR/build/release/libmms-settings-dconf.a
 }

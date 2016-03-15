@@ -49,6 +49,7 @@ SRC = \
   mms_task_read.c \
   mms_task_retrieve.c \
   mms_task_send.c \
+  mms_transfer_list.c \
   mms_util.c
 
 ifeq ($(MMS_RESIZE),Qt)

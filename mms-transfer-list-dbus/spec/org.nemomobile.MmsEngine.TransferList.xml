@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE node PUBLIC
+  "-//freedesktop//DTD D-Bus Object Introspection 1.0//EN"
+  "http://standards.freedesktop.org/dbus/1.0/introspect.dtd">
+<node>
+    <interface name="org.nemomobile.MmsEngine.TransferList">
+        <method name="Get">
+            <arg name="list" type="ao" direction="out"/>
+        </method>
+        <signal name="TransferStarted">
+            <arg name="path" type="o"/>
+        </signal>
+        <signal name="TransferFinished">
+            <arg name="path" type="o"/>
+        </signal>
+    </interface>
+    <interface name="org.nemomobile.MmsEngine.Transfer">
+        <method name="GetAll">
+            <arg name="version" type="u" direction="out"/>
+            <arg name="bytes_sent" type="u" direction="out"/>
+            <arg name="bytes_to_send" type="u" direction="out"/>
+            <arg name="bytes_received" type="u" direction="out"/>
+            <arg name="bytes_to_receive" type="u" direction="out"/>
+        </method>
+        <!--
+            uint32 EnableUpdates(uint32)
+
+            Ensures that the specified progress signals are emitted.
+            Note that you may still receive the signals even if you
+            have not enabled them, because they may be enabled by
+            another D-Bus client. However if you need realtime updates
+            you better explicitely enable them.
+
+            Returns the cookie which can be used to revoke this request
+            for progress signals with DisableUpdates calls.
+        -->
+        <method name="EnableUpdates">
+            <!-- 1 - send, 2 - receive, 3 - both -->
+            <arg name="flags" type="u" direction="in"/>
+            <arg name="cookie" type="u" direction="out"/>
+        </method>
+        <method name="DisableUpdates">
+            <arg name="cookie" type="u" direction="in"/>
+        </method>
+        <method name="GetInterfaceVersion">
+            <arg name="version" type="u" direction="out"/>
+        </method>
+        <method name="GetSendProgress">
+            <arg name="bytes_sent" type="u" direction="out"/>
+            <arg name="bytes_to_send" type="u" direction="out"/>
+        </method>
+        <method name="GetReceiveProgress">
+            <arg name="bytes_received" type="u" direction="out"/>
+            <arg name="bytes_to_receive" type="u" direction="out"/>
+        </method>
+        <!--
+            Progress signals are only emitted if at least one client has
+            enabled them with EnableUpdates call. They are emitted as long
+            as at least one client needs them.
+        -->
+        <signal name="SendProgressChanged">
+            <arg name="bytes_sent" type="u"/>
+            <arg name="bytes_to_send" type="u"/>
+        </signal>
+        <signal name="ReceiveProgressChanged">
+            <arg name="bytes_received" type="u"/>
+            <arg name="bytes_to_receive" type="u"/>
+        </signal>
+        <signal name="Finished"/>
+    </interface>
+</node>

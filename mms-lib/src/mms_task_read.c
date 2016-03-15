@@ -116,6 +116,7 @@ MMSTask*
 mms_task_read_new(
     MMSSettings* settings,
     MMSHandler* handler,
+    MMSTransferList* transfers,
     const char* id,
     const char* imsi,
     const char* msg_id,
@@ -127,7 +128,8 @@ mms_task_read_new(
         id, msg_id, to, rs, err);
     if (file) {
         return mms_task_http_alloc(MMS_TYPE_TASK_READ, settings, handler,
-            "Read", id, imsi, NULL, NULL, file, MMS_CONNECTION_TYPE_AUTO);
+            transfers, MMS_TRANSFER_TYPE_READ_REPORT, id, imsi, NULL, NULL,
+            file, MMS_CONNECTION_TYPE_AUTO);
     }
     return NULL;
 }

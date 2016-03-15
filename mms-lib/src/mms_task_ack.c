@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -49,14 +50,15 @@ mms_task_ack_encode(
 MMSTask*
 mms_task_ack_new(
     MMSTask* parent,
+    MMSTransferList* transfers,
     const char* tx_id)
 {
     MMSTask* task = NULL;
     const char* file = mms_task_ack_encode(task_config(parent),
         mms_task_sim_settings(parent), parent->id, tx_id);
     if (file) {
-        task = mms_task_http_alloc_with_parent(0, parent, "Ack",
-            NULL, NULL, file);
+        task = mms_task_http_alloc_with_parent(0, parent, transfers,
+            MMS_TRANSFER_TYPE_ACK, NULL, NULL, file);
         task->priority = MMS_TASK_PRIORITY_POST_PROCESS;
     }
     return task;
