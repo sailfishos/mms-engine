@@ -461,7 +461,7 @@ mms_task_http_start(
 
     /* Open the files */
     if (priv->send_path) {
-        send_fd = open(priv->send_path, O_RDONLY);
+        send_fd = open(priv->send_path, O_RDONLY | O_BINARY);
         if (send_fd >= 0) {
             struct stat st;
             int err = fstat(send_fd, &st);
