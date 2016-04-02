@@ -8,7 +8,7 @@ URL:      https://git.merproject.org/mer-core/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 Requires: dbus
 Requires: ofono
-Requires: libgofono >= 1.0.11
+Requires: libgofono >= 2.0.0
 Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
 #Requires: ImageMagick
@@ -23,7 +23,7 @@ BuildRequires: pkgconfig(gmime-2.6)
 BuildRequires: pkgconfig(glib-2.0) >= 2.32
 BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
 BuildRequires: pkgconfig(libwspcodec) >= 2.2
-BuildRequires: pkgconfig(libgofono) >= 1.0.11
+BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil) >= 1.0.5
 BuildRequires:  pkgconfig(Qt5Gui)

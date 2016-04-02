@@ -321,7 +321,6 @@ mms_connman_ofono_init_modems(
         mms_connman_ofono_add_modem(self, OFONO_MODEM(modems->pdata[i]));
     }
     mms_connman_ofono_select_default_modem(self);
-    g_ptr_array_unref(modems);
 }
 
 static
