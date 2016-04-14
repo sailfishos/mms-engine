@@ -145,6 +145,7 @@ mms_transfer_dbus_client_destroy(
     MMSTransferDbusClient* client = data;
     g_bus_unwatch_name(client->watch_id);
     g_hash_table_destroy(client->requests);
+    g_slice_free(MMSTransferDbusClient, client);
 }
 
 static
@@ -243,7 +244,7 @@ mms_transfer_dbus_handle_enable_updates(
                 g_free, mms_transfer_dbus_client_destroy);
         }
         if (!client) {
-            client = g_new0(MMSTransferDbusClient, 1);
+            client = g_slice_new0(MMSTransferDbusClient);
             client->requests = g_hash_table_new(g_direct_hash, g_direct_equal);
             client->watch_id = g_bus_watch_name_on_connection(priv->bus,
                 sender, G_BUS_NAME_WATCHER_FLAGS_NONE, NULL,
