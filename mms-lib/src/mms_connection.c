@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 #define MMS_LOG_MODULE_NAME mms_connection_log
 #include "mms_lib_log.h"
 
-G_DEFINE_TYPE(MMSConnection, mms_connection, G_TYPE_OBJECT);
+G_DEFINE_ABSTRACT_TYPE(MMSConnection, mms_connection, G_TYPE_OBJECT)
 #define MMS_CONNECTION_GET_CLASS(obj)  \
     (G_TYPE_INSTANCE_GET_CLASS((obj), MMS_TYPE_CONNECTION, MMSConnectionClass))
 

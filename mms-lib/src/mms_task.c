@@ -33,7 +33,7 @@ struct mms_task_priv {
     time_t wakeup_time;                  /* Wake up time (if sleeping) */
 };
 
-G_DEFINE_TYPE(MMSTask, mms_task, G_TYPE_OBJECT)
+G_DEFINE_ABSTRACT_TYPE(MMSTask, mms_task, G_TYPE_OBJECT)
 
 #define MMS_TASK(obj) \
     (G_TYPE_CHECK_INSTANCE_CAST((obj), MMS_TYPE_TASK, MMSTask))

@@ -19,7 +19,7 @@
 #define MMS_LOG_MODULE_NAME mms_connman_log
 #include "mms_lib_log.h"
 
-G_DEFINE_TYPE(MMSConnMan, mms_connman, G_TYPE_OBJECT);
+G_DEFINE_ABSTRACT_TYPE(MMSConnMan, mms_connman, G_TYPE_OBJECT)
 #define MMS_CONNMAN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_CONNMAN, MMSConnMan))
 #define MMS_CONNMAN_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), \

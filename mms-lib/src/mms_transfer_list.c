@@ -19,7 +19,7 @@
 #define MMS_LOG_MODULE_NAME mms_transfer_list_log
 #include "mms_lib_log.h"
 
-G_DEFINE_TYPE(MMSTransferList, mms_transfer_list, G_TYPE_OBJECT)
+G_DEFINE_ABSTRACT_TYPE(MMSTransferList, mms_transfer_list, G_TYPE_OBJECT)
 
 #define MMS_TRANSFER_LIST(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
     MMS_TYPE_TRANSFER_LIST, MMSTransferList))

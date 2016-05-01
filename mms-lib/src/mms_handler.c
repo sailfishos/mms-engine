@@ -19,7 +19,7 @@
 #define MMS_LOG_MODULE_NAME mms_handler_log
 #include "mms_lib_log.h"
 
-G_DEFINE_TYPE(MMSHandler, mms_handler, G_TYPE_OBJECT);
+G_DEFINE_ABSTRACT_TYPE(MMSHandler, mms_handler, G_TYPE_OBJECT)
 
 #define MMS_HANDLER(obj) \
     (G_TYPE_CHECK_INSTANCE_CAST((obj), MMS_TYPE_HANDLER, MMSHandler))
