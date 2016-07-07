@@ -1,6 +1,6 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.49
+Version:  1.0.50
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
@@ -8,6 +8,8 @@ URL:      https://git.merproject.org/mer-core/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 Requires: dbus
 Requires: ofono
+Requires: libsoup >= 2.38
+Requires: libwspcodec >= 2.2
 Requires: libgofono >= 2.0.0
 Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
