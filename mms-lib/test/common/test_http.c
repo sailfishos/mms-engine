@@ -27,6 +27,7 @@ typedef struct test_http_response {
 
 struct test_http {
     gint ref_count;
+    guint port;
     SoupServer* server;
     GPtrArray* responses;
     GPtrArray* post_data;
@@ -97,7 +98,7 @@ guint
 test_http_get_port(
     TestHttp* http)
 {
-    return soup_server_get_port(http->server);
+    return http->port;
 }
 
 guint
@@ -170,6 +171,16 @@ test_http_add_response(
     g_ptr_array_add(http->responses, resp);
 }
 
+#if SOUP_CHECK_VERSION(2,48,0)
+static
+void
+test_http_uri_free(
+    gpointer uri)
+{
+    soup_uri_free(uri);
+}
+#endif
+
 TestHttp*
 test_http_new(
     GMappedFile* get_file,
@@ -181,9 +192,21 @@ test_http_new(
     http->responses = g_ptr_array_new_full(0, test_http_response_free);
     http->post_data = g_ptr_array_new_full(0, test_http_post_data_bytes_free);
     http->server = g_object_new(SOUP_TYPE_SERVER, NULL);
-    MMS_DEBUG("Listening on port %hu", soup_server_get_port(http->server));
-    soup_server_add_handler(http->server, NULL, test_http_callback, http, NULL);
+#if SOUP_CHECK_VERSION(2,48,0)
+    if (soup_server_listen_local(http->server, 0, 0, NULL)) {
+        GSList* uris = soup_server_get_uris(http->server);
+        if (uris) {
+            SoupURI* uri = uris->data;
+            http->port = soup_uri_get_port(uri);
+            g_slist_free_full(uris, test_http_uri_free);
+        }
+    }
+#else
+    http->port = soup_server_get_port(http->server);
     soup_server_run_async(http->server);
+#endif
+    MMS_DEBUG("Listening on port %hu", http->port);
+    soup_server_add_handler(http->server, NULL, test_http_callback, http, NULL);
     if (get_file || resp_content_type || resp_status) {
         test_http_add_response(http, get_file, resp_content_type, resp_status);
     }

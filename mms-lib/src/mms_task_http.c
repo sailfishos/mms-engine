@@ -32,6 +32,11 @@
 #  define SOUP_SESSION_LOCAL_ADDRESS "local-address"
 #endif
 
+#if SOUP_CHECK_VERSION(2,42,0)
+#  define soup_session_async_new_with_options soup_session_new_with_options
+#  define soup_session_async_new soup_session_new
+#endif
+
 /* Logging */
 #define MMS_LOG_MODULE_NAME MMS_TASK_HTTP_LOG
 #include "mms_lib_log.h"
