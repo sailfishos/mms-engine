@@ -10,14 +10,13 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_handler.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_handler_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_handler_log
+#include <gutil_log.h>
 
 G_DEFINE_ABSTRACT_TYPE(MMSHandler, mms_handler, G_TYPE_OBJECT)
 
@@ -33,7 +32,7 @@ enum {
     MMS_HANDLER_SIGNAL_COUNT
 };
 
-#define MMS_HANDLER_SIGNAL_DONE_NAME "done"
+#define MMS_HANDLER_SIGNAL_DONE_NAME "mms-handler-done"
 
 static guint mms_handler_signals[MMS_HANDLER_SIGNAL_COUNT] = { 0 };
 
@@ -42,8 +41,8 @@ void
 mms_handler_finalize(
     GObject* object)
 {
-    MMS_VERBOSE_("%p", object);
-    MMS_ASSERT(!MMS_HANDLER(object)->busy);
+    GVERBOSE_("%p", object);
+    GASSERT(!MMS_HANDLER(object)->busy);
     G_OBJECT_CLASS(mms_handler_parent_class)->finalize(object);
 }
 
@@ -65,15 +64,15 @@ void
 mms_handler_init(
     MMSHandler* h)
 {
-    MMS_VERBOSE_("%p", h);
+    GVERBOSE_("%p", h);
 }
 
 MMSHandler*
 mms_handler_ref(
     MMSHandler* h)
 {
-    if (h) {
-        MMS_ASSERT(MMS_HANDLER(h));
+    if (G_LIKELY(h)) {
+        GASSERT(MMS_HANDLER(h));
         g_object_ref(h);
     }
     return h;
@@ -83,8 +82,8 @@ void
 mms_handler_unref(
     MMSHandler* h)
 {
-    if (h) {
-        MMS_ASSERT(MMS_HANDLER(h));
+    if (G_LIKELY(h)) {
+        GASSERT(MMS_HANDLER(h));
         g_object_unref(h);
     }
 }
@@ -95,7 +94,7 @@ mms_handler_add_done_callback(
     mms_handler_event_fn fn,
     void* param)
 {
-    if (h && fn) {
+    if (G_LIKELY(h) && G_LIKELY(fn)) {
         return g_signal_connect_data(h, MMS_HANDLER_SIGNAL_DONE_NAME,
             G_CALLBACK(fn), param, NULL, 0);
     }
@@ -107,7 +106,9 @@ mms_handler_remove_callback(
     MMSHandler* h,
     gulong handler_id)
 {
-    if (h && handler_id) g_signal_handler_disconnect(h, handler_id);
+    if (G_LIKELY(h) && G_LIKELY(handler_id)) {
+        g_signal_handler_disconnect(h, handler_id);
+    }
 }
 
 MMSHandlerMessageNotifyCall*
@@ -121,7 +122,7 @@ mms_handler_message_notify(
     mms_handler_message_notify_complete_fn cb,
     void* param)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_notify) {
             if (!from) from = "";
@@ -129,7 +130,6 @@ mms_handler_message_notify(
             return klass->fn_message_notify(h, imsi, from, subject, expiry,
                 push, cb, param);
         }
-        MMS_ERR("mms_handler_message_notify not implemented");
     }
     return NULL;
 }
@@ -139,12 +139,10 @@ mms_handler_message_notify_cancel(
     MMSHandler* h,
     MMSHandlerMessageNotifyCall* call)
 {
-    if (h && call) {
+    if (G_LIKELY(h) && G_LIKELY(call)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_notify_cancel) {
             klass->fn_message_notify_cancel(h, call);
-        } else {
-            MMS_ERR("mms_handler_message_notify_cancel not implemented");
         }
     }
 }
@@ -156,12 +154,11 @@ mms_handler_message_received(
     mms_handler_message_received_complete_fn cb,
     void* param)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_received) {
             return klass->fn_message_received(h, msg, cb, param);
         }
-        MMS_ERR("mms_handler_message_received not implemented");
     }
     return NULL;
 }
@@ -171,12 +168,10 @@ mms_handler_message_received_cancel(
     MMSHandler* h,
     MMSHandlerMessageReceivedCall* call)
 {
-    if (h && call) {
+    if (G_LIKELY(h) && G_LIKELY(call)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_received_cancel) {
             klass->fn_message_received_cancel(h, call);
-        } else {
-            MMS_ERR("mms_handler_message_notify_cancel not implemented");
         }
     }
 }
@@ -187,12 +182,11 @@ mms_handler_message_receive_state_changed(
     const char* id,
     MMS_RECEIVE_STATE state)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_receive_state_changed) {
             return klass->fn_message_receive_state_changed(h, id, state);
         }
-        MMS_ERR("mms_handler_message_receive_state_changed not implemented");
     }
     return FALSE;
 }
@@ -204,12 +198,11 @@ mms_handler_message_send_state_changed(
     MMS_SEND_STATE state,
     const char* details)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_send_state_changed) {
             return klass->fn_message_send_state_changed(h, id, state, details);
         }
-        MMS_ERR("mms_handler_message_send_state_changed not implemented");
     }
     return FALSE;
 }
@@ -220,12 +213,11 @@ mms_handler_message_sent(
     const char* id,
     const char* msgid)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_message_sent) {
             return klass->fn_message_sent(h, id, msgid);
         }
-        MMS_ERR("mms_handler_message_sent not implemented");
     }
     return FALSE;
 }
@@ -238,12 +230,11 @@ mms_handler_delivery_report(
     const char* recipient,
     MMS_DELIVERY_STATUS ds)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_delivery_report) {
             return klass->fn_delivery_report(h, imsi, msgid, recipient, ds);
         }
-        MMS_ERR("mms_handler_delivery_report not implemented");
     }
     return FALSE;
 }
@@ -256,12 +247,11 @@ mms_handler_read_report(
     const char* recipient,
     MMS_READ_STATUS rs)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_read_report) {
             return klass->fn_read_report(h, imsi, msgid, recipient, rs);
         }
-        MMS_ERR("mms_handler_read_report not implemented");
     }
     return FALSE;
 }
@@ -272,12 +262,11 @@ mms_handler_read_report_send_status(
     const char* id,
     MMS_READ_REPORT_STATUS status)
 {
-    if (h) {
+    if (G_LIKELY(h)) {
         MMSHandlerClass* klass = MMS_HANDLER_GET_CLASS(h);
         if (klass->fn_read_report_send_status) {
             return klass->fn_read_report_send_status(h, id, status);
         }
-        MMS_ERR("mms_handler_read_report_send_status not implemented");
     }
     return FALSE;
 }
@@ -287,10 +276,10 @@ mms_handler_busy_update(
     MMSHandler* h,
     int change)
 {
-    MMS_ASSERT(change);
-    if (h && change) {
+    GASSERT(change);
+    if (G_LIKELY(h) && G_LIKELY(change)) {
         h->busy += change;
-        MMS_ASSERT(h->busy >= 0);
+        GASSERT(h->busy >= 0);
         if (h->busy < 1) {
             g_signal_emit(h, mms_handler_signals[MMS_HANDLER_SIGNAL_DONE], 0);
         }

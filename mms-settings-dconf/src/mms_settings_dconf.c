@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Jolla Ltd.
+ * Copyright (C) 2014-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,16 +10,16 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_settings_dconf.h"
 #include <dconf.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_settings_log
+#define GLOG_MODULE_NAME mms_settings_log
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-settings-dconf");
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-settings-dconf");
 
 typedef MMSSettingsClass MMSSettingsDconfClass;
 typedef struct mms_settings_dconf {
@@ -30,7 +31,7 @@ typedef struct mms_settings_dconf {
     gulong changed_signal_id;
 } MMSSettingsDconf;
 
-G_DEFINE_TYPE(MMSSettingsDconf, mms_settings_dconf, MMS_TYPE_SETTINGS);
+G_DEFINE_TYPE(MMSSettingsDconf, mms_settings_dconf, MMS_TYPE_SETTINGS)
 #define MMS_TYPE_SETTINGS_DCONF mms_settings_dconf_get_type()
 #define MMS_SETTINGS_DCONF_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), \
         MMS_TYPE_SETTINGS_DCONF, MMSSettingsDconfClass))
@@ -75,7 +76,7 @@ mms_settings_dconf_get_uint32(
         } else if (klass == G_VARIANT_CLASS_INT32) {
             /* Typical result of updating dconf value from command line */
             gint32 i32 = g_variant_get_int32(variant);
-            MMS_ASSERT(i32 >= 0);
+            GASSERT(i32 >= 0);
             if (i32 >= 0) {
                 *value = i32;
                 return TRUE;
@@ -83,14 +84,14 @@ mms_settings_dconf_get_uint32(
             /* The rest is not so typical */
         } else if (klass == G_VARIANT_CLASS_INT16) {
             gint16 i16 = g_variant_get_int16(variant);
-            MMS_ASSERT(i16 >= 0);
+            GASSERT(i16 >= 0);
             if (i16 >= 0) {
                 *value = i16;
                 return TRUE;
             }
         } else if (klass == G_VARIANT_CLASS_INT64) {
             gint64 i64 = g_variant_get_int64(variant);
-            MMS_ASSERT(i64 >= 0 && i64 <= (gint64)UINT_MAX);
+            GASSERT(i64 >= 0 && i64 <= (gint64)UINT_MAX);
             if (i64 >= 0 && i64 <= (gint64)UINT_MAX) {
                 *value = (unsigned int)i64;
                 return TRUE;
@@ -114,10 +115,10 @@ mms_settings_dconf_get_uint32(
                 return TRUE;
             }
         } else {
-            MMS_ERR("Unexpected variant type \'%c\'", (char)klass);
+            GERR("Unexpected variant type \'%c\'", (char)klass);
             return FALSE;
         }
-        MMS_ERR("Unable to convert variant type \'%c\'", (char)klass);
+        GERR("Unable to convert variant type \'%c\'", (char)klass);
     }
     return FALSE;
 }
@@ -129,7 +130,7 @@ mms_settings_dconf_update_user_agent(
     GVariant* variant)
 {
     const char* value = g_variant_get_string(variant, NULL);
-    MMS_DEBUG(MMS_DCONF_KEY_USER_AGENT " = %s", value);
+    GDEBUG(MMS_DCONF_KEY_USER_AGENT " = %s", value);
     g_free(dest->user_agent);
     dest->data.user_agent = dest->user_agent = g_strdup(value);
 }
@@ -141,7 +142,7 @@ mms_settings_dconf_update_uaprof(
     GVariant* variant)
 {
     const char* value = g_variant_get_string(variant, NULL);
-    MMS_DEBUG(MMS_DCONF_KEY_UAPROF " = %s", value);
+    GDEBUG(MMS_DCONF_KEY_UAPROF " = %s", value);
     g_free(dest->uaprof);
     dest->data.uaprof = dest->uaprof = g_strdup(value);
 }
@@ -153,9 +154,9 @@ mms_settings_dconf_update_size_limit(
     GVariant* variant)
 {
     if (mms_settings_dconf_get_uint32(variant, &dest->data.size_limit)) {
-        MMS_DEBUG(MMS_DCONF_KEY_SIZE_LIMIT " = %u", dest->data.size_limit);
+        GDEBUG(MMS_DCONF_KEY_SIZE_LIMIT " = %u", dest->data.size_limit);
     } else {
-        MMS_WARN("Unable to decode " MMS_DCONF_KEY_SIZE_LIMIT " value");
+        GWARN("Unable to decode " MMS_DCONF_KEY_SIZE_LIMIT " value");
     }
 }
 
@@ -166,9 +167,9 @@ mms_settings_dconf_update_max_pixels(
     GVariant* variant)
 {
     if (mms_settings_dconf_get_uint32(variant, &dest->data.max_pixels)) {
-        MMS_DEBUG(MMS_DCONF_KEY_MAX_PIXELS " = %u", dest->data.max_pixels);
+        GDEBUG(MMS_DCONF_KEY_MAX_PIXELS " = %u", dest->data.max_pixels);
     } else {
-        MMS_WARN("Unable to decode " MMS_DCONF_KEY_MAX_PIXELS " value");
+        GWARN("Unable to decode " MMS_DCONF_KEY_MAX_PIXELS " value");
     }
 }
 
@@ -179,7 +180,7 @@ mms_settings_dconf_update_allow_dr(
     GVariant* variant)
 {
     const gboolean value = g_variant_get_boolean(variant);
-    MMS_DEBUG(MMS_DCONF_KEY_ALLOW_DR " = %s", value ? "true" : "false");
+    GDEBUG(MMS_DCONF_KEY_ALLOW_DR " = %s", value ? "true" : "false");
     dest->data.allow_dr = value;
 }
 
@@ -232,12 +233,12 @@ mms_settings_dconf_key_changed(
         unsigned int override = key->override_flag;
         if (override && (dconf->settings.flags & override) == override) {
             /* Value is fixed from the command line */
-            MMS_DEBUG("%s changed (ignored)", name);
+            GDEBUG("%s changed (ignored)", name);
         } else {
             /* Query and parse the value */
             char* path = g_strconcat(dconf->dir, name, NULL);
             GVariant* value = dconf_client_read(dconf->client, path);
-            MMS_ASSERT(value);
+            GASSERT(value);
             if (value) {
                 key->fn_update(&dconf->imsi_data, value);
                 g_variant_unref(value);
@@ -245,7 +246,7 @@ mms_settings_dconf_key_changed(
             g_free(path);
         }
     } else {
-        MMS_DEBUG("Key %s/%s changed - ignoring", dconf->dir, name);
+        GDEBUG("Key %s/%s changed - ignoring", dconf->dir, name);
     }
 }
 
@@ -258,7 +259,7 @@ mms_settings_dconf_changed(
     const char* tag,
     MMSSettingsDconf* dconf)
 {
-    MMS_ASSERT(dconf->client == client);
+    GASSERT(dconf->client == client);
     if (dconf->dir) {
         if (*changes && **changes) {
             /* Multiple values have changed */
@@ -279,7 +280,7 @@ mms_settings_dconf_changed(
             }
         }
     }
-    MMS_DEBUG("Path %s has changed - ignoring", prefix);
+    GDEBUG("Path %s has changed - ignoring", prefix);
 }
 
 static
@@ -289,7 +290,7 @@ mms_settings_dconf_unwatch(
 {
     if (dconf->dir) {
         unsigned int i;
-        MMS_DEBUG("Detaching from %s", dconf->dir);
+        GDEBUG("Detaching from %s", dconf->dir);
         for (i=0; i<G_N_ELEMENTS(mms_settings_dconf_keys); i++) {
             const MMSSettingsDconfKey* key = mms_settings_dconf_keys + i;
             char* path = g_strconcat(dconf->dir, key->name, NULL);
@@ -324,7 +325,7 @@ mms_settings_dconf_get_sim_data(
             mms_settings_sim_data_copy(&dconf->imsi_data,
                 &settings->sim_defaults.data);
 
-            MMS_DEBUG("Attaching to %s", dir);
+            GDEBUG("Attaching to %s", dir);
 
             /* Migrate settings from old to the new location. */
             names = dconf_client_list(dconf->client, dir_old, &n);
@@ -336,15 +337,15 @@ mms_settings_dconf_get_sim_data(
                     char* from = g_strconcat(dir_old, name, NULL);
                     char* to = g_strconcat(dir, name, NULL);
                     GVariant* value = dconf_client_read(dconf->client, from);
-                    MMS_DEBUG("Migrating %s -> %s", from, to);
-                    MMS_ASSERT(value);
+                    GDEBUG("Migrating %s -> %s", from, to);
+                    GASSERT(value);
                     if (value) {
                         GError* error = NULL;
                         if (!dconf_client_write_sync(dconf->client,
                             to, value, NULL, NULL, &error) ||
                             !dconf_client_write_sync(dconf->client,
                             from, NULL, NULL, NULL, &error)) {
-                            MMS_ERR("%s", MMS_ERRMSG(error));
+                            GERR("%s", GERRMSG(error));
                             g_error_free(error);
                         }
                         g_variant_unref(value);

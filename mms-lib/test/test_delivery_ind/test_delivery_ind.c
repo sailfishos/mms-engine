@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connman.h"
@@ -22,6 +21,9 @@
 #include "mms_lib_util.h"
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
+
+#include <gutil_log.h>
+#include <gutil_macros.h>
 
 #define RET_OK      (0)
 #define RET_ERR     (1)
@@ -81,10 +83,10 @@ test_finish(
         ds = mms_handler_test_delivery_status(test->handler, test->id);
         if (ds != desc->status) {
             test->ret = RET_ERR;
-            MMS_ERR("%s status %d, expected %d", name, ds, desc->status);
+            GERR("%s status %d, expected %d", name, ds, desc->status);
         }
     }
-    MMS_INFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
+    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
     mms_handler_test_reset(test->handler);
     g_main_loop_quit(test->loop);
 }
@@ -95,7 +97,7 @@ test_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
-    Test* test = MMS_CAST(delegate,Test,delegate);
+    Test* test = G_CAST(delegate,Test,delegate);
     if (!mms_handler_test_receive_pending(test->handler, NULL)) {
         test_finish(test);
     }
@@ -109,7 +111,7 @@ test_timeout(
     Test* test = data;
     test->timeout_id = 0;
     test->ret = RET_TIMEOUT;
-    MMS_INFO("%s TIMEOUT", test->desc->name);
+    GINFO("%s TIMEOUT", test->desc->name);
     mms_connman_test_close_connection(test->cm);
     mms_dispatcher_cancel(test->disp, NULL);
     return FALSE;
@@ -145,7 +147,7 @@ test_init(
         test->ret = RET_ERR;
         ok = TRUE;
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
     }
     g_free(ni);
@@ -188,11 +190,11 @@ test_run_one(
                 test.ret = RET_OK;
                 g_main_loop_run(test.loop);
             } else {
-                MMS_INFO("%s FAILED", desc->name);
+                GINFO("%s FAILED", desc->name);
             }
         } else {
-            MMS_ERR("%s", MMS_ERRMSG(error));
-            MMS_INFO("%s FAILED", desc->name);
+            GERR("%s", GERRMSG(error));
+            GINFO("%s FAILED", desc->name);
             g_error_free(error);
         }
         g_bytes_unref(push);
@@ -220,7 +222,7 @@ test_run(
                 break;
             }
         }
-        if (!found) MMS_ERR("No such test: %s", name);
+        if (!found) GERR("No such test: %s", name);
     } else {
         for (i=0, ret = RET_OK; i<G_N_ELEMENTS(delivery_tests); i++) {
             int test_status = test_run_one(config, delivery_tests + i);
@@ -239,16 +241,16 @@ int main(int argc, char* argv[])
 
     mms_lib_init(argv[0]);
     mms_lib_default_config(&config);
-    mms_log_default.name = test;
+    gutil_log_default.name = test;
 
     if (argc > 1 && !strcmp(argv[1], "-v")) {
-        mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+        gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         memmove(argv + 1, argv + 2, (argc-2)*sizeof(argv[0]));
         argc--;
     } else {
-        mms_log_default.level = MMS_LOGLEVEL_INFO;
-        mms_task_notification_log.level = MMS_LOGLEVEL_NONE;
-        mms_log_stdout_timestamp = FALSE;
+        gutil_log_timestamp = FALSE;
+        gutil_log_default.level = GLOG_LEVEL_INFO;
+        mms_task_notification_log.level = GLOG_LEVEL_NONE;
     }
 
     if (argc == 2 && argv[1][0] != '-') {

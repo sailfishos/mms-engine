@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_engine.h"
@@ -20,9 +19,6 @@
 #include "mms_handler_dbus.h"
 #include "mms_settings_dconf.h"
 #include "mms_transfer_list_dbus.h"
-#include "mms_log.h"
-
-#include <gutil_misc.h>
 
 #ifdef SAILFISH
 #  include "mms_connman_nemo.h"
@@ -34,6 +30,9 @@
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.h"
+
+#include <gutil_misc.h>
+#include <gutil_log.h>
 
 /* Signals D-Bus proxy */
 enum mms_engine_dbus_methods {
@@ -105,8 +104,8 @@ mms_engine_start_timeout_callback(
     gpointer data)
 {
     MMSEngine* engine = data;
-    MMS_ASSERT(engine->start_timeout_id);
-    MMS_INFO("Shutting down due to inactivity...");
+    GASSERT(engine->start_timeout_id);
+    GINFO("Shutting down due to inactivity...");
     engine->start_timeout_id = 0;
     mms_engine_stop_schedule(engine);
     return FALSE;
@@ -193,7 +192,7 @@ mms_engine_handle_send_message(
             g_free(imsi);
         } else {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
-                G_DBUS_ERROR_FAILED, "%s", MMS_ERRMSG(error));
+                G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
             g_error_free(error);
         }
 
@@ -230,7 +229,7 @@ mms_engine_handle_receive_message(
 {
     gsize len = 0;
     const guint8* bytes = g_variant_get_fixed_array(data, &len, 1);
-    MMS_DEBUG("Processing push %u bytes from %s", (guint)len, imsi);
+    GDEBUG("Processing push %u bytes from %s", (guint)len, imsi);
     if (imsi && bytes && len) {
         char* id = g_strdup_printf("%d", database_id);
         GBytes* push = g_bytes_new(bytes, len);
@@ -243,7 +242,7 @@ mms_engine_handle_receive_message(
             org_nemomobile_mms_engine_complete_receive_message(proxy, call);
         } else {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
-                G_DBUS_ERROR_FAILED, "%s", MMS_ERRMSG(error));
+                G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
             g_error_free(error);
         }
         g_bytes_unref(push);
@@ -270,7 +269,7 @@ mms_engine_handle_send_read_report(
 {
     GError* error = NULL;
     char* id = g_strdup_printf("%d", database_id);
-    MMS_DEBUG_("%s %s %s %s %d", id, imsi, message_id, to, read_status);
+    GDEBUG_("%s %s %s %s %d", id, imsi, message_id, to, read_status);
     if (mms_dispatcher_send_read_report(engine->dispatcher, id, imsi,
         message_id, to, (read_status == 1) ? MMS_READ_STATUS_DELETED :
         MMS_READ_STATUS_READ, &error)) {
@@ -280,7 +279,7 @@ mms_engine_handle_send_read_report(
         org_nemomobile_mms_engine_complete_send_read_report(proxy, call);
     } else {
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
-            G_DBUS_ERROR_FAILED, "%s", MMS_ERRMSG(error));
+            G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
         g_error_free(error);
     }
     g_free(id);
@@ -298,7 +297,7 @@ mms_engine_handle_cancel(
 {
     char* id = NULL;
     if (database_id > 0) id = g_strdup_printf("%u", database_id);
-    MMS_DEBUG_("%s", id);
+    GDEBUG_("%s", id);
     mms_dispatcher_cancel(engine->dispatcher, id);
     org_nemomobile_mms_engine_complete_cancel(proxy, call);
     g_free(id);
@@ -318,17 +317,17 @@ mms_engine_handle_push_notify(
 {
     gsize len = 0;
     const guint8* bytes = g_variant_get_fixed_array(data, &len, 1);
-    MMS_DEBUG("Received %u bytes from %s", (guint)len, imsi);
+    GDEBUG("Received %u bytes from %s", (guint)len, imsi);
     if (!type || g_ascii_strcasecmp(type, MMS_CONTENT_TYPE)) {
-        MMS_ERR("Unsupported content type %s", type);
+        GERR("Unsupported content type %s", type);
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "Unsupported content type");
     } else if (!imsi || !imsi[0]) {
-        MMS_ERR_("IMSI is missing");
+        GERR_("IMSI is missing");
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "IMSI is missing");
     } else if (!bytes || !len) {
-        MMS_ERR_("No data provided");
+        GERR_("No data provided");
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "No data provided");
     } else {
@@ -341,7 +340,7 @@ mms_engine_handle_push_notify(
             org_nemomobile_mms_engine_complete_push(proxy, call);
         } else {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
-                G_DBUS_ERROR_FAILED, "%s", MMS_ERRMSG(err));
+                G_DBUS_ERROR_FAILED, "%s", GERRMSG(err));
             g_error_free(err);
         }
         g_bytes_unref(msg);
@@ -378,7 +377,7 @@ mms_engine_handle_set_log_level(
     gint level,
     MMSEngine* engine)
 {
-    MMS_DEBUG_("%s:%d", module, level);
+    GDEBUG_("%s:%d", module, level);
     if (module && module[0]) {
         int i;
         for (i=0; i<engine->log_count; i++) {
@@ -389,7 +388,7 @@ mms_engine_handle_set_log_level(
             }
         }
     } else {
-        mms_log_default.level = level;
+        gutil_log_default.level = level;
     }
     org_nemomobile_mms_engine_complete_set_log_level(proxy, call);
     return TRUE;
@@ -404,8 +403,8 @@ mms_engine_handle_set_log_type(
     const char* type,
     MMSEngine* engine)
 {
-    MMS_DEBUG_("%s", type);
-    mms_log_set_type(type, MMS_APP_LOG_PREFIX);
+    GDEBUG_("%s", type);
+    gutil_log_set_type(type, MMS_APP_LOG_PREFIX);
     org_nemomobile_mms_engine_complete_set_log_type(proxy, call);
     return TRUE;
 }
@@ -423,14 +422,14 @@ mms_engine_handle_get_version(
     char* s = g_malloc(strlen(MMS_VERSION_STRING)+1);
     s[0] = 0;
     if (sscanf(MMS_VERSION_STRING, "%d.%d.%d%s", &v1, &v2, &v3, s) < 3) {
-        MMS_WARN_("unable to parse version %s", MMS_VERSION_STRING);
+        GWARN_("unable to parse version %s", MMS_VERSION_STRING);
     } else {
-        MMS_DEBUG_("version %d.%d.%d%s", v1, v2, v3, s);
+        GDEBUG_("version %d.%d.%d%s", v1, v2, v3, s);
     }
     org_nemomobile_mms_engine_complete_get_version(proxy, call, v1, v2, v3, s);
     g_free(s);
 #else
-    MMS_DEBUG_("oops");
+    GDEBUG_("oops");
     org_nemomobile_mms_engine_complete_get_version(proxy, call, 0, 0, 0, "");
 #endif
     return TRUE;
@@ -448,7 +447,7 @@ mms_engine_handle_migrate_settings(
     char* tmp = NULL;
     /* Querying settings will migrate per-SIM settings after upgrading
      * from 1.0.21 or older version of mme-engine */
-    MMS_DEBUG_("%s", imsi);
+    GDEBUG_("%s", imsi);
     if (!imsi || !imsi[0]) {
         imsi = tmp = mms_connman_default_imsi(engine->cm);
     }
@@ -568,7 +567,7 @@ mms_engine_run(
     MMSEngine* engine,
     GMainLoop* loop)
 {
-    MMS_ASSERT(!engine->loop);
+    GASSERT(!engine->loop);
     engine->loop = loop;
     engine->stopped = FALSE;
     engine->stop_requested = FALSE;
@@ -628,7 +627,7 @@ mms_engine_delegate_dispatcher_done(
     MMSDispatcher* dispatcher)
 {
     MMSEngine* engine = mms_engine_from_dispatcher_delegate(delegate);
-    MMS_DEBUG("All done");
+    GDEBUG("All done");
     if (!engine->keep_running || engine->stop_requested) {
         mms_engine_stop_schedule(engine);
     }
@@ -657,8 +656,8 @@ mms_engine_dispose(
     GObject* object)
 {
     MMSEngine* mms = MMS_ENGINE(object);
-    MMS_VERBOSE_("%p", mms);
-    MMS_ASSERT(!mms->loop);
+    GVERBOSE_("%p", mms);
+    GASSERT(!mms->loop);
     mms_engine_unregister(mms);
     mms_engine_start_timeout_cancel(mms);
     if (mms->proxy) {
@@ -692,9 +691,9 @@ mms_engine_class_init(
     MMSEngineClass* klass)
 {
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
-    MMS_ASSERT(object_class);
+    GASSERT(object_class);
     object_class->dispose = mms_engine_dispose;
-    MMS_VERBOSE_("done");
+    GVERBOSE_("done");
 }
 
 /*

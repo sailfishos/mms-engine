@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connman.h"
@@ -26,6 +25,7 @@
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
 
+#include <gutil_log.h>
 #include <libsoup/soup-status.h>
 
 #define RET_OK      (0)
@@ -374,7 +374,7 @@ test_files_equal(
         }
     }
     if (!equal) {
-        MMS_ERR("%s is not identical to %s", path1, path2);
+        GERR("%s is not identical to %s", path1, path2);
     }
     return equal;
 }
@@ -412,21 +412,21 @@ test_validate_parts(
                 }
                 
                 if (strcmp(expect->content_type, part->content_type)) {
-                    MMS_ERR("Content type mismatch: expected %s, got %s",
+                    GERR("Content type mismatch: expected %s, got %s",
                         expect->content_type, part->content_type);
                     return RET_ERR;
                 }
                 if (strcmp(expect->file_name, fname)) {
-                    MMS_ERR("File name mismatch: expected %s, got %s",
+                    GERR("File name mismatch: expected %s, got %s",
                         expect->file_name, fname);
                     return RET_ERR;
                 }
                 if (!part->content_id) {
-                    MMS_ERR("Missing content id");
+                    GERR("Missing content id");
                     return RET_ERR;
                 }
                 if (strcmp(expect->content_id, part->content_id)) {
-                    MMS_ERR("Content-ID mismatch: expected %s, got %s",
+                    GERR("Content-ID mismatch: expected %s, got %s",
                         expect->content_id, part->content_id);
                     return RET_ERR;
                 }
@@ -435,7 +435,7 @@ test_validate_parts(
             }
             return RET_OK;
         }
-        MMS_ERR("%u parts expected, got %u", desc->nparts, nparts);
+        GERR("%u parts expected, got %u", desc->nparts, nparts);
         return RET_ERR;
     }
 }
@@ -452,7 +452,7 @@ test_finish(
         state = mms_handler_test_receive_state(test->handler, NULL);
         if (state != desc->expected_state) {
             test->ret = RET_ERR;
-            MMS_ERR("%s state %d, expected %d", name, state,
+            GERR("%s state %d, expected %d", name, state,
                 desc->expected_state);
         } else {
             const void* resp_data = NULL;
@@ -467,21 +467,21 @@ test_finish(
                             test->ret = test_validate_parts(test);
                         } else {
                             test->ret = RET_ERR;
-                            MMS_ERR("%s reply %u, expected %u", name,
+                            GERR("%s reply %u, expected %u", name,
                                 pdu->type, desc->reply_msg);
                         }
                     } else {
                         test->ret = RET_ERR;
-                        MMS_ERR("%s can't decode reply message", name);
+                        GERR("%s can't decode reply message", name);
                     }
                     mms_message_free(pdu);
                 } else {
                     test->ret = RET_ERR;
-                    MMS_ERR("%s expects no reply", name);
+                    GERR("%s expects no reply", name);
                 }
             } else if (desc->reply_msg) {
                 test->ret = RET_ERR;
-                MMS_ERR("%s expects reply", name);
+                GERR("%s expects reply", name);
             }
         }
     }
@@ -501,7 +501,7 @@ test_finish(
         g_free(f1);
         g_free(f2);
     }
-    MMS_INFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
+    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
     mms_handler_test_reset(test->handler);
     g_signal_handler_disconnect(test->handler, test->msgreceived_id);
     g_main_loop_quit(test->loop);
@@ -527,7 +527,7 @@ test_timeout(
     Test* test = data;
     test->timeout_id = 0;
     test->ret = RET_TIMEOUT;
-    MMS_INFO("%s TIMEOUT", test->desc->name);
+    GINFO("%s TIMEOUT", test->desc->name);
     if (test->http) test_http_close(test->http);
     mms_connman_test_close_connection(test->cm);
     mms_dispatcher_cancel(test->disp, NULL);
@@ -560,7 +560,7 @@ test_cancel_msg_proc(
     void* param)
 {
    TestCancelMsg* cancel = param;
-   MMS_VERBOSE("Cancelling message %s", cancel->msg->id);
+   GVERBOSE("Cancelling message %s", cancel->msg->id);
    mms_dispatcher_cancel(cancel->disp, cancel->msg->id);
    mms_dispatcher_unref(cancel->disp);
    mms_message_unref(cancel->msg);
@@ -598,7 +598,7 @@ test_init(
     char* ni = g_strconcat(DATA_DIR, dir, "/", desc->ni_file, NULL);
     char* rc = desc->rc_file ? g_strconcat(DATA_DIR, dir, "/",
         desc->rc_file, NULL) : NULL;
-    MMS_DEBUG(">>>>>>>>>> %s <<<<<<<<<<", desc->name);
+    GDEBUG(">>>>>>>>>> %s <<<<<<<<<<", desc->name);
     memset(test, 0, sizeof(*test));
     test->config = config;
     test->notification_ind = g_mapped_file_new(ni, FALSE, &error);
@@ -641,12 +641,12 @@ test_init(
             test->ret = RET_ERR;
             ok = TRUE;
         } else {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
         g_mapped_file_unref(test->notification_ind);
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
     }
     g_free(ni);
@@ -695,7 +695,7 @@ test_retrieve_once(
                 test.ret = RET_OK;
                 g_main_loop_run(test.loop);
             } else {
-                MMS_INFO("%s FAILED", desc->name);
+                GINFO("%s FAILED", desc->name);
             }
         } else {
             g_error_free(error);
@@ -703,7 +703,7 @@ test_retrieve_once(
                 test.ret = RET_OK;
                 test_finish(&test);
             } else {
-                MMS_INFO("%s FAILED", desc->name);
+                GINFO("%s FAILED", desc->name);
             }
         }
         g_bytes_unref(push);
@@ -732,7 +732,7 @@ test_retrieve(
                 break;
             }
         }
-        if (!found) MMS_ERR("No such test: %s", name);
+        if (!found) GERR("No such test: %s", name);
     } else {
         for (i=0, ret = RET_OK; i<G_N_ELEMENTS(retrieve_tests); i++) {
             int status = test_retrieve_once(config, retrieve_tests + i, debug);
@@ -768,16 +768,16 @@ int main(int argc, char* argv[])
         TestDirs dirs;
 
         mms_lib_init(argv[0]);
-        mms_log_set_type(MMS_LOG_TYPE_STDOUT, test);
+        gutil_log_set_type(GLOG_TYPE_STDOUT, test);
         if (verbose) {
-            mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         } else {
-            mms_log_default.level = MMS_LOGLEVEL_INFO;
+            gutil_log_timestamp = FALSE;
+            gutil_log_default.level = GLOG_LEVEL_INFO;
             mms_task_http_log.level =
             mms_task_decode_log.level =
             mms_task_retrieve_log.level =
-            mms_task_notification_log.level = MMS_LOGLEVEL_NONE;
-            mms_log_stdout_timestamp = FALSE;
+            mms_task_notification_log.level = GLOG_LEVEL_NONE;
         }
 
         test_dirs_init(&dirs, test);
@@ -800,7 +800,7 @@ int main(int argc, char* argv[])
         test_dirs_cleanup(&dirs, !keep_temp);
         mms_lib_deinit();
     } else {
-        fprintf(stderr, "%s\n", MMS_ERRMSG(error));
+        fprintf(stderr, "%s\n", GERRMSG(error));
         g_error_free(error);
         ret = RET_ERR;
     }

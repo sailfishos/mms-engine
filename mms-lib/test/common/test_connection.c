@@ -10,15 +10,14 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connection.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connection_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-connection-test");
+#define GLOG_MODULE_NAME mms_connection_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-connection-test");
 
 typedef MMSConnectionClass MMSConnectionTestClass;
 typedef struct mms_connection_test {
@@ -29,7 +28,7 @@ typedef struct mms_connection_test {
     char* netif;
 } MMSConnectionTest;
 
-G_DEFINE_TYPE(MMSConnectionTest, mms_connection_test, MMS_TYPE_CONNECTION);
+G_DEFINE_TYPE(MMSConnectionTest, mms_connection_test, MMS_TYPE_CONNECTION)
 #define MMS_TYPE_CONNECTION_TEST (mms_connection_test_get_type())
 #define MMS_CONNECTION_TEST(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_CONNECTION_TEST, MMSConnectionTest))
@@ -139,7 +138,7 @@ void
 mms_connection_test_init(
     MMSConnectionTest* conn)
 {
-    MMS_VERBOSE_("%p", conn);
+    GVERBOSE_("%p", conn);
 }
 
 /*

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,11 +10,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#include "mms_log.h"
 #include "mms_codec.h"
+#include <gutil_log.h>
 
 typedef struct test_desc {
     const char* name;
@@ -94,7 +94,7 @@ run_test(
         ok = TRUE;
     }
     g_strfreev(parsed);
-    MMS_INFO("%s: %s", ok ? "OK" : "FAILED", test->name);
+    GINFO("%s: %s", ok ? "OK" : "FAILED", test->name);
     return ok;
 }
 
@@ -116,9 +116,9 @@ run_tests(
 
 int main(int argc, char* argv[])
 {
-    mms_log_set_type(MMS_LOG_TYPE_STDOUT, "test_media_type");
-    mms_log_stdout_timestamp = FALSE;
-    mms_log_default.level = MMS_LOGLEVEL_INFO;
+    gutil_log_set_type(GLOG_TYPE_STDOUT, "test_media_type");
+    gutil_log_timestamp = FALSE;
+    gutil_log_default.level = GLOG_LEVEL_INFO;
     return !run_tests(media_type_tests, G_N_ELEMENTS(media_type_tests));
 }
 

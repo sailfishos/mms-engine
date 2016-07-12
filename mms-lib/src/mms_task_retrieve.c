@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -20,10 +19,10 @@
 #include "mms_codec.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_retrieve_log
+#define GLOG_MODULE_NAME mms_task_retrieve_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-retrieve", MMS_TASK_HTTP_LOG);
+GLOG_MODULE_DEFINE2("mms-task-retrieve", MMS_TASK_HTTP_LOG);
 
 /* Class definition */
 typedef MMSTaskHttpClass MMSTaskRetrieveClass;
@@ -32,7 +31,7 @@ typedef struct mms_task_retrieve {
     char* transaction_id;
 } MMSTaskRetrieve;
 
-G_DEFINE_TYPE(MMSTaskRetrieve, mms_task_retrieve, MMS_TYPE_TASK_HTTP);
+G_DEFINE_TYPE(MMSTaskRetrieve, mms_task_retrieve, MMS_TYPE_TASK_HTTP)
 #define MMS_TYPE_TASK_RETRIEVE (mms_task_retrieve_get_type())
 #define MMS_TASK_RETRIEVE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_TASK_RETRIEVE, MMSTaskRetrieve))
@@ -125,9 +124,9 @@ mms_task_retrieve_new(
     GError** error)
 {
     const time_t now = time(NULL);
-    MMS_ASSERT(pdu);
-    MMS_ASSERT(pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND);
-    MMS_ASSERT(pdu->transaction_id);
+    GASSERT(pdu);
+    GASSERT(pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND);
+    GASSERT(pdu->transaction_id);
     if (pdu->ni.expiry > now) {
         MMSTaskRetrieve* retrieve = mms_task_http_alloc(
             MMS_TYPE_TASK_RETRIEVE, settings, handler, transfers,

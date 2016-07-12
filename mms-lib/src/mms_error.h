@@ -10,13 +10,13 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_ERROR_H
 #define JOLLA_MMS_ERROR_H
 
 #include "mms_lib_util.h"
+#include <gutil_log.h>
 
 void
 mms_error(
@@ -36,13 +36,13 @@ mms_error_valist(
 
 #ifdef __GNUC__
 #  define MMS_ERROR(error,code,format,args...) \
-    mms_error(MMS_LOG_MODULE_CURRENT, error, code, format, ##args)
+    mms_error(GLOG_MODULE_CURRENT, error, code, format, ##args)
 #else
 #  define MMS_ERROR mms_error_static
 static inline void mms_error_static(GError** error, MMSLibError code,   \
     const char* format, ...) {                                          \
     va_list va; va_start(va,format);                                    \
-    mms_error_valist(MMS_LOG_MODULE_CURRENT, error, code, format, va);  \
+    mms_error_valist(GLOG_MODULE_CURRENT, error, code, format, va);     \
     va_end(va);                                                         \
 }
 #endif /* __GNUC__ */

@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_connman_ofono.h"
@@ -23,9 +22,10 @@
 #include <gofono_modem.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connman_log
+#define GLOG_MODULE_NAME mms_connman_log
 #include "mms_connman_ofono_log.h"
-MMS_LOG_MODULE_DEFINE("mms-connman-ofono");
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-connman-ofono");
 
 enum manager_handler_id {
     MANAGER_HANDLER_VALID_CHANGED,
@@ -78,25 +78,25 @@ mms_connman_ofono_wait_valid(
             self->default_modem->modem &&
             !ofono_modem_wait_valid(self->default_modem->modem,
             MMS_OFONO_TIMEOUT, &error)) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
         if (self->default_modem &&
             self->default_modem->simmgr &&
             !ofono_simmgr_wait_valid(self->default_modem->simmgr,
             MMS_OFONO_TIMEOUT, &error)) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
         if (self->default_modem &&
             self->default_modem->connmgr &&
             !ofono_connmgr_wait_valid(self->default_modem->connmgr,
             MMS_OFONO_TIMEOUT, &error)) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
     }
 }
@@ -125,19 +125,19 @@ mms_connman_ofono_modem_for_imsi(
                 return modem;
             }
         }
-        MMS_INFO("SIM %s is not avialable", imsi);
+        GINFO("SIM %s is not avialable", imsi);
     } else if (self->default_modem) {
         if (ofono_simmgr_valid(self->default_modem->simmgr)) {
             if (self->default_modem->simmgr->present) {
                 return self->default_modem;
             } else {
-                MMS_INFO("SIM card is not present");
+                GINFO("SIM card is not present");
             }
         } else {
-            MMS_INFO("No SIM card found");
+            GINFO("No SIM card found");
         }
     } else {
-        MMS_WARN("No default modem");
+        GWARN("No default modem");
     }
     return NULL;
 }
@@ -178,7 +178,7 @@ mms_connman_ofono_connection_gone(
         MMSOfonoModem* modem = value;
         if (((GObject*)modem->conn) == connection) {
             modem->conn = NULL;
-            MMS_VERBOSE_("%s", ofono_modem_path(modem->modem));
+            GVERBOSE_("%s", ofono_modem_path(modem->modem));
             break;
         }
     }
@@ -215,7 +215,7 @@ mms_connman_ofono_open_connection(
             }
             return modem->conn;
         } else {
-            MMS_WARN("SIM %s has no MMS context", imsi);
+            GWARN("SIM %s has no MMS context", imsi);
         }
     }
     return NULL;
@@ -243,9 +243,9 @@ mms_connman_ofono_select_default_modem(
     }
     if (self->default_modem != context) {
         if (context) {
-            MMS_INFO("Default modem %s", ofono_modem_path(context->modem));
+            GINFO("Default modem %s", ofono_modem_path(context->modem));
         } else {
-            MMS_INFO("No default modem");
+            GINFO("No default modem");
         }
         self->default_modem = context;
     }
@@ -289,7 +289,7 @@ mms_connman_ofono_modem_added(
 {
     if (manager->valid) {
         MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
-        MMS_ASSERT(manager == self->manager);
+        GASSERT(manager == self->manager);
         mms_connman_ofono_add_modem(self, modem);
         mms_connman_ofono_select_default_modem(self);
     }
@@ -304,7 +304,7 @@ mms_connman_ofono_modem_removed(
 {
     if (manager->valid) {
         MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
-        MMS_ASSERT(manager == self->manager);
+        GASSERT(manager == self->manager);
         g_hash_table_remove(self->modems, path);
         mms_connman_ofono_select_default_modem(self);
     }
@@ -330,7 +330,7 @@ mms_connman_ofono_valid_changed(
     void* arg)
 {
     MMSConnManOfono* self = MMS_CONNMAN_OFONO(arg);
-    MMS_ASSERT(manager == self->manager);
+    GASSERT(manager == self->manager);
     if (manager->valid) {
         mms_connman_ofono_init_modems(self);
     } else {
@@ -391,7 +391,7 @@ mms_connman_ofono_dispose(
     GObject* object)
 {
     MMSConnManOfono* self = MMS_CONNMAN_OFONO(object);
-    MMS_VERBOSE_("");
+    GVERBOSE_("");
     self->default_modem = NULL;
     g_hash_table_remove_all(self->modems);
     if (self->manager) {
@@ -412,7 +412,7 @@ mms_connman_ofono_finalize(
     GObject* object)
 {
     MMSConnManOfono* self = MMS_CONNMAN_OFONO(object);
-    MMS_VERBOSE_("");
+    GVERBOSE_("");
     g_hash_table_destroy(self->modems);
     G_OBJECT_CLASS(mms_connman_ofono_parent_class)->finalize(object);
 }

@@ -10,15 +10,14 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_transfer_list.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_transfer_list_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-transfer-list-test");
+#define GLOG_MODULE_NAME mms_transfer_list_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-transfer-list-test");
 
 /* Class definition */
 typedef MMSTransferListClass MMSTransferListTestClass;

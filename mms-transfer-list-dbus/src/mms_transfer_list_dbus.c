@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_transfer_list_dbus.h"
@@ -20,7 +19,10 @@
 #include <gutil_strv.h>
 
 /* Log module */
-MMS_LOG_MODULE_DEFINE("mms-transfer-list-dbus");
+#define GLOG_MODULE_NAME mms_transfer_list_log
+#include "mms_lib_log.h"
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-transfer-list");
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.TransferList.h"
@@ -84,7 +86,7 @@ mms_transfer_destroy_cb(
 {
     MMSTransferDbus* transfer = MMS_TRANSFER_DBUS(data);
     MMSTransferListDbus* list = MMS_TRANSFER_LIST_DBUS(transfer->list);
-    MMS_DEBUG("Transfer %s finished", transfer->path);
+    GDEBUG("Transfer %s finished", transfer->path);
     mms_transfer_dbus_finished(transfer);
     org_nemomobile_mms_engine_transfer_list_emit_transfer_finished(list->proxy,
         transfer->path);
@@ -106,7 +108,7 @@ mms_transfer_list_dbus_bus_cb(
         if (!g_dbus_interface_skeleton_export(
             G_DBUS_INTERFACE_SKELETON(self->proxy), self->bus,
             MMS_TRANSFER_LIST_DBUS_PATH, &error)) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     }
@@ -131,7 +133,7 @@ mms_transfer_list_dbus_transfer_started(
 {
     MMSTransferListDbus* self = MMS_TRANSFER_LIST_DBUS(list);
     MMSTransferDbus* transfer = mms_transfer_dbus_new(self->bus, id, type);
-    MMS_DEBUG("Transfer %s started", transfer->path);
+    GDEBUG("Transfer %s started", transfer->path);
     transfer->list = self;
     g_hash_table_replace(self->transfers, &transfer->key, transfer);
     org_nemomobile_mms_engine_transfer_list_emit_transfer_started(self->proxy,
@@ -150,7 +152,7 @@ mms_transfer_list_dbus_transfer_finished(
     key.id = id;
     key.type = type;
     if (!g_hash_table_remove(self->transfers, &key)) {
-        MMS_WARN("Transfer %s/%s not found", id, type);
+        GWARN("Transfer %s/%s not found", id, type);
     }
 }
 
@@ -169,7 +171,7 @@ mms_transfer_list_dbus_find(
     if (transfer) {
         return transfer;
     } else {
-        MMS_WARN("Transfer %s/%s not found", id, type);
+        GWARN("Transfer %s/%s not found", id, type);
         return NULL;
     }
 }
@@ -224,16 +226,16 @@ mms_transfer_list_dbus_handle_get(
         GHashTableIter it;
         g_hash_table_iter_init(&it, self->transfers);
         paths = g_new(const char*, n+1);
-        MMS_VERBOSE("%u transfer(s)", n);
+        GVERBOSE("%u transfer(s)", n);
         while (i < n && g_hash_table_iter_next(&it, NULL, &value)) {
             MMSTransferDbus* transfer = value;
-            MMS_VERBOSE("  %s", transfer->path);
+            GVERBOSE("  %s", transfer->path);
             paths[i++] = transfer->path;
         }
         paths[i++] = NULL;
         list = paths;
     } else {
-        MMS_VERBOSE("No transfers");
+        GVERBOSE("No transfers");
         list = &null;
     }
     org_nemomobile_mms_engine_transfer_list_complete_get(proxy, call, list);

@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -19,14 +18,13 @@
 #include "mms_handler.h"
 #include "mms_codec.h"
 #include "mms_util.h"
-#include "mms_log.h"
 #include "mms_error.h"
 
 /* Class definition */
 typedef MMSTaskHttpClass MMSTaskReadClass;
 typedef MMSTaskHttp MMSTaskRead;
 
-G_DEFINE_TYPE(MMSTaskRead, mms_task_read, MMS_TYPE_TASK_HTTP);
+G_DEFINE_TYPE(MMSTaskRead, mms_task_read, MMS_TYPE_TASK_HTTP)
 #define MMS_TYPE_TASK_READ (mms_task_read_get_type())
 #define MMS_TASK_READ(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
         MMS_TYPE_TASK_READ, MMSTaskRead))

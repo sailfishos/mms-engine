@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -22,9 +21,10 @@
 #include "mms_transfer_list.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_decode_log
+#define GLOG_MODULE_NAME mms_task_decode_log
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-decode", MMS_TASK_LOG);
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE2("mms-task-decode", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskDecodeClass;
@@ -130,11 +130,11 @@ mms_task_decode_part(
             rename(part->orig, part->file);
             g_free(part->orig);
             part->orig = NULL;
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     } else {
-        MMS_ERR("Failed to rename %s to %s: %s", part->file, part->orig,
+        GERR("Failed to rename %s to %s: %s", part->file, part->orig,
             strerror(errno));
     }
 }
@@ -155,25 +155,25 @@ mms_task_decode_retrieve_conf(
     const struct mms_retrieve_conf* rc = &pdu->rc;
     MMSMessage* msg = mms_message_new();
 
-#if MMS_LOG_DEBUG
+#if GUTIL_LOG_DEBUG
     char date[128];
     strftime(date, sizeof(date), "%Y-%m-%dT%H:%M:%S%z", localtime(&rc->date));
     date[sizeof(date)-1] = '\0';
-#endif /* MMS_LOG_DEBUG */
+#endif /* GUTIL_LOG_DEBUG */
 
-    MMS_ASSERT(pdu->type == MMS_MESSAGE_TYPE_RETRIEVE_CONF);
-    MMS_INFO("Processing M-Retrieve.conf");
-    MMS_INFO("  From: %s", rc->from);
+    GASSERT(pdu->type == MMS_MESSAGE_TYPE_RETRIEVE_CONF);
+    GINFO("Processing M-Retrieve.conf");
+    GINFO("  From: %s", rc->from);
 
-#if MMS_LOG_DEBUG
-    MMS_DEBUG("  To: %s", rc->to);
-    if (rc->cc) MMS_DEBUG("  Cc: %s", rc->cc);
-    MMS_DEBUG("  Message-ID: %s", rc->msgid);
-    MMS_DEBUG("  Transaction-ID: %s", pdu->transaction_id);
-    if (rc->subject) MMS_DEBUG("  Subject: %s", rc->subject);
-    MMS_DEBUG("  Date: %s", date);
-    MMS_DEBUG("  %u parts", nparts);
-#endif /* MMS_LOG_DEBUG */
+#if GUTIL_LOG_DEBUG
+    GDEBUG("  To: %s", rc->to);
+    if (rc->cc) GDEBUG("  Cc: %s", rc->cc);
+    GDEBUG("  Message-ID: %s", rc->msgid);
+    GDEBUG("  Transaction-ID: %s", pdu->transaction_id);
+    if (rc->subject) GDEBUG("  Subject: %s", rc->subject);
+    GDEBUG("  Date: %s", date);
+    GDEBUG("  %u parts", nparts);
+#endif /* GUTIL_LOG_DEBUG */
 
     if (task_config(task)->keep_temp_files) {
         msg->flags |= MMS_MESSAGE_FLAG_KEEP_FILES;
@@ -216,8 +216,8 @@ mms_task_decode_retrieve_conf(
             file = mms_task_decode_add_file_name(part_files, name);
             g_free(name);
         }
-        MMS_DEBUG("Part: %s %s", name, attach->content_type);
-        MMS_ASSERT(attach->offset < pdu_size);
+        GDEBUG("Part: %s %s", name, attach->content_type);
+        GASSERT(attach->offset < pdu_size);
         if (mms_write_file(msg->parts_dir, file, pdu_data + attach->offset,
             attach->length, &path)) {
             MMSMessagePart* part = g_new0(MMSMessagePart, 1);
@@ -233,7 +233,7 @@ mms_task_decode_retrieve_conf(
                         attach->transfer_encoding);
                 if (enc > GMIME_CONTENT_ENCODING_BINARY) {
                     /* The part actually needs some decoding */
-                    MMS_DEBUG("Decoding %s", attach->transfer_encoding);
+                    GDEBUG("Decoding %s", attach->transfer_encoding);
                     mms_task_decode_part(part,enc,msg->parts_dir,part_files);
                 }
             }
@@ -282,16 +282,16 @@ mms_task_decode_process_pdu(
                 /* MMS server returned an error. Most likely, MMS message
                  * has expired. We need more MMS_RECEIVE_STATE values to
                  * better describe it to the user. */
-                MMS_ERR("MMSC responded with %u", rc->retrieve_status);
+                GERR("MMSC responded with %u", rc->retrieve_status);
                 mms_handler_message_receive_state_changed(task->handler,
                     task->id, MMS_RECEIVE_STATE_DOWNLOAD_ERROR);
                 return;
             }
         } else {
-            MMS_ERR("Unexpected MMS PDU type %u", (guint)pdu->type);
+            GERR("Unexpected MMS PDU type %u", (guint)pdu->type);
         }
     } else {
-        MMS_ERR("Failed to decode MMS PDU");
+        GERR("Failed to decode MMS PDU");
     }
 
     /* Tell MMS server that we didn't understand this PDU */
@@ -366,7 +366,7 @@ mms_task_decode_new(
             dec->task.priority = MMS_TASK_PRIORITY_POST_PROCESS;
             return &dec->task;
         } else if (error) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     }

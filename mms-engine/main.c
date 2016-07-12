@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <syslog.h>
@@ -26,6 +25,8 @@
 #else
 #  include "mms_connman_ofono_log.h"
 #endif
+
+#include <gutil_log.h>
 
 #define RET_OK  (0)
 #define RET_ERR (1)
@@ -43,7 +44,7 @@ typedef struct mms_app_options {
 
 /* All known log modules */
 static MMSLogModule* mms_app_log_modules[] = {
-    &mms_log_default,
+    &gutil_log_default,
 #define MMS_LIB_LOG_MODULE(m) &(m),
     MMS_LIB_LOG_MODULES(MMS_LIB_LOG_MODULE)
     MMS_CONNMAN_LOG_MODULES(MMS_LIB_LOG_MODULE)
@@ -57,7 +58,7 @@ mms_app_signal(
     gpointer arg)
 {
     MMSEngine* engine = arg;
-    MMS_INFO("Caught signal, shutting down...");
+    GINFO("Caught signal, shutting down...");
     mms_engine_stop(engine);
     return TRUE;
 }
@@ -72,9 +73,9 @@ mms_app_bus_acquired(
 {
     MMSEngine* engine = arg;
     GError* error = NULL;
-    MMS_DEBUG("Bus acquired, starting...");
+    GDEBUG("Bus acquired, starting...");
     if (!mms_engine_register(engine, bus, &error)) {
-        MMS_ERR("Could not start: %s", MMS_ERRMSG(error));
+        GERR("Could not start: %s", GERRMSG(error));
         g_error_free(error);
         mms_engine_stop(engine);
     }
@@ -87,7 +88,7 @@ mms_app_name_acquired(
     const gchar* name,
     gpointer arg)
 {
-    MMS_DEBUG("Acquired service name '%s'", name);
+    GDEBUG("Acquired service name '%s'", name);
 }
 
 static
@@ -98,7 +99,7 @@ mms_app_name_lost(
     gpointer arg)
 {
     MMSEngine* engine = arg;
-    MMS_ERR("'%s' service already running or access denied", name);
+    GERR("'%s' service already running or access denied", name);
     mms_engine_stop(engine);
 }
 
@@ -111,7 +112,7 @@ mms_app_option_loglevel(
     gpointer data,
     GError** error)
 {
-    return mms_log_parse_option(value, mms_app_log_modules,
+    return gutil_log_parse_option(value, mms_app_log_modules,
         G_N_ELEMENTS(mms_app_log_modules), error);
 }
 
@@ -123,7 +124,7 @@ mms_app_option_logtype(
     gpointer data,
     GError** error)
 {
-    if (mms_log_set_type(value, MMS_APP_LOG_PREFIX)) {
+    if (gutil_log_set_type(value, MMS_APP_LOG_PREFIX)) {
         return TRUE;
     } else {
         if (error) {
@@ -142,7 +143,7 @@ mms_app_option_verbose(
     gpointer data,
     GError** error)
 {
-    mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+    gutil_log_default.level = GLOG_LEVEL_VERBOSE;
     return TRUE;
 }
 
@@ -178,7 +179,7 @@ mms_app_parse_options(
     char* idle_secs_help = g_strdup_printf(
         "Inactivity timeout in seconds [%d]",
         opt->config.idle_secs);
-    char* description = mms_log_description(NULL, 0);
+    char* description = gutil_log_description(NULL, 0);
 
     GOptionContext* options;
     GOptionEntry entries[] = {
@@ -233,7 +234,7 @@ mms_app_parse_options(
     g_free(description);
 
     if (!ok) {
-        fprintf(stderr, "%s\n", MMS_ERRMSG(error));
+        fprintf(stderr, "%s\n", GERRMSG(error));
         g_error_free(error);
         *result = RET_ERR;
         return FALSE;
@@ -252,9 +253,9 @@ mms_app_parse_options(
 #endif
     } else {
 #ifdef MMS_VERSION_STRING
-        MMS_INFO("Version %s starting", MMS_VERSION_STRING);
+        GINFO("Version %s starting", MMS_VERSION_STRING);
 #else
-        MMS_INFO("Starting");
+        GINFO("Starting");
 #endif
         if (size_limit_kb >= 0) {
             opt->settings.size_limit = size_limit_kb * 1024;
@@ -275,10 +276,10 @@ mms_app_parse_options(
         if (opt->dir) opt->config.root_dir = opt->dir;
         if (keep_running) opt->flags |= MMS_ENGINE_FLAG_KEEP_RUNNING;
         if (session_bus) {
-            MMS_DEBUG("Attaching to session bus");
+            GDEBUG("Attaching to session bus");
             opt->bus_type = G_BUS_TYPE_SESSION;
         } else {
-            MMS_DEBUG("Attaching to system bus");
+            GDEBUG("Attaching to system bus");
             opt->bus_type = G_BUS_TYPE_SYSTEM;
         }
         *result = RET_OK;
@@ -292,7 +293,7 @@ int main(int argc, char* argv[])
     MMSAppOptions opt = {0};
     mms_lib_init(argv[0]);
     gofono_log.name = "mms-ofono";
-    mms_log_default.name = MMS_APP_LOG_PREFIX;
+    gutil_log_default.name = MMS_APP_LOG_PREFIX;
     mms_lib_default_config(&opt.config);
     mms_settings_sim_data_default(&opt.settings);
     if (mms_app_parse_options(&opt, argc, argv, &result)) {
@@ -323,9 +324,9 @@ int main(int argc, char* argv[])
             g_main_loop_unref(loop);
             mms_engine_unref(engine);
         }
-        MMS_INFO("Exiting");
+        GINFO("Exiting");
     }
-    if (mms_log_func == mms_log_syslog) {
+    if (gutil_log_func == gutil_log_syslog) {
         closelog();
     }
     g_free(opt.dir);

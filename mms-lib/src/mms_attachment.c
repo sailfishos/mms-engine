@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_attachment.h"
@@ -23,15 +22,14 @@
 #endif
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_attachment_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_attachment_log
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE("mms-attachment");
+GLOG_MODULE_DEFINE("mms-attachment");
 
 #define MMS_ATTACHMENT_DEFAULT_TYPE "application/octet-stream"
 #define CONTENT_TYPE_PARAM_NAME     "name"
 
-G_DEFINE_TYPE(MMSAttachment, mms_attachment, G_TYPE_OBJECT);
+G_DEFINE_TYPE(MMSAttachment, mms_attachment, G_TYPE_OBJECT)
 
 #define MMS_ATTACHMENT(obj) \
     (G_TYPE_CHECK_INSTANCE_CAST((obj), MMS_TYPE_ATTACHMENT, MMSAttachment))
@@ -58,7 +56,7 @@ mms_attachment_finalize(
     GObject* object)
 {
     MMSAttachment* at = MMS_ATTACHMENT(object);
-    MMS_VERBOSE_("%p", at);
+    GVERBOSE_("%p", at);
     if (at->map) g_mapped_file_unref(at->map);
     if (!at->config->keep_temp_files &&
         !(at->flags & MMS_ATTACHMENT_KEEP_FILES)) {
@@ -87,7 +85,7 @@ void
 mms_attachment_init(
     MMSAttachment* at)
 {
-    MMS_VERBOSE_("%p", at);
+    GVERBOSE_("%p", at);
 }
 
 static
@@ -143,7 +141,7 @@ mms_attachment_write_smil(
     /* Check if we have text region, image region or both */
     for (i=0; i<n && !(text_region && media_region); i++) {
         const MMSAttachment* at = ats[i];
-        MMS_ASSERT(!(at->flags & MMS_ATTACHMENT_SMIL));
+        GASSERT(!(at->flags & MMS_ATTACHMENT_SMIL));
         if (g_str_has_prefix(at->content_type, MEDIA_TYPE_TEXT_PREFIX)) {
             text_region = text_region_1;
         } else {
@@ -173,7 +171,7 @@ mms_attachment_write_smil(
             const char* ct = at->content_type;
             const char* elem;
             const char* region;
-            MMS_ASSERT(!(at->flags & MMS_ATTACHMENT_SMIL));
+            GASSERT(!(at->flags & MMS_ATTACHMENT_SMIL));
             if (g_str_has_prefix(ct, MEDIA_TYPE_TEXT_PREFIX)) {
                 elem = MEDIA_TEXT;
                 region = REGION_TEXT;
@@ -228,7 +226,7 @@ mms_attachment_guess_content_type(
     }
 
     if (!detected_type) {
-        MMS_WARN("No mime type for %s", path);
+        GWARN("No mime type for %s", path);
         detected_type = MMS_ATTACHMENT_DEFAULT_TYPE;
     }
 
@@ -255,7 +253,7 @@ mms_attachment_new_smil(
         FILE* f = fdopen(fd, "w");
         if (f) {
             gboolean ok;
-            MMS_VERBOSE("Writing SMIL %s", path);
+            GVERBOSE("Writing SMIL %s", path);
             ok = mms_attachment_write_smil(f, ats, n, error);
             fclose(f);
             if (ok) {
@@ -264,7 +262,7 @@ mms_attachment_new_smil(
                 ai.content_type = SMIL_CONTENT_TYPE "; charset=utf-8";
                 ai.content_id = NULL;
                 smil = mms_attachment_new(config, &ai, error);
-                MMS_ASSERT(smil && (smil->flags & MMS_ATTACHMENT_SMIL));
+                GASSERT(smil && (smil->flags & MMS_ATTACHMENT_SMIL));
             }
         } else {
             MMS_ERROR(error, MMS_LIB_ERROR_IO,
@@ -350,7 +348,7 @@ mms_attachment_new(
                 content_type = mms_unparse_http_content_type((char**)ct);
             }
 
-            MMS_DEBUG("%s: %s", path, content_type);
+            GDEBUG("%s: %s", path, content_type);
 
             if (!strcmp(media_type, "image/jpeg")) {
                 type = MMS_TYPE_ATTACHMENT_JPEG;

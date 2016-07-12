@@ -10,13 +10,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_LIB_LOG_H
 #define JOLLA_MMS_LIB_LOG_H
 
-#include "mms_log.h"
+#include "gutil_types.h"
 
 #define MMS_LIB_LOG_MODULES(log) \
     log(mms_dispatcher_log)\

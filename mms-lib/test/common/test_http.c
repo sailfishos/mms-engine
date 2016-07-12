@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,12 +10,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_http.h"
 
-#include "mms_log.h"
+#include <gutil_log.h>
 
 #include <libsoup/soup.h>
 
@@ -55,7 +55,7 @@ test_http_callback(
 {
     TestHttp* http = data;
     char* uri = soup_uri_to_string(soup_message_get_uri (msg), FALSE);
-    MMS_VERBOSE("%s %s HTTP/1.%d", msg->method, uri,
+    GVERBOSE("%s %s HTTP/1.%d", msg->method, uri,
         soup_message_get_http_version(msg));
     g_free(uri);
     if (msg->method == SOUP_METHOD_CONNECT) {
@@ -205,7 +205,7 @@ test_http_new(
     http->port = soup_server_get_port(http->server);
     soup_server_run_async(http->server);
 #endif
-    MMS_DEBUG("Listening on port %hu", http->port);
+    GDEBUG("Listening on port %hu", http->port);
     soup_server_add_handler(http->server, NULL, test_http_callback, http, NULL);
     if (get_file || resp_content_type || resp_status) {
         test_http_add_response(http, get_file, resp_content_type, resp_status);
@@ -218,7 +218,7 @@ test_http_ref(
     TestHttp* http)
 {
     if (http) {
-        MMS_ASSERT(http->ref_count > 0);
+        GASSERT(http->ref_count > 0);
         g_atomic_int_inc(&http->ref_count);
     }
     return http;
@@ -229,7 +229,7 @@ test_http_unref(
     TestHttp* http)
 {
     if (http) {
-        MMS_ASSERT(http->ref_count > 0);
+        GASSERT(http->ref_count > 0);
         if (g_atomic_int_dec_and_test(&http->ref_count)) {
             test_http_close(http);
             g_ptr_array_unref(http->responses);

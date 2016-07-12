@@ -27,7 +27,7 @@ BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
 BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
-BuildRequires: pkgconfig(libglibutil) >= 1.0.5
+BuildRequires: pkgconfig(libglibutil) >= 1.0.11
 BuildRequires:  pkgconfig(Qt5Gui)
 #BuildRequires: pkgconfig(ImageMagick)
 

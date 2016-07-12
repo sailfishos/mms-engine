@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,10 +10,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#include "mms_log.h"
 #include "mms_error.h"
 
 void
@@ -30,7 +29,7 @@ mms_error_valist(
         g_error_new_valist(MMS_LIB_ERROR, code, format, args2));
         va_end(args2);
     }
-    mms_logv(module, MMS_LOGLEVEL_ERR, format, args);
+    gutil_logv(module, GLOG_LEVEL_ERR, format, args);
 }
 
 void

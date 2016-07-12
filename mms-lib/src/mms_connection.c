@@ -10,14 +10,13 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_connection.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connection_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_connection_log
+#include <gutil_log.h>
 
 G_DEFINE_ABSTRACT_TYPE(MMSConnection, mms_connection, G_TYPE_OBJECT)
 #define MMS_CONNECTION_GET_CLASS(obj)  \
@@ -108,7 +107,7 @@ void
 mms_connection_init(
     MMSConnection* self)
 {
-    MMS_VERBOSE_("%p", self);
+    GVERBOSE_("%p", self);
 }
 
 /**
@@ -119,7 +118,7 @@ void
 mms_connection_finalize(
     GObject* object)
 {
-    MMS_VERBOSE_("%p", object);
+    GVERBOSE_("%p", object);
     G_OBJECT_CLASS(mms_connection_parent_class)->finalize(object);
 }
 

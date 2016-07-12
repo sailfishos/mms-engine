@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,11 +10,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_file_util.h"
-#include "mms_log.h"
 #include "mms_error.h"
 
 /**
@@ -88,7 +86,7 @@ mms_remove_file_and_dir(
         char* dir = g_path_get_dirname(file);
         unlink(file);
         if (rmdir(dir) == 0) {
-            MMS_VERBOSE("Deleted %s", dir);
+            GVERBOSE("Deleted %s", dir);
         }
         g_free(dir);
     }
@@ -145,7 +143,7 @@ mms_write_file(
         char* fname = g_strconcat(dir, "/", file, NULL);
         unlink(fname);
         if (g_file_set_contents(fname, data, size, &error)) {
-            MMS_VERBOSE("Created %s", fname);
+            GVERBOSE("Created %s", fname);
             chmod(fname, MMS_FILE_PERM);
             saved = TRUE;
             if (path) {
@@ -153,12 +151,12 @@ mms_write_file(
                 fname = NULL;
             }
         } else {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
         g_free(fname);
     } else {
-        MMS_ERR("Failed to create directory %s: %s", dir, strerror(errno));
+        GERR("Failed to create directory %s: %s", dir, strerror(errno));
     }
     return saved;
 }
@@ -323,7 +321,7 @@ mms_file_decode(
             } else if (ok) {
                 if (mms_file_decode_step(&dec, NULL, 0,
                     g_mime_encoding_flush, error)) {
-                    MMS_DEBUG("Decoded %s (%d bytes) -> %s (%d bytes)",
+                    GDEBUG("Decoded %s (%d bytes) -> %s (%d bytes)",
                         src, (int)inbytes, dest, (int)dec.outbytes);
                 } else {
                     ok = FALSE;

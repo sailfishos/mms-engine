@@ -10,16 +10,17 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connman.h"
 #include "test_handler.h"
 
-#include "mms_log.h"
 #include "mms_lib_util.h"
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
+
+#include <gutil_log.h>
+#include <gutil_macros.h>
 
 #define RET_OK      (0)
 #define RET_ERR     (1)
@@ -54,8 +55,8 @@ test_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
-    Test* test = MMS_CAST(delegate,Test,delegate);
-    MMS_INFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED",
+    Test* test = G_CAST(delegate,Test,delegate);
+    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED",
         test->desc->name);
     g_main_loop_quit(test->loop);
 }
@@ -68,7 +69,7 @@ test_timeout(
     Test* test = data;
     test->timeout_id = 0;
     test->ret = RET_TIMEOUT;
-    MMS_INFO("%s TIMEOUT", test->desc->name);
+    GINFO("%s TIMEOUT", test->desc->name);
     mms_dispatcher_cancel(test->disp, NULL);
     return FALSE;
 }
@@ -128,7 +129,7 @@ test_cancel(
 {
     Test* test = param;
     test->cancel_id = 0;
-    MMS_DEBUG("Asynchronous cancel %s", test->id ? test->id : "all");
+    GDEBUG("Asynchronous cancel %s", test->id ? test->id : "all");
     mms_dispatcher_cancel(test->disp, test->id);
     return FALSE;
 }
@@ -141,9 +142,9 @@ test_postnotify_cancel_async(
     void* param)
 {
     Test* test = param;
-    MMS_ASSERT(!test->id);
-    MMS_ASSERT(!test->cancel_id);
-    MMS_DEBUG("Scheduling asynchronous cancel for %s", id);
+    GASSERT(!test->id);
+    GASSERT(!test->cancel_id);
+    GDEBUG("Scheduling asynchronous cancel for %s", id);
     test->id = g_strdup(id);
     test->cancel_id = g_idle_add_full(G_PRIORITY_HIGH, test_cancel, test, NULL);
 }
@@ -156,7 +157,7 @@ test_postnotify_cancel(
     void* param)
 {
     Test* test = param;
-    MMS_DEBUG("Cancel all");
+    GDEBUG("Cancel all");
     mms_dispatcher_cancel(test->disp, NULL);
 }
 
@@ -172,9 +173,9 @@ test_prenotify_cancel_async(
     void* param)
 {
     Test* test = param;
-    MMS_ASSERT(!test->cancel_id);
+    GASSERT(!test->cancel_id);
     /* High priority item gets executed before notification is completed */
-    MMS_DEBUG("Scheduling asynchronous cancel");
+    GDEBUG("Scheduling asynchronous cancel");
     test->cancel_id = g_idle_add_full(G_PRIORITY_HIGH, test_cancel, test, NULL);
     return TRUE;
 }
@@ -187,7 +188,7 @@ test_once(
     Test test;
     MMSConfig config;
     GError* error = NULL;
-    MMS_VERBOSE(">>>>>>>>>>>>>> %s <<<<<<<<<<<<<<", desc->name);
+    GVERBOSE(">>>>>>>>>>>>>> %s <<<<<<<<<<<<<<", desc->name);
     mms_lib_default_config(&config);
     config.root_dir = "."; /* Dispatcher will attempt to create it */
     test_init(&test, &config, desc);
@@ -285,13 +286,13 @@ int main(int argc, char* argv[])
 {
     int ret;
     mms_lib_init(argv[0]);
-    mms_log_default.name = "test_retrieve_cancel";
+    gutil_log_default.name = "test_retrieve_cancel";
     if (argc > 1 && !strcmp(argv[1], "-v")) {
-        mms_log_stdout_timestamp = TRUE;
-        mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+        gutil_log_timestamp = TRUE;
+        gutil_log_default.level = GLOG_LEVEL_VERBOSE;
     } else {
-        mms_log_stdout_timestamp = FALSE;
-        mms_log_default.level = MMS_LOGLEVEL_INFO;
+        gutil_log_timestamp = FALSE;
+        gutil_log_default.level = GLOG_LEVEL_INFO;
     }
     ret = test_run();
     mms_lib_deinit();

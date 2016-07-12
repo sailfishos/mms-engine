@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_attachment.h"
@@ -17,6 +17,9 @@
 #include "mms_lib_util.h"
 #include "mms_lib_log.h"
 #include "mms_file_util.h"
+
+#include <gutil_log.h>
+#include <gutil_macros.h>
 
 #include <libexif/exif-content.h>
 #include <libexif/exif-loader.h>
@@ -192,7 +195,7 @@ test_jpeg_error_log(
     buf[0] = 0;
     cinfo->err->format_message(cinfo, buf);
     buf[JMSG_LENGTH_MAX] = 0;
-    mms_log(NULL, level, "%s", buf);
+    gutil_log(NULL, level, "%s", buf);
     g_free(buf);
 }
 
@@ -202,7 +205,7 @@ test_jpeg_error_exit(
     j_common_ptr cinfo)
 {
     TestJpegError* err = (TestJpegError*)cinfo->err;
-    test_jpeg_error_log(MMS_LOGLEVEL_ERR, cinfo);
+    test_jpeg_error_log(GLOG_LEVEL_ERR, cinfo);
     longjmp(err->setjmp_buf, 1);
 }
 
@@ -211,7 +214,7 @@ void
 test_jpeg_error_output(
     j_common_ptr cinfo)
 {
-    test_jpeg_error_log(MMS_LOGLEVEL_DEBUG, cinfo);
+    test_jpeg_error_log(GLOG_LEVEL_DEBUG, cinfo);
 }
 
 static
@@ -232,7 +235,7 @@ boolean
 test_jpeg_APP1(
     j_decompress_ptr cinfo)
 {
-    TestJpegDecompress* dec = MMS_CAST(cinfo, TestJpegDecompress, pub);
+    TestJpegDecompress* dec = G_CAST(cinfo, TestJpegDecompress, pub);
     ExifLoader* eloader;
     ExifData* edata;
     unsigned int len;
@@ -243,7 +246,7 @@ test_jpeg_APP1(
     buf[1] = test_jpeg_getc(cinfo);
     len = buf[0] << 8;
     len += buf[1];
-    MMS_DEBUG("Marker 0x%02X %u bytes", cinfo->unread_marker, len);
+    GDEBUG("Marker 0x%02X %u bytes", cinfo->unread_marker, len);
     if (len < 2) ERREXIT(cinfo, JERR_BAD_LENGTH);
 
     /* Feed the whole thing to the Exit loader */
@@ -271,7 +274,7 @@ test_jpeg_APP1(
             /* Actually there are two bytes there but the second one
              * should be zero */
             dec->orientation = orientation->data[0];
-            MMS_DEBUG("Orientation %d", dec->orientation);
+            GDEBUG("Orientation %d", dec->orientation);
         }
         exif_data_unref(edata);
     }
@@ -385,10 +388,10 @@ test_run_one(
                             if (!strcmp(at->file_name, testfile)) {
                                 ret = RET_OK;
                             } else {
-                                MMS_DEBUG("Reset didn't work");
+                                GDEBUG("Reset didn't work");
                             }
                         } else {
-                            MMS_ERR("Output size mismatch: (%ux%u) vs (%ux%u)",
+                            GERR("Output size mismatch: (%ux%u) vs (%ux%u)",
                                 size.width, size.height,
                                 test->size.width, test->size.height);
                         }
@@ -401,15 +404,15 @@ test_run_one(
                 mms_attachment_unref(at);
                 mms_attachment_unref(at);
             } else {
-                MMS_ERR("%s", MMS_ERRMSG(error));
+                GERR("%s", GERRMSG(error));
                 g_error_free(error);
             }
         } else {
-            MMS_ERR("Failed to copy %s -> %s", test->file, testfile);
+            GERR("Failed to copy %s -> %s", test->file, testfile);
         }
         g_free(testfile);
     }
-    MMS_INFO("%s: %s", (ret == RET_OK) ? "OK" : "FAILED", test->name);
+    GINFO("%s: %s", (ret == RET_OK) ? "OK" : "FAILED", test->name);
     g_free(name);
     g_free(tmpl);
     return ret;
@@ -432,7 +435,7 @@ test_run(
                 break;
             }
         }
-        if (!found) MMS_ERR("No such test: %s", name);
+        if (!found) GERR("No such test: %s", name);
     } else {
         for (i=0, ret = RET_OK; i<G_N_ELEMENTS(resize_tests); i++) {
             int test_status = test_run_one(config, resize_tests + i);
@@ -466,13 +469,13 @@ int main(int argc, char* argv[])
         config.root_dir = "/tmp";
         config.keep_temp_files = keep_temp;
 
-        mms_log_stdout_timestamp = FALSE;
-        mms_log_default.name = "test_resize";
+        gutil_log_timestamp = FALSE;
+        gutil_log_default.name = "test_resize";
         if (verbose) {
-            mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         } else {
-            mms_log_default.level = MMS_LOGLEVEL_INFO;
-            mms_attachment_log.level = MMS_LOGLEVEL_ERR;
+            gutil_log_default.level = GLOG_LEVEL_INFO;
+            mms_attachment_log.level = GLOG_LEVEL_ERR;
         }
         ret = test_run(&config, test);
     }

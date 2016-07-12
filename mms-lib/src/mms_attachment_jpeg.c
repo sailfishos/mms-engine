@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_attachment_image.h"
@@ -20,14 +20,14 @@
 #include <setjmp.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_attachment_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_attachment_log
+#include <gutil_log.h>
 
 typedef MMSAttachmentImageClass MMSAttachmentJpegClass;
 typedef MMSAttachmentImage MMSAttachmentJpeg;
 
 G_DEFINE_TYPE(MMSAttachmentJpeg, mms_attachment_jpeg, \
-        MMS_TYPE_ATTACHMENT_IMAGE);
+        MMS_TYPE_ATTACHMENT_IMAGE)
 #define MMS_ATTACHMENT_JPEG(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
         MMS_TYPE_ATTACHMENT_JPEG, MMSAttachmentJpeg))
 
@@ -59,7 +59,7 @@ mms_attachment_jpeg_error_log(
     buf[0] = 0;
     cinfo->err->format_message(cinfo, buf);
     buf[JMSG_LENGTH_MAX-1] = 0;
-    mms_log(MMS_LOG_MODULE_CURRENT, level, "%s", buf);
+    gutil_log(GLOG_MODULE_CURRENT, level, "%s", buf);
     g_free(buf);
 }
 
@@ -69,7 +69,7 @@ mms_attachment_jpeg_error_exit(
     j_common_ptr cinfo)
 {
     MMSAttachmentJpegError* err = (MMSAttachmentJpegError*)cinfo->err;
-    mms_attachment_jpeg_error_log(MMS_LOGLEVEL_WARN, cinfo);
+    mms_attachment_jpeg_error_log(GLOG_LEVEL_WARN, cinfo);
     longjmp(err->setjmp_buf, 1);
 }
 
@@ -78,7 +78,7 @@ void
 mms_attachment_jpeg_error_output(
     j_common_ptr cinfo)
 {
-    mms_attachment_jpeg_error_log(MMS_LOGLEVEL_DEBUG, cinfo);
+    mms_attachment_jpeg_error_log(GLOG_LEVEL_DEBUG, cinfo);
 }
 
 static

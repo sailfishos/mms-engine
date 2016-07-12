@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_dispatcher.h"
@@ -27,10 +26,9 @@
 #include <errno.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_dispatcher_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_dispatcher_log
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE("mms-dispatcher");
+GLOG_MODULE_DEFINE("mms-dispatcher");
 
 struct mms_dispatcher {
     gint ref_count;
@@ -97,7 +95,7 @@ mms_dispatcher_drop_connection(
     MMSDispatcher* disp)
 {
     if (disp->connection) {
-        MMS_ASSERT(!mms_connection_is_active(disp->connection));
+        GASSERT(!mms_connection_is_active(disp->connection));
         mms_connection_remove_handler(disp->connection,
             disp->connection_changed_id);
         disp->connection_changed_id = 0;
@@ -121,7 +119,7 @@ mms_dispatcher_close_connection(
     if (disp->connection) {
         mms_connection_close(disp->connection);
         /* Assert that connection state changes are asynchronous */
-        MMS_ASSERT(disp->connection);
+        GASSERT(disp->connection);
         if (!mms_connection_is_active(disp->connection)) {
             mms_dispatcher_drop_connection(disp);
         }
@@ -188,7 +186,7 @@ void
 mms_dispatcher_network_idle_run(
     MMSDispatcher* disp)
 {
-    MMS_ASSERT(disp->network_idle_id);
+    GASSERT(disp->network_idle_id);
     disp->network_idle_id = 0;
     mms_dispatcher_close_connection(disp);
 }
@@ -200,7 +198,7 @@ mms_dispatcher_network_idle_check(
 {
     if (disp->connection && !disp->network_idle_id) {
         /* Schedule idle inactivity timeout callback */
-        MMS_VERBOSE("Network connection is inactive");
+        GVERBOSE("Network connection is inactive");
         disp->network_idle_id = mms_dispatcher_timeout_callback_schedule(disp,
             disp->settings->config->idle_secs, mms_dispatcher_network_idle_run);
     }
@@ -212,7 +210,7 @@ mms_dispatcher_network_idle_cancel(
     MMSDispatcher* disp)
 {
     if (disp->network_idle_id) {
-        MMS_VERBOSE("Cancel network inactivity timeout");
+        GVERBOSE("Cancel network inactivity timeout");
         g_source_remove(disp->network_idle_id);
         disp->network_idle_id = 0;
     }
@@ -226,8 +224,8 @@ void
 mms_dispatcher_next_run(
     MMSDispatcher* disp)
 {
-    MMS_ASSERT(disp->next_run_id);
-    MMS_ASSERT(!disp->active_task);
+    GASSERT(disp->next_run_id);
+    GASSERT(!disp->active_task);
     disp->next_run_id = 0;
     if (!disp->active_task) {
         mms_dispatcher_run(disp);
@@ -255,8 +253,8 @@ mms_dispatcher_connection_state_changed(
 {
     MMSDispatcher* disp = data;
     MMS_CONNECTION_STATE state = mms_connection_state(conn);
-    MMS_DEBUG("%s %s", conn->imsi, mms_connection_state_name(conn));
-    MMS_ASSERT(conn == disp->connection);
+    GDEBUG("%s %s", conn->imsi, mms_connection_state_name(conn));
+    GASSERT(conn == disp->connection);
     if (state == MMS_CONNECTION_STATE_FAILED ||
         state == MMS_CONNECTION_STATE_CLOSED) {
         GList* entry;
@@ -293,7 +291,7 @@ mms_dispatcher_set_delegate(
     MMSDispatcher* disp,
     MMSDispatcherDelegate* delegate)
 {
-    MMS_ASSERT(!disp->delegate || !delegate);
+    GASSERT(!disp->delegate || !delegate);
     disp->delegate = delegate;
 }
 
@@ -328,8 +326,8 @@ mms_dispatcher_sort_cb(
     gboolean connection_is_open =
         mms_connection_state(disp->connection) == MMS_CONNECTION_STATE_OPEN;
 
-    MMS_ASSERT(task1);
-    MMS_ASSERT(task2);
+    GASSERT(task1);
+    GASSERT(task2);
     if (task1 == task2) {
         return 0;
     }
@@ -419,7 +417,7 @@ mms_dispatcher_pick_next_task(
                         (task->state == MMS_TASK_STATE_NEED_USER_CONNECTION) ?
                         MMS_CONNECTION_TYPE_USER : MMS_CONNECTION_TYPE_AUTO);
                  if (disp->connection) {
-                     MMS_ASSERT(!disp->connection_changed_id);
+                     GASSERT(!disp->connection_changed_id);
                      disp->connection_changed_id =
                          mms_connection_add_state_change_handler(
                              disp->connection,
@@ -458,9 +456,9 @@ mms_dispatcher_run(
     MMSDispatcher* disp)
 {
     MMSTask* task;
-    MMS_ASSERT(!disp->active_task);
+    GASSERT(!disp->active_task);
     while ((task = mms_dispatcher_pick_next_task(disp)) != NULL) {
-        MMS_DEBUG("%s %s", task->name, mms_task_state_name(task->state));
+        GDEBUG("%s %s", task->name, mms_task_state_name(task->state));
         disp->active_task = task;
         switch (task->state) {
         case MMS_TASK_STATE_READY:
@@ -471,8 +469,8 @@ mms_dispatcher_run(
         case MMS_TASK_STATE_NEED_USER_CONNECTION:
             /* mms_dispatcher_pick_next_task() has checked that the right
              * connection is active, we can send/receive the data */
-            MMS_ASSERT(mms_connection_is_open(disp->connection));
-            MMS_ASSERT(!strcmp(task->imsi, disp->connection->imsi));
+            GASSERT(mms_connection_is_open(disp->connection));
+            GASSERT(!strcmp(task->imsi, disp->connection->imsi));
             mms_task_transmit(task, disp->connection);
             break;
 
@@ -530,7 +528,7 @@ mms_dispatcher_start(
             return TRUE;
         }
     } else {
-        MMS_ERR("Failed to create %s: %s", root_dir, strerror(errno));
+        GERR("Failed to create %s: %s", root_dir, strerror(errno));
     }
     return FALSE;
 }
@@ -590,7 +588,7 @@ mms_dispatcher_receive_message(
     gboolean ok = FALSE;
     MMSPdu* pdu = mms_decode_bytes(bytes);
     if (pdu) {
-        MMS_ASSERT(pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND);
+        GASSERT(pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND);
         if (pdu->type == MMS_MESSAGE_TYPE_NOTIFICATION_IND) {
             const MMSConfig* config = disp->settings->config;
             ok = mms_dispatcher_queue_and_unref_task(disp,
@@ -731,7 +729,7 @@ mms_dispatcher_handler_done(
     void* param)
 {
     MMSDispatcher* disp = param;
-    MMS_VERBOSE("Handler is inactive");
+    GVERBOSE("Handler is inactive");
     mms_dispatcher_next_run_schedule(disp);
 }
 
@@ -745,7 +743,7 @@ mms_dispatcher_connman_done(
     void* param)
 {
     MMSDispatcher* disp = param;
-    MMS_VERBOSE("Connman is inactive");
+    GVERBOSE("Connman is inactive");
     mms_dispatcher_check_if_done(disp);
 }
 
@@ -789,7 +787,7 @@ mms_dispatcher_finalize(
     MMSTask* task;
     const char* root_dir = disp->settings->config->root_dir;
     char* msg_dir = g_strconcat(root_dir, "/" MMS_MESSAGE_DIR "/", NULL);
-    MMS_VERBOSE_("");
+    GVERBOSE_("");
     mms_handler_remove_callback(disp->handler, disp->handler_done_id);
     mms_connman_remove_callback(disp->cm, disp->connman_done_id);
     mms_dispatcher_drop_connection(disp);
@@ -817,7 +815,7 @@ mms_dispatcher_ref(
     MMSDispatcher* disp)
 {
     if (disp) {
-        MMS_ASSERT(disp->ref_count > 0);
+        GASSERT(disp->ref_count > 0);
         g_atomic_int_inc(&disp->ref_count);
     }
     return disp;
@@ -828,7 +826,7 @@ mms_dispatcher_unref(
     MMSDispatcher* disp)
 {
     if (disp) {
-        MMS_ASSERT(disp->ref_count > 0);
+        GASSERT(disp->ref_count > 0);
         if (g_atomic_int_dec_and_test(&disp->ref_count)) {
             mms_dispatcher_finalize(disp);
             g_free(disp);

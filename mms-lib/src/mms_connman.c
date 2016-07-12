@@ -10,14 +10,13 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_connman.h"
 
 /* Logging */
 #define MMS_LOG_MODULE_NAME mms_connman_log
-#include "mms_lib_log.h"
+#include <gutil_log.h>
 
 G_DEFINE_ABSTRACT_TYPE(MMSConnMan, mms_connman, G_TYPE_OBJECT)
 #define MMS_CONNMAN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
@@ -75,7 +74,7 @@ void
 mms_connman_finalize(
     GObject* object)
 {
-    MMS_ASSERT(!MMS_CONNMAN(object)->busy);
+    GASSERT(!MMS_CONNMAN(object)->busy);
     G_OBJECT_CLASS(mms_connman_parent_class)->finalize(object);
 }
 
@@ -145,11 +144,11 @@ mms_connman_busy_update(
     MMSConnMan* cm,
     int change)
 {
-    MMS_ASSERT(change);
+    GASSERT(change);
     if (cm && change) {
         cm->busy += change;
-        MMS_VERBOSE("busy count %d", cm->busy);
-        MMS_ASSERT(cm->busy >= 0);
+        GVERBOSE("busy count %d", cm->busy);
+        GASSERT(cm->busy >= 0);
         if (cm->busy < 1) {
             g_signal_emit(cm, mms_connman_sig[MMS_CONNMAN_SIGNAL_DONE], 0);
         }

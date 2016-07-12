@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -26,10 +25,10 @@
 #include <gio/gio.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_encode_log
+#define GLOG_MODULE_NAME mms_task_encode_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-encode", MMS_TASK_LOG);
+GLOG_MODULE_DEFINE2("mms-task-encode", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskEncodeClass;
@@ -88,7 +87,7 @@ mms_encode_job_resize(
     MMSAttachment* resize_me = NULL;
     unsigned int largest_size = 0;
     int i;
-    MMS_DEBUG("Message is too big, need to resize");
+    GDEBUG("Message is too big, need to resize");
     for (i=0; i<enc->nparts; i++) {
         MMSAttachment* part = enc->parts[i];
         if (part->flags & MMS_ATTACHMENT_RESIZABLE) {
@@ -103,19 +102,19 @@ mms_encode_job_resize(
                         resize_me = part;
                     }
                 } else {
-                    MMS_ERR("Can't stat %s: %s", fname, strerror(errno));
+                    GERR("Can't stat %s: %s", fname, strerror(errno));
                 }
                 close(fd);
             } else {
-                MMS_ERR("Can't open %s: %s", fname, strerror(errno));
+                GERR("Can't open %s: %s", fname, strerror(errno));
             }
         }
     }
     if (resize_me) {
-        MMS_DEBUG("Resizing %s", resize_me->original_file);
+        GDEBUG("Resizing %s", resize_me->original_file);
         return mms_attachment_resize(resize_me, &job->settings->data);
     } else {
-        MMS_DEBUG("There is nothing to resize");
+        GDEBUG("There is nothing to resize");
         return FALSE;
     }
 }
@@ -149,7 +148,7 @@ mms_encode_job_encode(
         ct[3] = "type";
         ct[4] = SMIL_CONTENT_TYPE;
         ct[5] = NULL;
-        MMS_ASSERT(smil->flags & MMS_ATTACHMENT_SMIL);
+        GASSERT(smil->flags & MMS_ATTACHMENT_SMIL);
 
         mms->type = MMS_MESSAGE_TYPE_SEND_REQ;
         mms->version = MMS_VERSION;
@@ -183,13 +182,13 @@ mms_encode_job_encode(
             int err = fstat(fd, &st);
             if (!err) {
                 pdu_size = st.st_size;
-                MMS_DEBUG("Created %s (%d bytes)", job->path, (int)pdu_size);
+                GDEBUG("Created %s (%d bytes)", job->path, (int)pdu_size);
             } else {
-                MMS_ERR("Can't stat %s: %s", job->path, strerror(errno));
+                GERR("Can't stat %s: %s", job->path, strerror(errno));
                 ok = FALSE;
             }
         } else {
-            MMS_ERR("Failed to encode message");
+            GERR("Failed to encode message");
         }
 
         close(fd);
@@ -248,7 +247,7 @@ mms_encode_job_ref(
     MMSEncodeJob* job)
 {
     if (job) {
-        MMS_ASSERT(job->ref_count > 0);
+        GASSERT(job->ref_count > 0);
         g_atomic_int_inc(&job->ref_count);
     }
     return job;
@@ -260,7 +259,7 @@ mms_encode_job_unref(
     MMSEncodeJob* job)
 {
     if (job) {
-        MMS_ASSERT(job->ref_count > 0);
+        GASSERT(job->ref_count > 0);
         if (g_atomic_int_dec_and_test(&job->ref_count)) {
             mms_task_unref(&job->enc->task);
             g_object_unref(job->cancellable);
@@ -321,7 +320,7 @@ mms_task_encode_job_done(
 {
     if (enc->active_job == job) {
         MMSTask* task = &enc->task;
-        MMS_VERBOSE_("Encoding completion state %d", job->state);
+        GVERBOSE_("Encoding completion state %d", job->state);
         enc->active_job = NULL;
         if (job->state == MMS_ENCODE_STATE_DONE) {
             mms_task_queue_and_unref(task->delegate,
@@ -335,7 +334,7 @@ mms_task_encode_job_done(
         mms_task_set_state(&enc->task, MMS_TASK_STATE_DONE);
         mms_encode_job_unref(job);
     } else {
-        MMS_VERBOSE_("Ignoring stale job completion");
+        GVERBOSE_("Ignoring stale job completion");
     }
 }
 
@@ -356,10 +355,10 @@ mms_task_encode_run(
         mms_handler_message_send_state_changed(task->handler, task->id,
             MMS_SEND_STATE_ENCODING, NULL);
         mms_task_set_state(task, MMS_TASK_STATE_WORKING);
-        MMS_ASSERT(!enc->active_job);
+        GASSERT(!enc->active_job);
         enc->active_job = job;
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
         mms_encode_job_unref(job);
         mms_encode_job_unref(job);
@@ -480,7 +479,7 @@ mms_task_encode_prepare_attachments(
                 g_ptr_array_add(array, attachment);
             }
         } else if (error && *error) {
-            MMS_ERR("%s", MMS_ERRMSG(*error));
+            GERR("%s", GERRMSG(*error));
         }
 
         g_free(detected_type);
@@ -600,7 +599,7 @@ mms_task_encode_new(
     int nparts,
     GError** error)
 {
-    MMS_ASSERT(to && to[0]);
+    GASSERT(to && to[0]);
     if (to && to[0]) {
         int err;
         char* dir;
@@ -624,7 +623,7 @@ mms_task_encode_new(
                 enc->flags = flags;
                 enc->transfers = mms_transfer_list_ref(transfers);
 
-                MMS_ASSERT(!error || !*error);
+                GASSERT(!error || !*error);
                 g_free(dir);
                 return &enc->task;
             }
@@ -637,7 +636,7 @@ mms_task_encode_new(
     } else {
         MMS_ERROR(error, MMS_LIB_ERROR_ARGS, "Missing To: address");
     }
-    MMS_ASSERT(!error || *error);
+    GASSERT(!error || *error);
     return NULL;
 }
 

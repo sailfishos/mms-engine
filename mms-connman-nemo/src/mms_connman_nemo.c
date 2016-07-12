@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_connman_nemo.h"
@@ -20,9 +19,10 @@
 #include <gofono_modem.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connman_log
+#define GLOG_MODULE_NAME mms_connman_log
 #include "mms_connman_nemo_log.h"
-MMS_LOG_MODULE_DEFINE("mms-connman-nemo");
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-connman-nemo");
 
 enum mm_event {
     MM_EVENT_VALID,
@@ -79,10 +79,10 @@ mms_connman_nemo_check_default_sim(
     if (g_strcmp0(path, ofono_simmgr_path(self->default_sim))) {
         ofono_simmgr_unref(self->default_sim);
         if (path) {
-            MMS_DEBUG("Default SIM at %s", path);
+            GDEBUG("Default SIM at %s", path);
             self->default_sim = ofono_simmgr_new(path);
         } else {
-            MMS_DEBUG("No default SIM");
+            GDEBUG("No default SIM");
             self->default_sim = NULL;
         }
     }
@@ -136,10 +136,10 @@ mms_connman_nemo_default_imsi(
         ofono_simmgr_wait_valid(self->default_sim, MMS_INIT_TIMEOUT_MS, 0) &&
         self->default_sim /* Check it again */ &&
         self->default_sim->imsi) {
-        MMS_DEBUG("Default IMSI %s", self->default_sim->imsi);
+        GDEBUG("Default IMSI %s", self->default_sim->imsi);
         return g_strdup(self->default_sim->imsi);
     }
-    MMS_DEBUG("No default IMSI");
+    GDEBUG("No default IMSI");
     return NULL;
 }
 
@@ -153,8 +153,8 @@ mms_connman_nemo_connection_weak_ref_notify(
     GObject* connection)
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(arg);
-    MMS_ASSERT(MMS_CONNECTION(connection) == self->conn);
-    MMS_VERBOSE_("%p", connection);
+    GASSERT(MMS_CONNECTION(connection) == self->conn);
+    GVERBOSE_("%p", connection);
     self->conn_change_id = 0;
     self->conn = NULL;
 }
@@ -168,7 +168,7 @@ mms_connman_nemo_drop_connection(
     MMSConnManNemo* self)
 {
     if (self->conn) {
-        MMS_VERBOSE_("%p", self->conn);
+        GVERBOSE_("%p", self->conn);
         mms_connection_remove_handler(self->conn, self->conn_change_id);
         self->conn_change_id = 0;
         g_object_weak_unref(G_OBJECT(self->conn),
@@ -187,7 +187,7 @@ mms_connman_nemo_connection_state_changed(
     void* arg)
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(arg);
-    MMS_ASSERT(connection == self->conn);
+    GASSERT(connection == self->conn);
     if (self->conn && !mms_connection_is_active(self->conn)) {
         mms_connman_nemo_drop_connection(self);
     }
@@ -216,7 +216,7 @@ mms_connman_nemo_open_connection(
     self->conn = mms_connection_nemo_new(cm, imsi, type);
     self->conn_change_id = mms_connection_add_state_change_handler(self->conn,
         mms_connman_nemo_connection_state_changed, self);
-    MMS_ASSERT(mms_connection_is_active(self->conn));
+    GASSERT(mms_connection_is_active(self->conn));
     g_object_weak_ref(G_OBJECT(self->conn),
         mms_connman_nemo_connection_weak_ref_notify, self);
     return self->conn;
@@ -260,7 +260,7 @@ mms_connman_nemo_finalize(
     GObject* object)
 {
     MMSConnManNemo* self = MMS_CONNMAN_NEMO(object);
-    MMS_VERBOSE_("");
+    GVERBOSE_("");
     ofonoext_mm_unref(self->mm);
     G_OBJECT_CLASS(mms_connman_nemo_parent_class)->finalize(object);
 }
@@ -288,7 +288,7 @@ void
 mms_connman_nemo_init(
     MMSConnManNemo* self)
 {
-    MMS_VERBOSE_("");
+    GVERBOSE_("");
     self->mm = ofonoext_mm_new();
     self->mm_event_id[MM_EVENT_VALID] =
         ofonoext_mm_add_valid_changed_handler(self->mm,

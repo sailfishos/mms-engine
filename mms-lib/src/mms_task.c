@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -22,9 +21,9 @@
 #endif
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME MMS_TASK_LOG
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-task");
+#define GLOG_MODULE_NAME MMS_TASK_LOG
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-task");
 
 #define MMS_TASK_DEFAULT_LIFETIME (600)
 
@@ -64,7 +63,7 @@ mms_task_wakeup_callback(
     MMSTask* task = MMS_TASK(data);
     MMSTaskPriv* priv = task->priv;
     priv->wakeup_id = 0;
-    MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
+    GASSERT(task->state == MMS_TASK_STATE_SLEEP);
     mms_task_set_state(task, MMS_TASK_STATE_READY);
     return FALSE;
 }
@@ -80,7 +79,7 @@ mms_task_schedule_wakeup(
 
     /* Cancel the previous sleep */
     if (priv->wakeup_id) {
-        MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
+        GASSERT(task->state == MMS_TASK_STATE_SLEEP);
         g_source_remove(priv->wakeup_id);
         priv->wakeup_id = 0;
     }
@@ -94,8 +93,8 @@ mms_task_schedule_wakeup(
         priv->wakeup_id = g_timeout_add_seconds_full(G_PRIORITY_DEFAULT,
             secs, mms_task_wakeup_callback, mms_task_ref(task),
             mms_task_wakeup_free);
-        MMS_ASSERT(priv->wakeup_id);
-        MMS_VERBOSE("%s sleeping for %u sec", task->name, secs);
+        GASSERT(priv->wakeup_id);
+        GVERBOSE("%s sleeping for %u sec", task->name, secs);
     }
 
     return (priv->wakeup_id > 0);
@@ -118,7 +117,7 @@ mms_task_cancel_cb(
 {
     MMSTaskPriv* priv = task->priv;
     if (priv->wakeup_id) {
-        MMS_ASSERT(task->state == MMS_TASK_STATE_SLEEP);
+        GASSERT(task->state == MMS_TASK_STATE_SLEEP);
         g_source_remove(priv->wakeup_id);
         priv->wakeup_id = 0;
     }
@@ -132,19 +131,19 @@ mms_task_finalize(
     GObject* object)
 {
     MMSTask* task = MMS_TASK(object);
-    MMS_VERBOSE_("%p", task);
-    MMS_ASSERT(!task->delegate);
-    MMS_ASSERT(!task->priv->wakeup_id);
-    MMS_ASSERT(mms_task_count > 0);
+    GVERBOSE_("%p", task);
+    GASSERT(!task->delegate);
+    GASSERT(!task->priv->wakeup_id);
+    GASSERT(mms_task_count > 0);
     if (!(--mms_task_count)) {
-        MMS_VERBOSE("Last task is gone");
+        GVERBOSE("Last task is gone");
         mms_task_order = 0;
     }
     if (task->id) {
         if (!task_config(task)->keep_temp_files) {
             char* dir = mms_task_dir(task);
             if (rmdir(dir) == 0) {
-                MMS_VERBOSE("Deleted %s", dir);
+                GVERBOSE("Deleted %s", dir);
             }
             g_free(dir);
         }
@@ -172,7 +171,7 @@ void
 mms_task_init(
     MMSTask* task)
 {
-    MMS_VERBOSE_("%p", task);
+    GVERBOSE_("%p", task);
     mms_task_count++;
     task->order = mms_task_order++;
     task->priv = G_TYPE_INSTANCE_GET_PRIVATE(task, MMS_TYPE_TASK, MMSTaskPriv);
@@ -223,9 +222,9 @@ void
 mms_task_run(
     MMSTask* task)
 {
-    MMS_ASSERT(task->state == MMS_TASK_STATE_READY);
+    GASSERT(task->state == MMS_TASK_STATE_READY);
     MMS_TASK_GET_CLASS(task)->fn_run(task);
-    MMS_ASSERT(task->state != MMS_TASK_STATE_READY);
+    GASSERT(task->state != MMS_TASK_STATE_READY);
 }
 
 void
@@ -233,10 +232,10 @@ mms_task_transmit(
     MMSTask* task,
     MMSConnection* connection)
 {
-    MMS_ASSERT(task->state == MMS_TASK_STATE_NEED_CONNECTION ||
+    GASSERT(task->state == MMS_TASK_STATE_NEED_CONNECTION ||
                task->state == MMS_TASK_STATE_NEED_USER_CONNECTION);
     MMS_TASK_GET_CLASS(task)->fn_transmit(task, connection);
-    MMS_ASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
+    GASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
                task->state != MMS_TASK_STATE_NEED_USER_CONNECTION);
 }
 
@@ -246,11 +245,11 @@ mms_task_network_unavailable(
     gboolean can_retry)
 {
     if (task->state != MMS_TASK_STATE_DONE) {
-        MMS_ASSERT(task->state == MMS_TASK_STATE_NEED_CONNECTION ||
+        GASSERT(task->state == MMS_TASK_STATE_NEED_CONNECTION ||
                    task->state == MMS_TASK_STATE_NEED_USER_CONNECTION ||
                    task->state == MMS_TASK_STATE_TRANSMITTING);
         MMS_TASK_GET_CLASS(task)->fn_network_unavailable(task, can_retry);
-        MMS_ASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
+        GASSERT(task->state != MMS_TASK_STATE_NEED_CONNECTION &&
                    task->state != MMS_TASK_STATE_NEED_USER_CONNECTION &&
                    task->state != MMS_TASK_STATE_TRANSMITTING);
     }
@@ -260,7 +259,7 @@ void
 mms_task_cancel(
     MMSTask* task)
 {
-    MMS_DEBUG_("%s", task->name);
+    GDEBUG_("%s", task->name);
     MMS_TASK_GET_CLASS(task)->fn_cancel(task);
 }
 
@@ -271,13 +270,13 @@ mms_task_set_state(
 {
     MMSTaskPriv* priv = task->priv;
     if (task->state != state) {
-        MMS_DEBUG("%s %s -> %s", task->name,
+        GDEBUG("%s %s -> %s", task->name,
             mms_task_state_name(task->state),
             mms_task_state_name(state));
         if (state == MMS_TASK_STATE_SLEEP && !priv->wakeup_id) {
             const unsigned int secs = task_config(task)->retry_secs;
             if (!mms_task_schedule_wakeup(task, secs)) {
-                MMS_DEBUG("%s SLEEP -> DONE (no time left)", task->name);
+                GDEBUG("%s SLEEP -> DONE (no time left)", task->name);
                 MMS_TASK_GET_CLASS(task)->fn_cancel(task);
                 state = MMS_TASK_STATE_DONE;
             }
@@ -369,7 +368,7 @@ mms_task_make_id(
             }
             g_free(tmpl);
         } else {
-            MMS_ERR("Failed to create %s: %s", root_dir, strerror(errno));
+            GERR("Failed to create %s: %s", root_dir, strerror(errno));
         }
         g_free(msgdir);
     }

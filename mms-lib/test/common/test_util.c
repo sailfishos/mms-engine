@@ -10,12 +10,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_util.h"
 #include "mms_file_util.h"
-#include "mms_log.h"
+
+#include <gutil_log.h>
 
 void
 test_dirs_init(
@@ -26,7 +26,7 @@ test_dirs_init(
     dirs->root = g_mkdtemp(g_strconcat(tmp, "/", test, "_XXXXXX", NULL));
     dirs->msg = g_strconcat(dirs->root, "/" MMS_MESSAGE_DIR, NULL);
     dirs->attic = g_strconcat(dirs->root, "/" MMS_ATTIC_DIR, NULL);
-    MMS_VERBOSE("Temporary directory %s", dirs->root);
+    GVERBOSE("Temporary directory %s", dirs->root);
 }
 
 static
@@ -36,10 +36,10 @@ test_dir_remove(
 {
     if (rmdir(dir) < 0) {
         if (errno != ENOENT) {
-            MMS_ERR("Failed to remove %s: %s", dir, strerror(errno));
+            GERR("Failed to remove %s: %s", dir, strerror(errno));
         }
     } else {
-        MMS_VERBOSE("Deleted %s", dir);
+        GVERBOSE("Deleted %s", dir);
     }
 }
 

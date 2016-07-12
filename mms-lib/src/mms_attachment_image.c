@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_attachment_image.h"
@@ -21,10 +21,10 @@
 #endif
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_attachment_log
-#include "mms_lib_log.h"
+#define GLOG_MODULE_NAME mms_attachment_log
+#include <gutil_log.h>
 
-G_DEFINE_TYPE(MMSAttachmentImage, mms_attachment_image, MMS_TYPE_ATTACHMENT);
+G_DEFINE_TYPE(MMSAttachmentImage, mms_attachment_image, MMS_TYPE_ATTACHMENT)
 #define MMS_ATTACHMENT_IMAGE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
         MMS_TYPE_ATTACHMENT_IMAGE, MMSAttachmentImage))
 #define MMS_ATTACHMENT_IMAGE_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), \
@@ -97,7 +97,7 @@ mms_attachment_image_resize_default(
             const unsigned int cols = src_cols/(next_step+1);
             const unsigned int rows = src_rows/(next_step+1);
             Image* dest;
-            MMS_DEBUG("Resizing (%ux%u -> %ux%u) with ImageMagick",
+            GDEBUG("Resizing (%ux%u -> %ux%u) with ImageMagick",
                 src_cols, src_rows, cols, rows);
             dest = ResizeImage(src, cols, rows, BoxFilter, 1.0, &ex);
             if (dest) {
@@ -107,17 +107,17 @@ mms_attachment_image_resize_default(
                 info->filename[G_N_ELEMENTS(info->filename)-1] = 0;
                 dest->filename[G_N_ELEMENTS(dest->filename)-1] = 0;
                 if (WriteImage(info, dest)) {
-                    MMS_DEBUG("Resized %s with ImageMagick", fname);
+                    GDEBUG("Resized %s with ImageMagick", fname);
                     ok = TRUE;
                 } else {
-                    MMS_ERR("Failed to write %s", dest->filename);
+                    GERR("Failed to write %s", dest->filename);
                 }
                 DestroyImage(dest);
             }
         }
         DestroyImage(src);
     } else {
-        MMS_ERR("Failed to read %s", info->filename);
+        GERR("Failed to read %s", info->filename);
     }
     ClearMagickException(&ex);
     DestroyExceptionInfo(&ex);
@@ -160,8 +160,8 @@ mms_attachment_image_resize_type_specific(
             klass->fn_resize_free(resize);
             resize = klass->fn_resize_new(image, at->original_file);
             if (!resize) return FALSE;
-            MMS_ASSERT(resize->image.width == image_size.width);
-            MMS_ASSERT(resize->image.height == image_size.height);
+            GASSERT(resize->image.width == image_size.width);
+            GASSERT(resize->image.height == image_size.height);
             resize->in = image_size;
             resize->out = out_size;
             can_resize = klass->fn_resize_prepare(resize, fname);
@@ -174,7 +174,7 @@ mms_attachment_image_resize_type_specific(
                 resize->in.height == resize->out.height) {
                 /* Nothing to resize, image decompressor is doing all
                  * the job for us */
-                MMS_DEBUG("Decoder-assisted resize (%ux%u -> %ux%u)",
+                GDEBUG("Decoder-assisted resize (%ux%u -> %ux%u)",
                     image_size.width, image_size.height,
                     out_size.width, out_size.height);
                 for (y=0;
@@ -188,7 +188,7 @@ mms_attachment_image_resize_type_specific(
                 gsize bufsize = 3*resize->out.width*sizeof(guint);
                 guint* buf = g_malloc(bufsize);
                 memset(buf, 0, bufsize);
-                MMS_DEBUG("Resizing (%ux%u -> %ux%u)",
+                GDEBUG("Resizing (%ux%u -> %ux%u)",
                     image_size.width, image_size.height,
                     out_size.width, out_size.height);
                 for (y=0;
@@ -237,7 +237,7 @@ mms_attachment_image_resize_type_specific(
             }
 
             if (y == resize->in.height) {
-                MMS_DEBUG("Resized %s", fname);
+                GDEBUG("Resized %s", fname);
                 image->resize_step = next_step;
                 ok = TRUE;
             }
@@ -273,7 +273,7 @@ mms_attachment_image_resize(
             at->file_name = image->resized;
             at->map = map;
         } else {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
             ok = FALSE;
         }

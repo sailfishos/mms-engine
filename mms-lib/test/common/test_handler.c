@@ -10,16 +10,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_handler.h"
 #include "mms_dispatcher.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_handler_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-handler-test");
+#define GLOG_MODULE_NAME mms_handler_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-handler-test");
 
 /* Class definition */
 typedef MMSHandlerClass MMSHandlerTestClass;
@@ -95,7 +94,7 @@ enum mms_handler_signal {
 
 static guint mms_handler_test_signals[SIGNAL_COUNT] = { 0 };
 
-G_DEFINE_TYPE(MMSHandlerTest, mms_handler_test, MMS_TYPE_HANDLER);
+G_DEFINE_TYPE(MMSHandlerTest, mms_handler_test, MMS_TYPE_HANDLER)
 #define MMS_TYPE_HANDLER_TEST (mms_handler_test_get_type())
 #define MMS_HANDLER_TEST(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
     MMS_TYPE_HANDLER_TEST, MMSHandlerTest))
@@ -104,7 +103,7 @@ static inline
 MMSHandlerRecordSend*
 mms_handler_test_record_send(MMSHandlerRecord* rec)
 {
-    MMS_ASSERT(rec->type == MMS_HANDLER_RECORD_SEND);
+    GASSERT(rec->type == MMS_HANDLER_RECORD_SEND);
     return MMS_CAST(rec, MMSHandlerRecordSend, rec);
 }
 
@@ -112,7 +111,7 @@ static inline
 MMSHandlerRecordReceive*
 mms_handler_test_record_receive(MMSHandlerRecord* rec)
 {
-    MMS_ASSERT(rec->type == MMS_HANDLER_RECORD_RECEIVE);
+    GASSERT(rec->type == MMS_HANDLER_RECORD_RECEIVE);
     return MMS_CAST(rec, MMSHandlerRecordReceive, rec);
 }
 
@@ -163,7 +162,7 @@ mms_handler_get_send_record_for_msgid_cb(
         MMSHandlerRecordSend* send = mms_handler_test_record_send(rec);
         MMSHandlerSendMsgIdSearch* search = user_data;
         if (!strcmp(send->msgid, search->msgid)) {
-            MMS_ASSERT(!search->send);
+            GASSERT(!search->send);
             search->send = send;
         }
     }
@@ -371,8 +370,8 @@ mms_handler_test_hash_remove_record(
     if (rec->type == MMS_HANDLER_RECORD_RECEIVE) {
         MMSHandlerRecordReceive* recv = mms_handler_test_record_receive(rec);
         if (recv->notify) {
-            MMS_ASSERT(recv->notify->defer_id);
-            MMS_ASSERT(recv->notify->recv == recv);
+            GASSERT(recv->notify->defer_id);
+            GASSERT(recv->notify->recv == recv);
             g_source_remove(recv->notify->defer_id);
             recv->notify->defer_id = 0;
             recv->notify->recv = NULL;
@@ -400,9 +399,9 @@ mms_handler_test_receive(
 {
     MMSHandlerRecordReceive* recv = data;
     MMSDispatcher* disp = recv->dispatcher;
-    MMS_ASSERT(recv->defer_id);
-    MMS_ASSERT(recv->dispatcher);
-    MMS_DEBUG("Initiating receive of message %s", recv->rec.id);
+    GASSERT(recv->defer_id);
+    GASSERT(recv->dispatcher);
+    GDEBUG("Initiating receive of message %s", recv->rec.id);
     recv->defer_id = 0;
     recv->dispatcher = NULL;
     mms_dispatcher_receive_message(disp, recv->rec.id, recv->rec.imsi,
@@ -420,7 +419,7 @@ mms_handler_test_notify_delete(
     mms_handler_busy_dec(&notify->test->handler);
     mms_handler_unref(&notify->test->handler);
     if (notify->recv) {
-        MMS_ASSERT(!notify->recv->notify || notify->recv->notify == notify);
+        GASSERT(!notify->recv->notify || notify->recv->notify == notify);
         notify->recv->notify = NULL;
     }
     g_free(notify->id);
@@ -503,17 +502,17 @@ mms_handler_test_message_notify(
     notify->param = param;
     if (test->prenotify_fn && !test->prenotify_fn(handler, imsi, from, subj,
         expiry, data, test->prenotify_data)) {
-        MMS_DEBUG("Rejecting push imsi=%s from=%s subj=%s", imsi, from, subj);
+        GDEBUG("Rejecting push imsi=%s from=%s subj=%s", imsi, from, subj);
     } else {
         MMSHandlerRecordReceive* recv =
             mms_handler_test_receive_create(test, imsi);
         const char* id = recv->rec.id;
         recv->data = g_bytes_ref(data);
-        MMS_DEBUG("Push %s imsi=%s from=%s subj=%s", id, imsi, from, subj);
+        GDEBUG("Push %s imsi=%s from=%s subj=%s", id, imsi, from, subj);
         recv->notify = notify;
         notify->recv = recv;
         if (test->dispatcher) {
-            MMS_DEBUG("Deferring push");
+            GDEBUG("Deferring push");
             recv->defer_id = g_idle_add(mms_handler_test_receive, recv);
             recv->dispatcher = mms_dispatcher_ref(test->dispatcher);
             notify->id = g_strdup("");
@@ -570,12 +569,12 @@ mms_handler_test_message_received(
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
     MMSHandlerRecordReceive* recv =
     mms_handler_test_get_receive_record(test, msg->id);
-    MMS_DEBUG("Message %s from=%s subj=%s", msg->id, msg->from, msg->subject);
-    MMS_ASSERT(recv);
+    GDEBUG("Message %s from=%s subj=%s", msg->id, msg->from, msg->subject);
+    GASSERT(recv);
     if (recv) { 
         MMSHandlerMessageReceivedCall* call =
         g_new0(MMSHandlerMessageReceivedCall,1);
-        MMS_ASSERT(!recv->msg);
+        GASSERT(!recv->msg);
         mms_message_unref(recv->msg);
         recv->msg = mms_message_ref(msg);
         mms_handler_busy_inc(handler);
@@ -605,12 +604,12 @@ mms_handler_test_message_receive_state_changed(
     mms_handler_test_get_receive_record(MMS_HANDLER_TEST(handler), id);
     if (recv) {
         recv->state = state;
-        MMS_DEBUG("Message %s receive state %d", id, state);
+        GDEBUG("Message %s receive state %d", id, state);
         g_signal_emit(handler, mms_handler_test_signals[
             SIGNAL_MESSAGE_RECEIVE_STATE_CHANGED], 0, id, state);
         return TRUE;
     } else {
-        MMS_ERR("No such incoming message: %s", id);
+        GERR("No such incoming message: %s", id);
         return FALSE;
     }
 }
@@ -629,7 +628,7 @@ mms_handler_test_send_new(
     send->state = MMS_SEND_STATE_INVALID;
     send->delivery_status = MMS_DELIVERY_STATUS_INVALID;
     send->read_status = MMS_READ_STATUS_INVALID;
-    MMS_DEBUG("New send %s imsi=%s", id, imsi);
+    GDEBUG("New send %s imsi=%s", id, imsi);
     g_hash_table_replace(test->recs, id, &send->rec);
     return id;
 }
@@ -649,15 +648,15 @@ mms_handler_test_message_send_state_changed(
         g_free(send->details);
         send->details = g_strdup(details);
         if (details) {
-            MMS_DEBUG("Message %s send state %d: %s", id, state, details);
+            GDEBUG("Message %s send state %d: %s", id, state, details);
         } else {
-            MMS_DEBUG("Message %s send state %d", id, state);
+            GDEBUG("Message %s send state %d", id, state);
         }
         g_signal_emit(handler, mms_handler_test_signals[
             SIGNAL_MESSAGE_SEND_STATE_CHANGED], 0, id, state, details);
         return TRUE;
     } else {
-        MMS_ERR("No such outbound message: %s", id);
+        GERR("No such outbound message: %s", id);
         return FALSE;
     }
 }
@@ -671,10 +670,10 @@ mms_handler_test_message_sent(
 {
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
     MMSHandlerRecordSend* send = mms_handler_test_get_send_record(test, id);
-    MMS_DEBUG("Message %s sent, msgid=%s", id, msgid);
-    MMS_ASSERT(send);
+    GDEBUG("Message %s sent, msgid=%s", id, msgid);
+    GASSERT(send);
     if (send) {
-        MMS_ASSERT(!send->msgid);
+        GASSERT(!send->msgid);
         if (!send->msgid) {
             send->msgid = g_strdup(msgid);
             return TRUE;
@@ -695,15 +694,15 @@ mms_handler_test_delivery_report(
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
     MMSHandlerRecordSend* send =
     mms_handler_get_send_record_for_msgid(test, msgid);
-    MMS_DEBUG("Message %s delivered to %s", msgid, recipient);
+    GDEBUG("Message %s delivered to %s", msgid, recipient);
     if (send) {
-        MMS_ASSERT(send->delivery_status == MMS_DELIVERY_STATUS_INVALID);
+        GASSERT(send->delivery_status == MMS_DELIVERY_STATUS_INVALID);
         if (send->delivery_status == MMS_DELIVERY_STATUS_INVALID) {
             send->delivery_status = status;
             return TRUE;
         }
     } else {
-        MMS_DEBUG("Unknown message id %s (this may be OK)", msgid);
+        GDEBUG("Unknown message id %s (this may be OK)", msgid);
     }
     return FALSE;
 }
@@ -720,15 +719,15 @@ mms_handler_test_read_report(
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
     MMSHandlerRecordSend* send =
     mms_handler_get_send_record_for_msgid(test, msgid);
-    MMS_DEBUG("Message %s read by %s", msgid, recipient);
+    GDEBUG("Message %s read by %s", msgid, recipient);
     if (send) {
-        MMS_ASSERT(send->read_status == MMS_READ_STATUS_INVALID);
+        GASSERT(send->read_status == MMS_READ_STATUS_INVALID);
         if (send->read_status == MMS_READ_STATUS_INVALID) {
             send->read_status = status;
             return TRUE;
         }
     } else {
-        MMS_DEBUG("Unknown message id %s (this may be OK)", msgid);
+        GDEBUG("Unknown message id %s (this may be OK)", msgid);
     }
     return FALSE;
 }
@@ -742,11 +741,11 @@ mms_handler_test_read_report_send_status(
     MMSHandlerRecordReceive* recv =
     mms_handler_test_get_receive_record(MMS_HANDLER_TEST(handler), id);
     if (recv) {
-        MMS_DEBUG("Read report %s status %d", id, status);
+        GDEBUG("Read report %s status %d", id, status);
         recv->read_report_status = status;
         return TRUE;
     } else {
-        MMS_DEBUG("Unknown record id %s", id);
+        GDEBUG("Unknown record id %s", id);
         return FALSE;
     }
 }
@@ -831,7 +830,7 @@ mms_handler_test_set_prenotify_fn(
     void* user_data)
 {
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
-    MMS_ASSERT(!test->prenotify_fn);
+    GASSERT(!test->prenotify_fn);
     test->prenotify_fn = cb;
     test->prenotify_data = user_data;
 }
@@ -843,7 +842,7 @@ mms_handler_test_set_postnotify_fn(
     void* user_data)
 {
     MMSHandlerTest* test = MMS_HANDLER_TEST(handler);
-    MMS_ASSERT(!test->postnotify_fn);
+    GASSERT(!test->postnotify_fn);
     test->postnotify_fn = cb;
     test->postnotify_data = user_data;
 }

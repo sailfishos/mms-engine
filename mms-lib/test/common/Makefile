@@ -65,8 +65,7 @@ MMS_LIB_DIR = ../..
 MMS_LIB_BUILD_DIR = $(MMS_LIB_DIR)/build
 MMS_LIB_DEBUG_LIB = $(MMS_LIB_BUILD_DIR)/debug/$(MMS_LIB_LIB)
 MMS_LIB_RELEASE_LIB = $(MMS_LIB_BUILD_DIR)/release/$(MMS_LIB_LIB)
-MMS_LIB_MAKE = $(MAKE) --no-print-directory -C $(MMS_LIB_DIR) \
-  GCOV=$(GCOV) MMS_LOG_SYSLOG=0
+MMS_LIB_MAKE = $(MAKE) --no-print-directory -C $(MMS_LIB_DIR) GCOV=$(GCOV)
 
 #
 # Tools and flags

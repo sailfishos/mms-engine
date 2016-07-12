@@ -10,13 +10,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_CONNMAN_OFONO_LOG_H
 #define JOLLA_MMS_CONNMAN_OFONO_LOG_H
 
-#include "mms_log.h"
+#include "mms_lib_types.h"
 
 #define MMS_CONNMAN_LOG_MODULES(log) \
     log(gofono_log)

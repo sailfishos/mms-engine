@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,15 +10,14 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_message.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_message_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-message");
+#define GLOG_MODULE_NAME mms_message_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-message");
 
 static
 void
@@ -46,7 +45,7 @@ void
 mms_message_finalize(
     MMSMessage* msg)
 {
-    MMS_VERBOSE_("%p", msg);
+    GVERBOSE_("%p", msg);
     g_free(msg->id);
     g_free(msg->message_id);
     g_free(msg->from);
@@ -59,7 +58,7 @@ mms_message_finalize(
     if (msg->parts_dir) {
         if (!(msg->flags & MMS_MESSAGE_FLAG_KEEP_FILES)) {
             if (rmdir(msg->parts_dir) == 0) {
-                MMS_VERBOSE("Deleted %s", msg->parts_dir);
+                GVERBOSE("Deleted %s", msg->parts_dir);
             }
         }
         g_free(msg->parts_dir);
@@ -67,7 +66,7 @@ mms_message_finalize(
     if (msg->msg_dir) {
         if (!(msg->flags & MMS_MESSAGE_FLAG_KEEP_FILES)) {
             if (rmdir(msg->msg_dir) == 0) {
-                MMS_VERBOSE("Deleted %s", msg->msg_dir);
+                GVERBOSE("Deleted %s", msg->msg_dir);
             }
         }
         g_free(msg->msg_dir);
@@ -78,7 +77,7 @@ MMSMessage*
 mms_message_new()
 {
     MMSMessage* msg = g_new0(MMSMessage, 1);
-    MMS_VERBOSE_("%p", msg);
+    GVERBOSE_("%p", msg);
     msg->ref_count = 1;
     msg->priority = MMS_PRIORITY_NORMAL;
     return msg;
@@ -89,7 +88,7 @@ mms_message_ref(
     MMSMessage* msg)
 {
     if (msg) {
-        MMS_ASSERT(msg->ref_count > 0);
+        GASSERT(msg->ref_count > 0);
         g_atomic_int_inc(&msg->ref_count);
     }
     return msg;
@@ -100,7 +99,7 @@ mms_message_unref(
     MMSMessage* msg)
 {
     if (msg) {
-        MMS_ASSERT(msg->ref_count > 0);
+        GASSERT(msg->ref_count > 0);
         if (g_atomic_int_dec_and_test(&msg->ref_count)) {
             mms_message_finalize(msg);
             g_free(msg);

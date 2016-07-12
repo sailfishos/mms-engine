@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -20,10 +19,10 @@
 #include "mms_codec.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_send_log
+#define GLOG_MODULE_NAME mms_task_send_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-send", MMS_TASK_HTTP_LOG);
+GLOG_MODULE_DEFINE2("mms-task-send", MMS_TASK_HTTP_LOG);
 
 /* Class definition */
 typedef MMSTaskHttpClass MMSTaskSendClass;
@@ -77,12 +76,12 @@ mms_task_send_done(
                     if (pdu->sc.rsp_status == MMS_MESSAGE_RSP_STATUS_OK) {
                         if (pdu->sc.msgid && pdu->sc.msgid[0]) {
                             msgid = pdu->sc.msgid;
-                            MMS_INFO("Message ID %s", pdu->sc.msgid);
+                            GINFO("Message ID %s", pdu->sc.msgid);
                         } else {
-                            MMS_ERR("Missing Message-ID");
+                            GERR("Missing Message-ID");
                         }
                     } else {
-                        MMS_ERR("MMSC responded with %u", pdu->sc.rsp_status);
+                        GERR("MMSC responded with %u", pdu->sc.rsp_status);
                         details = pdu->sc.rsp_text;
                         switch (pdu->sc.rsp_status) {
                         case MMS_MESSAGE_RSP_STATUS_ERR_SERVICE_DENIED:
@@ -98,14 +97,14 @@ mms_task_send_done(
                         }
                     }
                 } else {
-                    MMS_ERR("Unexpected response from MMSC");
+                    GERR("Unexpected response from MMSC");
                 }
             } else {
-                MMS_ERR("Failed to parse MMSC response");
+                GERR("Failed to parse MMSC response");
             }
             g_mapped_file_unref(map);
         } else {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     }

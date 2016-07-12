@@ -1,9 +1,8 @@
 /*
- *
  *  Multimedia Messaging Service
  *
  *  Copyright (C) 2010-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2013-2015  Jolla Ltd.
+ *  Copyright (C) 2013-2016  Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -13,12 +12,12 @@
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
  */
+
+#ifndef MMS_CODEC_H
+#define MMS_CODEC_H
+
+#include <glib.h>
 
 enum mms_message_type {
 	MMS_MESSAGE_TYPE_SEND_REQ =			128,
@@ -213,3 +212,5 @@ gboolean mms_message_decode(const unsigned char *pdu,
 				unsigned int len, struct mms_message *out);
 gboolean mms_message_encode(struct mms_message *msg, int fd);
 void mms_message_free(struct mms_message *msg);
+
+#endif /* MMS_CODEC_H_ */

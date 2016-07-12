@@ -10,16 +10,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connman.h"
 #include "test_connection.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connman_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-connman-test");
+#define GLOG_MODULE_NAME mms_connman_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-connman-test");
 
 typedef MMSConnManClass MMSConnManTestClass;
 typedef struct mms_connman_test {
@@ -33,7 +32,7 @@ typedef struct mms_connman_test {
     void* connect_param;
 } MMSConnManTest;
 
-G_DEFINE_TYPE(MMSConnManTest, mms_connman_test, MMS_TYPE_CONNMAN);
+G_DEFINE_TYPE(MMSConnManTest, mms_connman_test, MMS_TYPE_CONNMAN)
 #define MMS_TYPE_CONNMAN_TEST (mms_connman_test_get_type())
 #define MMS_CONNMAN_TEST(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
     MMS_TYPE_CONNMAN_TEST, MMSConnManTest))
@@ -94,7 +93,7 @@ mms_connman_test_close_connection(
 {
     MMSConnManTest* test = MMS_CONNMAN_TEST(cm);
     if (test->conn) {
-        MMS_DEBUG("Closing connection...");
+        GDEBUG("Closing connection...");
         mms_connman_test_make_busy(test);
         mms_connection_close(test->conn);
         mms_connection_unref(test->conn);

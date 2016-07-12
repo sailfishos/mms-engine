@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,12 +10,13 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_lib_util.h"
 #include "mms_lib_log.h"
 #include "mms_codec.h"
+
+#include <gutil_log.h>
 
 #define DATA_DIR "data/"
 
@@ -40,12 +41,12 @@ test_file(
         g_mapped_file_unref(map);
         mms_message_free(msg);
         if (ok) {
-            MMS_INFO("OK: %s", file);
+            GINFO("OK: %s", file);
             return TRUE;
         }
-        MMS_ERR("Failed to decode %s", file);
+        GERR("Failed to decode %s", file);
     } else {
-        MMS_ERR("%s", error->message);
+        GERR("%s", error->message);
         g_error_free(error);
     }
     return FALSE;
@@ -95,13 +96,13 @@ int main(int argc, char* argv[])
     if (g_option_context_parse(options, &argc, &argv, NULL)) {
         int i;
 
-        mms_log_set_type(MMS_LOG_TYPE_STDOUT, "test_mms_codec");
+        gutil_log_set_type(GLOG_TYPE_STDOUT, "test_mms_codec");
         if (verbose) {
-            mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         } else {
-            mms_log_stdout_timestamp = FALSE;
-            mms_log_default.level = MMS_LOGLEVEL_INFO;
-            mms_codec_log.level = MMS_LOGLEVEL_ERR;
+            gutil_log_timestamp = FALSE;
+            gutil_log_default.level = GLOG_LEVEL_INFO;
+            mms_codec_log.level = GLOG_LEVEL_ERR;
         }
 
         ret = RET_OK;

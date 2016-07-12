@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "test_connman.h"
@@ -18,7 +17,6 @@
 #include "test_http.h"
 #include "test_util.h"
 
-#include "mms_log.h"
 #include "mms_codec.h"
 #include "mms_file_util.h"
 #include "mms_lib_log.h"
@@ -26,6 +24,7 @@
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
 
+#include <gutil_log.h>
 #include <gio/gio.h>
 #include <libsoup/soup-status.h>
 
@@ -61,7 +60,7 @@ test_finish(
         state = mms_handler_test_receive_state(test->handler, NULL);
         if (state != MMS_RECEIVE_STATE_DECODING) {
             test->ret = RET_ERR;
-            MMS_ERR("Unexpected state %d", state);
+            GERR("Unexpected state %d", state);
         } else {
             const void* resp_data = NULL;
             gsize resp_len = 0;
@@ -72,20 +71,20 @@ test_finish(
                 if (mms_message_decode(resp_data, resp_len, pdu)) {
                     if (pdu->type != MMS_MESSAGE_TYPE_ACKNOWLEDGE_IND) {
                         test->ret = RET_ERR;
-                        MMS_ERR("Unexpected reply %u", pdu->type);
+                        GERR("Unexpected reply %u", pdu->type);
                     }
                 } else {
                     test->ret = RET_ERR;
-                    MMS_ERR("Failed to decode reply message");
+                    GERR("Failed to decode reply message");
                 }
                 mms_message_free(pdu);
             } else {
                 test->ret = RET_ERR;
-                MMS_ERR("Reply expected");
+                GERR("Reply expected");
             }
         }
     }
-    MMS_INFO("%s", (test->ret == RET_OK) ? "OK" : "FAILED");
+    GINFO("%s", (test->ret == RET_OK) ? "OK" : "FAILED");
     mms_handler_test_reset(test->handler);
     g_main_loop_quit(test->loop);
 }
@@ -108,7 +107,7 @@ test_timeout(
     Test* test = data;
     test->timeout_id = 0;
     test->ret = RET_TIMEOUT;
-    MMS_INFO("TIMEOUT");
+    GINFO("TIMEOUT");
     if (test->http) test_http_close(test->http);
     mms_connman_test_close_connection(test->cm);
     mms_dispatcher_cancel(test->disp, NULL);
@@ -170,7 +169,7 @@ test_init(
         test->ret = RET_ERR;
         ok = TRUE;
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(err));
+        GERR("%s", GERRMSG(err));
         g_error_free(err);
     }
     return ok;
@@ -212,11 +211,11 @@ test_retrieve_no_proxy(
                 test.ret = RET_OK;
                 g_main_loop_run(test.loop);
             } else {
-                MMS_INFO("FAILED");
+                GINFO("FAILED");
             }
         } else {
             g_error_free(error);
-            MMS_INFO("FAILED");
+            GINFO("FAILED");
         }
         test_finalize(&test);
         return test.ret;
@@ -233,18 +232,18 @@ int main(int argc, char* argv[])
 
     mms_lib_init(argv[0]);
     mms_lib_default_config(&config);
-    mms_log_default.name = test;
+    gutil_log_default.name = test;
 
     if (argc > 1 && !strcmp(argv[1], "-v")) {
-        mms_log_default.level = MMS_LOGLEVEL_VERBOSE;
+        gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         argc--;
     } else {
-        mms_log_default.level = MMS_LOGLEVEL_INFO;
+        gutil_log_timestamp = FALSE;
+        gutil_log_default.level = GLOG_LEVEL_INFO;
         mms_task_decode_log.level =
         mms_task_retrieve_log.level =
         mms_task_http_log.level =
-        mms_task_notification_log.level = MMS_LOGLEVEL_NONE;
-        mms_log_stdout_timestamp = FALSE;
+        mms_task_notification_log.level = GLOG_LEVEL_NONE;
     }
 
     if (argc == 1) {

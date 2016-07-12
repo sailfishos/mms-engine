@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
@@ -21,10 +20,10 @@
 #include "mms_transfer_list.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_notification_log
+#define GLOG_MODULE_NAME mms_task_notification_log
 #include "mms_lib_log.h"
 #include "mms_error.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-notification", MMS_TASK_LOG);
+GLOG_MODULE_DEFINE2("mms-task-notification", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskNotificationClass;
@@ -87,11 +86,11 @@ mms_task_notification_done(
 {
     MMSTaskNotification* ind = MMS_TASK_NOTIFICATION(param);
     MMSTask* task = &ind->task;
-    MMS_ASSERT(ind->notify == notify);
+    GASSERT(ind->notify == notify);
     ind->notify = NULL;
     if (id) {
         if (id[0]) {
-            MMS_DEBUG("  Database id: %s", id);
+            GDEBUG("  Database id: %s", id);
             if (task->id) {
                 char* olddir = mms_task_dir(task);
                 char* file = g_strconcat(olddir, "/"
@@ -103,9 +102,9 @@ mms_task_notification_done(
                     /* Move file to the new place */
                     char* newdir = mms_task_dir(task);
                     if (rename(olddir, newdir) == 0) {
-                        MMS_VERBOSE("Moved %s to %s", file, newdir);
+                        GVERBOSE("Moved %s to %s", file, newdir);
                     } else {
-                        MMS_ERR("Failed to rename %s to %s: %s", olddir,
+                        GERR("Failed to rename %s to %s: %s", olddir,
                             newdir, strerror(errno));
                     }
                     g_free(newdir);
@@ -147,25 +146,25 @@ mms_task_notification_ind(
     MMSTask* task = &ind->task;
     const struct mms_notification_ind* ni = &ind->pdu->ni;
 
-#if MMS_LOG_DEBUG
+#if GUTIL_LOG_DEBUG
     char expiry[128];
     strftime(expiry, sizeof(expiry), "%Y-%m-%dT%H:%M:%S%z",
         localtime(&ni->expiry));
     expiry[sizeof(expiry)-1] = '\0';
 
-    MMS_DEBUG("Processing M-Notification.ind");
-    MMS_DEBUG("  From: %s", ni->from);
-    if (ni->subject) MMS_DEBUG("  Subject: %s", ni->subject);
-    MMS_DEBUG("  Size: %d bytes", ni->size);
-    MMS_DEBUG("  Location: %s", ni->location);
-    MMS_DEBUG("  Expiry: %s", expiry);
-#endif /* MMS_LOG_DEBUG */
+    GDEBUG("Processing M-Notification.ind");
+    GDEBUG("  From: %s", ni->from);
+    if (ni->subject) GDEBUG("  Subject: %s", ni->subject);
+    GDEBUG("  Size: %d bytes", ni->size);
+    GDEBUG("  Location: %s", ni->location);
+    GDEBUG("  Expiry: %s", expiry);
+#endif /* GUTIL_LOG_DEBUG */
 
     if (task->deadline > ni->expiry) {
         task->deadline = ni->expiry;
     }
 
-    MMS_ASSERT(!ind->notify);
+    GASSERT(!ind->notify);
     mms_task_ref(task);
     ind->notify = mms_handler_message_notify(task->handler, task->imsi,
         mms_strip_address_type(ni->from), ni->subject, ni->expiry,
@@ -195,9 +194,9 @@ mms_task_delivery_ind(
     MMSTask* task = &ind->task;
     const struct mms_delivery_ind* di = &ind->pdu->di;
     const char* to = mms_strip_address_type(di->to);
-    MMS_DEBUG("Processing M-Delivery.ind");
-    MMS_DEBUG("  MMS message id: %s", di->msgid);
-    MMS_DEBUG("  Recipient: %s", to);
+    GDEBUG("Processing M-Delivery.ind");
+    GDEBUG("  MMS message id: %s", di->msgid);
+    GDEBUG("  Recipient: %s", to);
     switch (di->dr_status) {
     case MMS_MESSAGE_DELIVERY_STATUS_EXPIRED:
         ds = MMS_DELIVERY_STATUS_EXPIRED;
@@ -243,9 +242,9 @@ mms_task_read_orig_ind(
     MMSTask* task = &ind->task;
     const struct mms_read_ind* ri = &ind->pdu->ri;
     const char* to = mms_strip_address_type(ri->to);
-    MMS_DEBUG("Processing M-Read-Orig.ind");
-    MMS_DEBUG("  MMS message id: %s", ri->msgid);
-    MMS_DEBUG("  Recipient: %s", to);
+    GDEBUG("Processing M-Read-Orig.ind");
+    GDEBUG("  MMS message id: %s", ri->msgid);
+    GDEBUG("  Recipient: %s", to);
     switch (ri->rr_status) {
     case MMS_MESSAGE_READ_STATUS_READ:
         rs = MMS_READ_STATUS_READ;
@@ -306,7 +305,7 @@ mms_task_notification_run(
         mms_task_read_orig_ind(ind);
         break;
     default:
-        MMS_INFO("Ignoring MMS push PDU of type %u", ind->pdu->type);
+        GINFO("Ignoring MMS push PDU of type %u", ind->pdu->type);
         mms_task_notification_unrecornized(task_config(task), ind->push);
         break;
     }
@@ -341,7 +340,7 @@ mms_task_notification_finalize(
     GObject* object)
 {
     MMSTaskNotification* ind = MMS_TASK_NOTIFICATION(object);
-    MMS_ASSERT(!ind->notify);
+    GASSERT(!ind->notify);
     g_bytes_unref(ind->push);
     mms_message_free(ind->pdu);
     mms_transfer_list_unref(ind->transfers);
@@ -382,18 +381,18 @@ mms_task_notification_new(
     GError** error)
 {
     MMSPdu* pdu = mms_decode_bytes(bytes);
-    MMS_ASSERT(!error || !(*error));
+    GASSERT(!error || !(*error));
     if (pdu) {
         MMSTaskNotification* ind;
 
         /* Looks like a legitimate MMS Push PDU */
-#if MMS_LOG_DEBUG
-        MMS_DEBUG("  MMS version: %u.%u", (pdu->version & 0x70) >> 4,
+#if GUTIL_LOG_DEBUG
+        GDEBUG("  MMS version: %u.%u", (pdu->version & 0x70) >> 4,
             pdu->version & 0x0f);
         if (pdu->transaction_id) {
-            MMS_DEBUG("  MMS transaction id: %s", pdu->transaction_id);
+            GDEBUG("  MMS transaction id: %s", pdu->transaction_id);
         }
-#endif /* MMS_LOG_DEBUG */
+#endif /* GUTIL_LOG_DEBUG */
 
         ind = mms_task_alloc(MMS_TYPE_TASK_NOTIFICATION,
             settings, handler, "Notification", NULL, imsi);

@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task_http.h"
@@ -38,9 +37,10 @@
 #endif
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME MMS_TASK_HTTP_LOG
+#define GLOG_MODULE_NAME MMS_TASK_HTTP_LOG
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-http", MMS_TASK_LOG);
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE2("mms-task-http", MMS_TASK_LOG);
 
 /* HTTP task state */
 typedef enum _mms_http_state {
@@ -111,7 +111,7 @@ mms_http_uri_parse(
         }
         uri = soup_uri_new(uri_to_parse);
         if (!uri) {
-            MMS_ERR("Could not parse %s as a URI", uri_to_parse);
+            GERR("Could not parse %s as a URI", uri_to_parse);
         }
         g_free(tmp_uri);
     }
@@ -137,7 +137,7 @@ mms_http_create_session(
             if (ioctl(fd, SIOCGIFADDR, &ifr) >= 0) {
                 SoupAddress* local_address = soup_address_new_from_sockaddr(
                     &ifr.ifr_addr, sizeof(ifr.ifr_addr));
-#  if MMS_LOG_DEBUG
+#  if GUTIL_LOG_DEBUG
                 char buf[128];
                 int af = ifr.ifr_addr.sa_family;
                 buf[0] = 0;
@@ -151,22 +151,22 @@ mms_http_create_session(
                     snprintf(buf, sizeof(buf), "<address family %d>", af);
                 }
                 buf[sizeof(buf)-1] = 0;
-                MMS_DEBUG("MMS interface address %s", buf);
-#  endif /* MMS_LOG_DEBUG */
-                MMS_ASSERT(local_address);
+                GDEBUG("MMS interface address %s", buf);
+#  endif /* GUTIL_LOG_DEBUG */
+                GASSERT(local_address);
                 session = soup_session_async_new_with_options(
                     SOUP_SESSION_LOCAL_ADDRESS, local_address,
                     NULL);
                 g_object_unref(local_address);
             } else {
-                MMS_ERR("Failed to query IP address of %s: %s",
+                GERR("Failed to query IP address of %s: %s",
                     conn->netif, strerror(errno));
             }
             close(fd);
         }
 #endif /* _WIN32 */
     } else {
-        MMS_WARN("MMS interface is unknown");
+        GWARN("MMS interface is unknown");
     }
 
     if (!session) {
@@ -177,7 +177,7 @@ mms_http_create_session(
     if (conn->mmsproxy && conn->mmsproxy[0]) {
         SoupURI* proxy_uri = mms_http_uri_parse(conn->mmsproxy);
         if (proxy_uri) {
-            MMS_DEBUG("MMS proxy %s", conn->mmsproxy);
+            GDEBUG("MMS proxy %s", conn->mmsproxy);
             g_object_set(session, SOUP_SESSION_PROXY_URI, proxy_uri, NULL);
             soup_uri_free(proxy_uri);
         }
@@ -214,7 +214,7 @@ mms_http_transfer_new(
             SOUP_MESSAGE_NEW_CONNECTION);
         if (cfg->uaprof && cfg->uaprof[0]) {
             const char* uaprof_header = "x-wap-profile";
-            MMS_VERBOSE("%s %s", uaprof_header, cfg->uaprof);
+            GVERBOSE("%s %s", uaprof_header, cfg->uaprof);
             soup_message_headers_append(tx->message->request_headers,
                 uaprof_header, cfg->uaprof);
         }
@@ -249,7 +249,7 @@ mms_task_http_send_progress(
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
     if (tx) {
-        MMS_ASSERT(tx->bytes_sent <= tx->bytes_to_send);
+        GASSERT(tx->bytes_sent <= tx->bytes_to_send);
         mms_transfer_list_transfer_send_progress(http->transfers,
             http->task.id, priv->transfer_type, tx->bytes_sent,
             tx->bytes_to_send);
@@ -264,7 +264,7 @@ mms_task_http_receive_progress(
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
     if (tx) {
-        MMS_ASSERT(tx->bytes_received <= tx->bytes_to_receive);
+        GASSERT(tx->bytes_received <= tx->bytes_to_receive);
         mms_transfer_list_transfer_receive_progress(http->transfers,
             http->task.id, priv->transfer_type, tx->bytes_received,
             tx->bytes_to_receive);
@@ -337,19 +337,19 @@ mms_task_http_finished(
     if (priv->tx && priv->tx->session == session) {
         MMS_HTTP_STATE next_http_state;
         MMSTask* task = &http->task;
-        MMSHttpTransfer* tx = priv->tx;
         SoupStatus http_status = msg->status_code;
 
-#if MMS_LOG_DEBUG
+#if GUTIL_LOG_DEBUG
+        MMSHttpTransfer* tx = priv->tx;
         if (tx->bytes_received) {
-            MMS_DEBUG("HTTP status %u [%s] %u byte(s)", msg->status_code,
+            GDEBUG("HTTP status %u [%s] %u byte(s)", msg->status_code,
                 soup_message_headers_get_content_type(msg->response_headers,
                 NULL), tx->bytes_received);
         } else {
-            MMS_DEBUG("HTTP status %u (%s)", msg->status_code,
+            GDEBUG("HTTP status %u (%s)", msg->status_code,
                 soup_status_get_phrase(msg->status_code));
         }
-#endif /* MMS_LOG_DEBUG */
+#endif /* GUTIL_LOG_DEBUG */
 
         if (SOUP_STATUS_IS_SUCCESSFUL(msg->status_code)) {
             next_http_state = MMS_HTTP_DONE;
@@ -366,14 +366,14 @@ mms_task_http_finished(
                 }
             } else {
                 next_http_state = MMS_HTTP_DONE;
-                MMS_WARN("HTTP error %u (%s)", msg->status_code,
+                GWARN("HTTP error %u (%s)", msg->status_code,
                     soup_status_get_phrase(msg->status_code));
                 mms_task_set_state(task, MMS_TASK_STATE_DONE);
             }
         }
         mms_task_http_set_state(http, next_http_state, http_status);
     } else {
-        MMS_VERBOSE_("ignoring stale completion message");
+        GVERBOSE_("ignoring stale completion message");
     }
 }
 
@@ -387,10 +387,10 @@ mms_task_http_write_next_chunk(
     MMSHttpTransfer* tx = priv->tx;
 #if MMS_LOG_VERBOSE
     if (tx->bytes_sent) {
-        MMS_VERBOSE("%u bytes sent", tx->bytes_sent);
+        GVERBOSE("%u bytes sent", tx->bytes_sent);
     }
 #endif
-    MMS_ASSERT(tx && tx->message == msg);
+    GASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
         void* chunk = g_malloc(MMS_HTTP_MAX_CHUNK);
         int nbytes = read(tx->send_fd, chunk, MMS_HTTP_MAX_CHUNK);
@@ -413,14 +413,14 @@ mms_task_http_got_headers(
 {
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
-    MMS_ASSERT(tx && tx->message == msg);
+    GASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
-        MMS_ASSERT(!tx->bytes_received);
+        GASSERT(!tx->bytes_received);
         tx->bytes_to_receive = (guint)soup_message_headers_get_content_length(
             msg->response_headers);
 #if MMS_LOG_VERBOSE
         if (tx->bytes_to_receive) {
-            MMS_VERBOSE("Receiving %u bytes", tx->bytes_to_receive);
+            GVERBOSE("Receiving %u bytes", tx->bytes_to_receive);
         }
 #endif
         mms_task_http_receive_progress(http);
@@ -436,14 +436,14 @@ mms_task_http_got_chunk(
 {
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
-    MMS_ASSERT(tx && tx->message == msg);
+    GASSERT(tx && tx->message == msg);
     if (tx && tx->message == msg) {
         tx->bytes_received += buf->length;
-        MMS_VERBOSE("%u bytes received", tx->bytes_received);
+        GVERBOSE("%u bytes received", tx->bytes_received);
         if (write(tx->receive_fd, buf->data, buf->length) == (int)buf->length) {
             mms_task_http_receive_progress(http);
         } else {
-            MMS_ERR("Write error: %s", strerror(errno));
+            GERR("Write error: %s", strerror(errno));
             mms_task_http_finish_transfer(http);
             mms_task_http_set_state(http, MMS_HTTP_PAUSED, 0);
             mms_task_set_state(&http->task, MMS_TASK_STATE_SLEEP);
@@ -461,7 +461,7 @@ mms_task_http_start(
     int receive_fd = -1;
     guint bytes_to_send = 0;
     MMSTaskHttpPriv* priv = http->priv;
-    MMS_ASSERT(mms_connection_is_open(connection));
+    GASSERT(mms_connection_is_open(connection));
     mms_task_http_finish_transfer(http);
 
     /* Open the files */
@@ -473,12 +473,12 @@ mms_task_http_start(
             if (!err) {
                 bytes_to_send = st.st_size;
             } else {
-                MMS_ERR("Can't stat %s: %s", priv->send_path, strerror(errno));
+                GERR("Can't stat %s: %s", priv->send_path, strerror(errno));
                 close(send_fd);
                 send_fd = -1;
             }
         } else {
-            MMS_ERR("Can't open %s: %s", priv->send_path, strerror(errno));
+            GERR("Can't open %s: %s", priv->send_path, strerror(errno));
         }
     }
 
@@ -538,20 +538,20 @@ mms_task_http_start(
             }
 
             /* Start the transfer */
-#if MMS_LOG_DEBUG
+#if GUTIL_LOG_DEBUG
             if (priv->send_path) {
                 if (priv->receive_path) {
-                    MMS_DEBUG("%s (%u bytes) -> %s -> %s", priv->send_path,
+                    GDEBUG("%s (%u bytes) -> %s -> %s", priv->send_path,
                         bytes_to_send, uri, priv->receive_path);
                 } else {
-                    MMS_DEBUG("%s (%u bytes) -> %s", priv->send_path,
+                    GDEBUG("%s (%u bytes) -> %s", priv->send_path,
                         bytes_to_send, uri);
                 }
             } else {
-                MMS_DEBUG("%s -> %s", uri, priv->receive_path);
+                GDEBUG("%s -> %s", uri, priv->receive_path);
 
             }
-#endif /* MMS_LOG_DEBUG */
+#endif /* GUTIL_LOG_DEBUG */
 
             mms_task_http_set_state(http, MMS_HTTP_ACTIVE, 0);
 
@@ -649,7 +649,7 @@ mms_task_http_finalize(
 {
     MMSTaskHttp* http = MMS_TASK_HTTP(object);
     MMSTaskHttpPriv* priv = http->priv;
-    MMS_ASSERT(!priv->tx);
+    GASSERT(!priv->tx);
     if (!task_config(&http->task)->keep_temp_files) {
         mms_remove_file_and_dir(priv->send_path);
         mms_remove_file_and_dir(priv->receive_path);
@@ -721,7 +721,7 @@ mms_task_http_alloc(
     priv->connection_type = ct;
     if (send_file) {
         priv->send_path = mms_task_file(&http->task, send_file);
-        MMS_ASSERT(g_file_test(priv->send_path, G_FILE_TEST_IS_REGULAR));
+        GASSERT(g_file_test(priv->send_path, G_FILE_TEST_IS_REGULAR));
     }
     return http;
 }

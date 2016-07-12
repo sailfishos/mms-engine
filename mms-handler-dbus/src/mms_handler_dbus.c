@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,15 +10,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_handler_dbus.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_handler_log
+#define GLOG_MODULE_NAME mms_handler_log
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-handler-dbus");
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-handler-dbus");
 
 /* Generated code */
 #include "org.nemomobile.MmsHandler.h"
@@ -151,7 +151,7 @@ mms_handler_dbus_connect(
             G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
             "org.nemomobile.MmsHandler", "/", NULL, &error);
         if (!dbus->proxy) {
-            MMS_ERR("%s", MMS_ERRMSG(error));
+            GERR("%s", GERRMSG(error));
             g_error_free(error);
         }
     }
@@ -176,18 +176,18 @@ mms_handler_dbus_message_notify_done(
     gboolean ok = org_nemomobile_mms_handler_call_message_notification_finish(
         ORG_NEMOMOBILE_MMS_HANDLER(proxy), &id, result, &error);
     if (ok) {
-        MMS_DEBUG_("id=%s", id);
-        MMS_ASSERT(id);
+        GDEBUG_("id=%s", id);
+        GASSERT(id);
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(error));
-        MMS_ASSERT(!id);
+        GERR("%s", GERRMSG(error));
+        GASSERT(!id);
         g_error_free(error);
     }
     if (call->cb) {
         void* param = g_hash_table_lookup(dbus->notify_pending, call);
         call->cb(call, id, param);
     }
-    MMS_VERIFY(g_hash_table_remove(dbus->notify_pending, call));
+    GVERIFY(g_hash_table_remove(dbus->notify_pending, call));
     mms_handler_busy_dec(&dbus->handler);
     g_free(id);
 }
@@ -230,7 +230,7 @@ mms_handler_dbus_message_notify_cancel(
     MMSHandler* handler,
     MMSHandlerMessageNotifyCall* call)
 {
-    MMS_ASSERT(call->cb);
+    GASSERT(call->cb);
     call->cb = NULL;
     g_cancellable_cancel(call->cancellable);
 }
@@ -252,14 +252,14 @@ mms_handler_dbus_message_received_done(
     gboolean ok = org_nemomobile_mms_handler_call_message_received_finish(
         ORG_NEMOMOBILE_MMS_HANDLER(proxy), result, &error);
     if (!ok) {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
     }
     if (call->cb) {
         void* param = g_hash_table_lookup(dbus->received_pending, call);
         call->cb(call, call->msg, ok, param);
     }
-    MMS_VERIFY(g_hash_table_remove(dbus->received_pending, call));
+    GVERIFY(g_hash_table_remove(dbus->received_pending, call));
     mms_handler_busy_dec(&dbus->handler);
 }
 
@@ -274,7 +274,7 @@ mms_handler_dbus_message_received(
 {
     MMSHandlerMessageReceivedCall* call = NULL;
     OrgNemomobileMmsHandler* proxy = mms_handler_dbus_connect(handler);
-    MMS_ASSERT(msg->id && msg->id[0]);
+    GASSERT(msg->id && msg->id[0]);
     if (msg->id && msg->id[0] && proxy) {
         MMSHandlerDbus* dbus = MMS_HANDLER_DBUS(handler);
         const char* nothing = NULL;
@@ -313,7 +313,7 @@ mms_handler_dbus_message_received_cancel(
     MMSHandler* handler,
     MMSHandlerMessageReceivedCall* call)
 {
-    MMS_ASSERT(call->cb);
+    GASSERT(call->cb);
     call->cb = NULL;
     g_cancellable_cancel(call->cancellable);
 }
@@ -336,7 +336,7 @@ mms_handler_dbus_call_done(
     if (ret) {
         g_variant_unref(ret);
     } else {
-        MMS_ERR("%s", MMS_ERRMSG(err));
+        GERR("%s", GERRMSG(err));
         g_error_free(err);
     }
     mms_handler_busy_dec(handler);
@@ -352,7 +352,7 @@ mms_handler_dbus_message_receive_state_changed(
     MMS_RECEIVE_STATE state)
 {
     OrgNemomobileMmsHandler* proxy = mms_handler_dbus_connect(handler);
-    MMS_ASSERT(id && id[0]);
+    GASSERT(id && id[0]);
     if (id && id[0] && proxy) {
         mms_handler_ref(handler);
         mms_handler_busy_inc(handler);
@@ -373,7 +373,7 @@ mms_handler_dbus_message_send_state_changed(
     const char* details)
 {
     OrgNemomobileMmsHandler* proxy = mms_handler_dbus_connect(handler);
-    MMS_ASSERT(id && id[0]);
+    GASSERT(id && id[0]);
     if (id && id[0] && proxy) {
         mms_handler_ref(handler);
         mms_handler_busy_inc(handler);
@@ -394,7 +394,7 @@ mms_handler_dbus_message_sent(
     const char* msgid)
 {
     OrgNemomobileMmsHandler* proxy = mms_handler_dbus_connect(handler);
-    MMS_ASSERT(id && id[0]);
+    GASSERT(id && id[0]);
     if (id && id[0] && msgid && msgid[0] && proxy) {
         mms_handler_ref(handler);
         mms_handler_busy_inc(handler);

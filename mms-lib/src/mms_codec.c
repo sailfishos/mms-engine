@@ -1,9 +1,8 @@
 /*
- *
  *  Multimedia Messaging Service
  *
  *  Copyright (C) 2010-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2013-2015  Jolla Ltd.
+ *  Copyright (C) 2013-2016  Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -13,11 +12,6 @@
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
  */
 
 #ifdef HAVE_CONFIG_H
@@ -42,9 +36,9 @@
 #include "mms_codec.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_codec_log
-#include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE("mms-codec");
+#define GLOG_MODULE_NAME mms_codec_log
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-codec");
 
 #define MAX_ENC_VALUE_BYTES 6
 
@@ -540,7 +534,7 @@ static char *decode_encoded_string_with_mib_enum(const unsigned char *p,
 			&bytes_read, &bytes_written, &error);
 
 	if (!converted) {
-		MMS_ERR("%s", MMS_ERRMSG(error));
+		GERR("%s", GERRMSG(error));
 		g_error_free(error);
 	}
 
@@ -1355,7 +1349,7 @@ static gboolean mms_parse_attachments(struct wsp_header_iter *iter,
 			 * parsing the rest of the PDU. And yes, it does
 			 * happen in real life.
 			 */
-			MMS_WARN("Failed to parse part headers");
+			GWARN("Failed to parse part headers");
 		}
 
 		if (wsp_header_iter_at_end(&hi) == FALSE) {

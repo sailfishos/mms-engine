@@ -10,16 +10,16 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_task.h"
 #include "mms_handler.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_task_publish_log
+#define GLOG_MODULE_NAME mms_task_publish_log
 #include "mms_lib_log.h"
-MMS_LOG_MODULE_DEFINE2("mms-task-publish", MMS_TASK_LOG);
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE2("mms-task-publish", MMS_TASK_LOG);
 
 /* Class definition */
 typedef MMSTaskClass MMSTaskPublishClass;
@@ -44,12 +44,12 @@ mms_task_publish_done(
 {
     MMSTaskPublish* pub = MMS_TASK_PUBLISH(param);
     if (ok) {
-        MMS_DEBUG("Done");
+        GDEBUG("Done");
         mms_task_set_state(&pub->task, MMS_TASK_STATE_DONE);
     } else if (mms_task_retry(&pub->task)) {
-        MMS_ERR("Failed to publish the message, will retry later...");
+        GERR("Failed to publish the message, will retry later...");
     } else {
-        MMS_ERR("Failed to publish the message");
+        GERR("Failed to publish the message");
     }
     mms_task_unref(&pub->task);
 }
@@ -60,7 +60,7 @@ mms_task_publish_run(
     MMSTask* task)
 {
     MMSTaskPublish* pub = MMS_TASK_PUBLISH(task);
-    MMS_ASSERT(!pub->call);
+    GASSERT(!pub->call);
     mms_task_ref(task);
     pub->call = mms_handler_message_received(task->handler, pub->msg,
         mms_task_publish_done, pub);
@@ -120,7 +120,7 @@ mms_task_publish_new(
     MMSHandler* handler,
     MMSMessage* msg)
 {
-    MMS_ASSERT(msg && msg->id);
+    GASSERT(msg && msg->id);
     if (msg && msg->id) {
         MMSTaskPublish* pub = mms_task_alloc(MMS_TYPE_TASK_PUBLISH,
             settings, handler, "Publish", msg->id, NULL);

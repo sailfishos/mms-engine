@@ -10,13 +10,16 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_transfer_dbus.h"
 #include "mms_transfer_list_dbus_log.h"
 
 #include <gutil_misc.h>
+
+/* Logging */
+#define GLOG_MODULE_NAME mms_transfer_list_log
+#include <gutil_log.h>
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.TransferList.h"
@@ -85,7 +88,7 @@ mms_transfer_dbus_new(
     if (!g_dbus_interface_skeleton_export(
         G_DBUS_INTERFACE_SKELETON(priv->proxy),
         priv->bus, priv->path, &error)) {
-        MMS_ERR("%s", MMS_ERRMSG(error));
+        GERR("%s", GERRMSG(error));
         g_error_free(error);
     }
     return self;
@@ -182,7 +185,7 @@ mms_transfer_dbus_update_flags(
     }
     if (priv->flags != flags) {
         priv->flags = flags;
-        MMS_DEBUG("Update flags => %u", priv->flags);
+        GDEBUG("Update flags => %u", priv->flags);
     }
 }
 
@@ -234,7 +237,7 @@ mms_transfer_dbus_handle_enable_updates(
         MMSTransferDbusClient* client = NULL;
         const char* sender = g_dbus_method_invocation_get_sender(call);
         cookie = ++(priv->last_update_cookie);
-        MMS_VERBOSE_("%s %u -> %u", sender, cookie, flags);
+        GVERBOSE_("%s %u -> %u", sender, cookie, flags);
 
         /* Create client context if necessary */
         if (priv->clients) {
@@ -256,10 +259,10 @@ mms_transfer_dbus_handle_enable_updates(
             GINT_TO_POINTER(flags));
         if ((priv->flags & flags) != flags) {
             priv->flags |= flags;
-            MMS_DEBUG("Update flags => %u", priv->flags);
+            GDEBUG("Update flags => %u", priv->flags);
         }
     } else {
-        MMS_WARN("Client provided no update flags!");
+        GWARN("Client provided no update flags!");
     }
 
     org_nemomobile_mms_engine_transfer_complete_enable_updates(proxy,
@@ -280,7 +283,7 @@ mms_transfer_dbus_handle_disable_updates(
     MMSTransferDbusClient* client = NULL;
     const char* sender = g_dbus_method_invocation_get_sender(call);
 
-    MMS_VERBOSE_("%s %u", sender, cookie);
+    GVERBOSE_("%s %u", sender, cookie);
     org_nemomobile_mms_engine_transfer_complete_disable_updates(proxy, call);
 
     if (priv->clients) {

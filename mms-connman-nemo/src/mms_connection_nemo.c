@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_connection_nemo.h"
@@ -20,9 +19,10 @@
 #include <gofono_connctx.h>
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connection_log
+#define GLOG_MODULE_NAME mms_connection_log
 #include "mms_connman_nemo_log.h"
-MMS_LOG_MODULE_DEFINE("mms-connection-nemo");
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-connection-nemo");
 
 enum mm_handler_id {
     MM_HANDLER_VALID,
@@ -113,7 +113,7 @@ mms_connection_nemo_reset_mms_imsi_done(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_DEBUG("Released %s", self->path);
+    GDEBUG("Released %s", self->path);
     mms_connman_busy_dec(self->cm);
     mms_connection_unref(&self->connection);
 }
@@ -161,7 +161,7 @@ mms_connection_nemo_cancel(
 {
     if (self->connection.state <= MMS_CONNECTION_STATE_OPENING &&
         mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_FAILED)) {
-        MMS_DEBUG("Connection %s cancelled", self->connection.imsi);
+        GDEBUG("Connection %s cancelled", self->connection.imsi);
     } else {
         mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_CLOSED);
     }
@@ -174,7 +174,7 @@ mms_connection_nemo_cancel_if_invalid(
     void* arg)
 {
     if (!obj->valid) {
-        MMS_VERBOSE_("oops!");
+        GVERBOSE_("oops!");
         mms_connection_nemo_cancel(MMS_CONNECTION_NEMO(arg));
     }
 }
@@ -186,9 +186,9 @@ mms_connection_nemo_active_changed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_ASSERT(self->context == context);
+    GASSERT(self->context == context);
     if (context->active) {
-        MMS_DEBUG("Connection %s opened", self->connection.imsi);
+        GDEBUG("Connection %s opened", self->connection.imsi);
         mms_connection_nemo_set_state(self, MMS_CONNECTION_STATE_OPEN);
     } else {
         mms_connection_nemo_disconnect_context(self, CONTEXT_HANDLER_ACTIVE);
@@ -203,10 +203,10 @@ mms_connection_nemo_interface_changed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_ASSERT(self->context == context);
+    GASSERT(self->context == context);
     if (context->ifname) {
         self->connection.netif = context->ifname;
-        MMS_DEBUG("Interface: %s", self->connection.netif);
+        GDEBUG("Interface: %s", self->connection.netif);
     } else {
         self->connection.netif = NULL;
     }
@@ -219,10 +219,10 @@ mms_connection_nemo_mms_proxy_changed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_ASSERT(self->context == context);
+    GASSERT(self->context == context);
     if (context->mms_proxy) {
         self->connection.mmsproxy = context->mms_proxy;
-        MMS_DEBUG("MessageProxy: %s", self->connection.mmsproxy);
+        GDEBUG("MessageProxy: %s", self->connection.mmsproxy);
     } else {
         self->connection.mmsproxy = NULL;
     }
@@ -235,10 +235,10 @@ mms_connection_nemo_mms_center_changed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_ASSERT(self->context == context);
+    GASSERT(self->context == context);
     if (context->mms_center) {
         self->connection.mmsc = context->mms_center;
-        MMS_DEBUG("MessageCenter: %s", self->connection.mmsc);
+        GDEBUG("MessageCenter: %s", self->connection.mmsc);
     } else {
         self->connection.mmsc = NULL;
     }
@@ -252,7 +252,7 @@ mms_connection_nemo_activate_failed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_ASSERT(self->context == context);
+    GASSERT(self->context == context);
     mms_connection_nemo_cancel(self);
 }
 
@@ -269,7 +269,7 @@ mms_connection_nemo_check_context(
         } else {
             OfonoConnMgr* connmgr = self->connmgr;
             if (ofono_connmgr_valid(connmgr) && connmgr->attached) {
-                MMS_DEBUG("Activate %s", ofono_connctx_path(context));
+                GDEBUG("Activate %s", ofono_connctx_path(context));
                 ofono_connctx_activate(context);
             }
         }
@@ -283,7 +283,7 @@ mms_connection_nemo_connmgr_attached_changed(
     void* arg)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
-    MMS_DEBUG("Data registration %s for %s", connmgr->attached ? "on" : "off",
+    GDEBUG("Data registration %s for %s", connmgr->attached ? "on" : "off",
         ofono_connmgr_path(connmgr));
     mms_connection_nemo_check_context(self);
 }
@@ -307,15 +307,15 @@ mms_connection_nemo_setup_context(
     /* Capture the current context state */
     if (context->mms_proxy && context->mms_proxy[0]) {
         conn->mmsproxy = context->mms_proxy;
-        MMS_DEBUG("MessageProxy: %s", conn->mmsproxy);
+        GDEBUG("MessageProxy: %s", conn->mmsproxy);
     }
     if (context->mms_center && context->mms_center[0]) {
         conn->mmsc = context->mms_center;
-        MMS_DEBUG("MessageCenter: %s", conn->mmsc);
+        GDEBUG("MessageCenter: %s", conn->mmsc);
     }
     if (context->ifname && context->ifname[0]) {
         conn->netif = context->ifname;
-        MMS_DEBUG("Interface: %s", conn->netif);
+        GDEBUG("Interface: %s", conn->netif);
     }
 
     /* Track context property changes */
@@ -364,8 +364,8 @@ void
 mms_connection_nemo_init_context(
     MMSConnectionNemo* self)
 {
-    MMS_ASSERT(ofono_connmgr_valid(self->connmgr));
-    MMS_ASSERT(!self->context);
+    GASSERT(ofono_connmgr_valid(self->connmgr));
+    GASSERT(!self->context);
 
     /* From this point on, cancel the connection if OfonoConnMgr becomes
      * invalid (which would probably mean SIM removal or ofono crash) */
@@ -379,7 +379,7 @@ mms_connection_nemo_init_context(
     self->context = ofono_connctx_ref(ofono_connmgr_get_context_for_type(
         self->connmgr, OFONO_CONNCTX_TYPE_MMS));
     if (self->context) {
-        MMS_DEBUG("MMS context %s", ofono_connctx_path(self->context));
+        GDEBUG("MMS context %s", ofono_connctx_path(self->context));
         if (ofono_connctx_valid(self->context)) {
             mms_connection_nemo_setup_context(self);
         } else {
@@ -388,7 +388,7 @@ mms_connection_nemo_init_context(
                 mms_connection_nemo_context_valid_changed, self);
         }
     } else {
-        MMS_WARN("No MMS context");
+        GWARN("No MMS context");
         mms_connection_nemo_cancel(self);
     }
 }
@@ -414,7 +414,7 @@ mms_connection_nemo_mms_imsi_changed(
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
     if (mm->valid && g_strcmp0(mm->mms_imsi, self->connection.imsi)) {
-        MMS_VERBOSE_("%s", mm->mms_imsi);
+        GVERBOSE_("%s", mm->mms_imsi);
         mms_connection_nemo_cancel(self);
     }
 }
@@ -431,9 +431,9 @@ mms_connection_nemo_set_mms_imsi_done(
     if (error) {
         mms_connection_nemo_cancel(self);
     } else {
-        MMS_DEBUG("MMS modem path %s", path);
-        MMS_ASSERT(!self->path);
-        MMS_ASSERT(!self->connmgr);
+        GDEBUG("MMS modem path %s", path);
+        GASSERT(!self->path);
+        GASSERT(!self->connmgr);
         self->path = g_strdup(path);
 
         if (self->connection.state == MMS_CONNECTION_STATE_OPENING) {
@@ -454,7 +454,7 @@ mms_connection_nemo_set_mms_imsi_done(
             }
         } else {
             /* Connection has been cancelled, release the slot */
-            MMS_DEBUG("Canceled, releasing %s", path);
+            GDEBUG("Canceled, releasing %s", path);
             mms_connection_ref(&self->connection);
             mms_connman_busy_inc(self->cm);
             ofonoext_mm_set_mms_imsi_full(self->mm, "",
@@ -473,7 +473,7 @@ mms_connection_nemo_cancel_if_mm_invalid(
     void* arg)
 {
     if (!mm->valid) {
-        MMS_VERBOSE_("oops!");
+        GVERBOSE_("oops!");
         mms_connection_nemo_cancel(MMS_CONNECTION_NEMO(arg));
     }
 }
@@ -504,7 +504,7 @@ mms_connection_nemo_mm_valid_changed(
     OfonoExtModemManager* mm,
     void* arg)
 {
-    MMS_VERBOSE_("%p %d", arg, mm->valid);
+    GVERBOSE_("%p %d", arg, mm->valid);
     if (mm->valid) {
         mms_connection_nemo_request_sim(arg);
     }
@@ -519,7 +519,7 @@ mms_connection_nemo_new(
     MMSConnectionNemo* self = g_object_new(MMS_TYPE_CONNECTION_NEMO, NULL);
     MMSConnection* conn = &self->connection;
 
-    MMS_VERBOSE_("%p %s", self, imsi);
+    GVERBOSE_("%p %s", self, imsi);
     conn->type = type;
     conn->imsi = self->imsi = g_strdup(imsi);
     conn->state = MMS_CONNECTION_STATE_OPENING;
@@ -545,7 +545,7 @@ mms_connection_nemo_close(
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(connection);
     OfonoConnCtx* context = self->context;
     if (ofono_connctx_valid(context) && context->active) {
-        MMS_DEBUG("Deactivate %s", ofono_connctx_path(context));
+        GDEBUG("Deactivate %s", ofono_connctx_path(context));
         ofono_connctx_deactivate(context);
     } else {
         mms_connection_nemo_cancel(self);
@@ -562,8 +562,8 @@ mms_connection_nemo_dispose(
     GObject* object)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(object);
-    MMS_VERBOSE_("%p %s", self, self->imsi);
-    MMS_ASSERT(!mms_connection_is_active(&self->connection));
+    GVERBOSE_("%p %s", self, self->imsi);
+    GASSERT(!mms_connection_is_active(&self->connection));
     mms_connection_nemo_disconnect(self);
     if (self->context) {
         if (mms_connection_is_active(&self->connection) &&
@@ -586,7 +586,7 @@ mms_connection_nemo_finalize(
     GObject* object)
 {
     MMSConnectionNemo* self = MMS_CONNECTION_NEMO(object);
-    MMS_VERBOSE_("%p %s", self, self->imsi);
+    GVERBOSE_("%p %s", self, self->imsi);
     ofono_connmgr_unref(self->connmgr);
     ofono_connctx_unref(self->context);
     ofonoext_mm_unref(self->mm);
@@ -618,7 +618,7 @@ void
 mms_connection_nemo_init(
     MMSConnectionNemo* self)
 {
-    MMS_VERBOSE_("%p", self);
+    GVERBOSE_("%p", self);
 }
 
 /*
