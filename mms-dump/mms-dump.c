@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <glib.h>
@@ -28,8 +27,15 @@ enum app_ret_value {
     RET_ERR_DECODE
 };
 
+#define N_(a) G_N_ELEMENTS(a)
+
 #define MMS_DUMP_FLAG_VERBOSE (0x01)
 #define MMS_DUMP_FLAG_DATA    (0x02)
+#define MMS_DUMP_FLAG_EXTRACT (0x04)
+
+#define HEADER_CONTENT_DISPOSITION  "Content-Disposition"
+#define PARAM_FILENAME              "Filename"
+#define PARAM_NAME                  "Name"
 
 #define WSP_QUOTE (127)
 
@@ -38,8 +44,27 @@ struct mms_named_value {
     unsigned int value;
 };
 
+struct mms_header_param {
+    char* name;
+    char* value;
+};
+
+struct mms_header {
+    char* name;
+    char* value;
+    char* dump;
+    struct mms_header_param** params;
+    unsigned int num_params;
+};
+
+struct mms_headers {
+    struct mms_header** headers;
+    unsigned int num_headers;
+};
+
 typedef gboolean
 (*mms_value_decoder)(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -84,14 +109,14 @@ typedef gboolean
 
 #define WSP_WELL_KNOWN_HEADERS(h) \
     h(CONTENT_LOCATION,       "Content-Location",             0x0E, text     )\
-    h(CONTENT_DISPOSITION,    "Content-Disposition",          0x2E, contdisp )\
+    h(CONTENT_DISPOSITION,    HEADER_CONTENT_DISPOSITION,     0x2E, contdisp )\
     h(CONTENT_ID,             "Content-ID",                   0x40, quote    )\
-    h(CONTENT_DISPOSITION2,   "Content-Disposition",          0x45, contdisp )
+    h(CONTENT_DISPOSITION2,   HEADER_CONTENT_DISPOSITION,     0x45, contdisp )
 
 #define MMS_HEADER_ID(id) MMS_HEADER_##id
 #define MMS_PART_HEADER_ID(id) MMS_PART_HEADER_##id
 
-typedef enum mms_header {
+typedef enum mms_header_id {
     MMS_HEADER_INVALID,
 #define h(id,n,x,t) MMS_HEADER_ID(id) = x,
     MMS_WELL_KNOWN_HEADERS(h)
@@ -99,7 +124,7 @@ typedef enum mms_header {
     MMS_HEADER_END,
 } MMS_HEADER;
 
-typedef enum mms_part_header {
+typedef enum mms_part_header_id {
 #define h(id,n,x,t) MMS_PART_HEADER_ID(id) = x,
     WSP_WELL_KNOWN_HEADERS(h)
 #undef h
@@ -156,25 +181,196 @@ mms_find_named_value(
 }
 
 static
+struct mms_header*
+mms_header_new(
+    const char* name)
+{
+    struct mms_header* header = g_slice_new0(struct mms_header);
+    header->name = g_strdup(name);
+    return header;
+}
+
+static
+struct mms_header*
+mms_header_new_content_type()
+{
+    return mms_header_new("Content-Type");
+}
+
+static
 void
-mms_value_verbose_dump(
+mms_header_free(
+    struct mms_header* header)
+{
+    if (header) {
+        unsigned int i;
+        for (i=0; i<header->num_params; i++) {
+            struct mms_header_param* param = header->params[i];
+            g_free(param->name);
+            g_free(param->value);
+            g_slice_free(struct mms_header_param, param);
+        }
+        g_free(header->name);
+        g_free(header->value);
+        g_free(header->dump);
+        g_free(header->params);
+        g_slice_free(struct mms_header, header);
+    }
+}
+
+static
+void
+mms_headers_free(
+    struct mms_headers* headers)
+{
+    if (headers) {
+        unsigned int i;
+        for (i=0; i<headers->num_headers; i++) {
+            mms_header_free(headers->headers[i]);
+        }
+        g_free(headers->headers);
+        g_slice_free(struct mms_headers, headers);
+    }
+}
+
+static
+void
+mms_header_print(
+    const struct mms_header* header,
+    const char* prefix,
+    unsigned int flags)
+{
+    if (header) {
+        unsigned int i;
+        printf("%s%s: ", prefix, header->name);
+        if (header->value) printf("%s", header->value);
+        for (i=0; i<header->num_params; i++) {
+            struct mms_header_param* param = header->params[i];
+            printf("; %s=%s", param->name, param->value);
+        }
+        if ((flags & MMS_DUMP_FLAG_VERBOSE) && header->dump) {
+            printf(" (%s)", header->dump);
+        }
+        printf("\n");
+    }
+}
+
+static
+void
+mms_headers_print(
+    const struct mms_headers* headers,
+    const char* prefix,
+    unsigned int flags)
+{
+    if (headers) {
+        unsigned int i;
+        for (i=0; i<headers->num_headers; i++) {
+            mms_header_print(headers->headers[i], prefix, flags);
+        }
+    }
+}
+
+static
+const char*
+mms_header_find(
+    const struct mms_header* header,
+    const char* name)
+{
+    if (header && name) {
+        unsigned int i;
+        for (i=0; i<header->num_params; i++) {
+            const struct mms_header_param* param = header->params[i];
+            if (!g_ascii_strcasecmp(param->name, name)) {
+                return param->value;
+            }
+        }
+    }
+    return NULL;
+}
+
+static
+const struct mms_header*
+mms_headers_find(
+    const struct mms_headers* headers,
+    const char* name)
+{
+    if (headers && name) {
+        unsigned int i;
+        for (i=0; i<headers->num_headers; i++) {
+            const struct mms_header* header = headers->headers[i];
+            if (!g_ascii_strcasecmp(header->name, name)) {
+                return header;
+            }
+        }
+    }
+    return NULL;
+}
+
+static
+const char*
+mms_headers_find_filename(
+    const struct mms_header* content_type,
+    const struct mms_headers* headers)
+{
+    const struct mms_header* disp = mms_headers_find(headers,
+        HEADER_CONTENT_DISPOSITION);
+    if (disp) {
+        const char* filename = mms_header_find(disp, PARAM_FILENAME);
+        if (filename) {
+            return filename;
+        }
+    }
+    return mms_header_find(content_type, PARAM_NAME);
+}
+
+static
+void
+mms_header_set_count_param(
+    struct mms_header* header,
+    unsigned int count)
+{
+    header->num_params = 1;
+    header->params = g_new(struct mms_header_param*, header->num_params);
+    header->params[0] = g_slice_new0(struct mms_header_param);
+    header->params[0]->name = g_strdup("Count");
+    header->params[0]->value = g_strdup_printf("%u", count);
+}
+
+static
+char*
+mms_hexdump(
+    const guint8* val,
+    unsigned int len)
+{
+    if (len > 0) {
+        unsigned int i;
+        GString* buf = g_string_new_len(NULL, len*3 - 1);
+        g_string_append_printf(buf, "%02X", val[0]);
+        for (i=1; i<len; i++) {
+            g_string_append_printf(buf, " %02X", val[i]);
+        }
+        return g_string_free(buf, FALSE);
+    }
+    return g_strdup("");
+}
+
+static
+void
+mms_header_dump(
+    struct mms_header* header,
     const guint8* val,
     unsigned int len,
     unsigned int flags)
 {
-    if (flags & MMS_DUMP_FLAG_VERBOSE) {
-        unsigned int i;
-        printf(" (%02X", val[0]);
-        for (i=1; i<len; i++) {
-            printf(" %02X", val[i]);
-        }
-        printf(")");
+    if ((flags & MMS_DUMP_FLAG_VERBOSE) && len > 0) {
+        header->dump = mms_hexdump(val, len);
     }
 }
 
 static
 gboolean
 mms_value_decode_unknown(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -182,17 +378,15 @@ mms_value_decode_unknown(
 {
     if (type == WSP_VALUE_TYPE_TEXT) {
         if (val[0] == WSP_QUOTE) val++;
-        printf("%s", val);
-        mms_value_verbose_dump(val, len, flags);
+        header->value = g_strdup((char*)val);
+        mms_header_dump(header, val, len, flags);
     } else if (len == 1) {
-        printf("0x%02X", val[0]);
-        if (flags & MMS_DUMP_FLAG_VERBOSE) printf(" (%u)", val[0]);
-    } else if (len > 1) {
-        unsigned int i;
-        printf("%02X", val[0]);
-        for (i=1; i<len; i++) {
-            printf(" %02X", val[i]);
+        header->value = g_strdup_printf("0x%02X", val[0]);
+        if (flags & MMS_DUMP_FLAG_VERBOSE) {
+            header->dump = g_strdup_printf("%u", val[0]);
         }
+    } else if (len > 1) {
+        header->value = mms_hexdump(val, len);
     }
     return TRUE;
 }
@@ -200,6 +394,7 @@ mms_value_decode_unknown(
 static
 gboolean
 mms_value_decode_quote(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -207,8 +402,8 @@ mms_value_decode_quote(
 {
     /* Quoted-string = <Octet 34> *TEXT End-of-string */
     if (type == WSP_VALUE_TYPE_TEXT && len > 0 && val[0] == 0x22) {
-        printf("%s", val+1);
-        mms_value_verbose_dump(val, len, flags);
+        header->value = g_strdup((char*)val+1);
+        mms_header_dump(header, val, len, flags);
         return TRUE;
     }
     return FALSE;
@@ -217,6 +412,7 @@ mms_value_decode_quote(
 static
 gboolean
 mms_value_decode_enum(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -228,17 +424,20 @@ mms_value_decode_enum(
         const struct mms_named_value* nv;
         nv = mms_find_named_value(values, num_values, val[0]);
         if (nv) {
-            printf("%s", nv->name);
-            if (flags & MMS_DUMP_FLAG_VERBOSE) printf(" (%u)", nv->value);
+            header->value = g_strdup(nv->name);
+            if (flags & MMS_DUMP_FLAG_VERBOSE) {
+                header->dump = g_strdup_printf("%u", nv->value);
+            }
             return TRUE;
         }
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 static
 gboolean
 mms_value_decode_version(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -246,16 +445,20 @@ mms_value_decode_version(
 {
     if (type == WSP_VALUE_TYPE_SHORT && len == 1) {
         const unsigned int value = val[0];
-        printf("%u.%u", (val[0] & 0x70) >> 4, val[0] & 0x0f);
-        if (flags & MMS_DUMP_FLAG_VERBOSE) printf(" (%u)", value);
+        header->value = g_strdup_printf("%u.%u",
+            (val[0] & 0x70) >> 4, val[0] & 0x0f);
+        if (flags & MMS_DUMP_FLAG_VERBOSE) {
+            header->dump = g_strdup_printf("%u", value);
+        }
         return TRUE;
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 static
 gboolean
 mms_value_decode_long(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -267,21 +470,20 @@ mms_value_decode_long(
         for (long_val = 0, i=0; i<len; i++) {
             long_val = ((long_val << 8) | val[i]);
         }
-        printf("%lu", long_val);
+        header->value = g_strdup_printf("%lu", long_val);
         return TRUE;
-    } else {
-        return mms_value_decode_unknown(type, val, len, flags);
     }
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 static
-void
-mms_value_print_date(
+char*
+mms_value_format_date(
     time_t t)
 {
     char date[64];
     strftime(date, sizeof(date), "%Y-%m-%dT%H:%M:%S%z", localtime(&t));
-    printf("%s", date);
+    return g_strdup(date);
 }
 
 static
@@ -298,12 +500,13 @@ mms_value_decode_date_value(
         }
         return TRUE;
     }
-        return FALSE;
+    return FALSE;
 }
 
 static
 gboolean
 mms_value_decode_date(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -312,17 +515,19 @@ mms_value_decode_date(
     time_t t;
     if (type == WSP_VALUE_TYPE_LONG &&
         mms_value_decode_date_value(val, len, &t)) {
-        mms_value_print_date(t);
-        if (flags & MMS_DUMP_FLAG_VERBOSE) printf(" (%lu)", (unsigned long)t);
+        header->value = mms_value_format_date(t);
+        if (flags & MMS_DUMP_FLAG_VERBOSE) {
+            header->dump = g_strdup_printf("%lu", (unsigned long)t);
+        }
         return TRUE;
-    } else {
-        return mms_value_decode_unknown(type, val, len, flags);
     }
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 static
 gboolean
 mms_value_decode_bool(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -332,13 +537,14 @@ mms_value_decode_bool(
         { "Yes", 128 },
         { "No",  129 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Message-type-value */
 static
 gboolean
 mms_value_decode_mtype(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -357,13 +563,14 @@ mms_value_decode_mtype(
         { "M-Forward.req",      137 },
         { "M-Forward.conf",     138 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Message-class-value */
 static
 gboolean
 mms_value_decode_mclass(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -375,13 +582,14 @@ mms_value_decode_mclass(
         { "Informational", 130 },
         { "Auto",          131 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Priority-value */
 static
 gboolean
 mms_value_decode_prio(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -392,13 +600,14 @@ mms_value_decode_prio(
         { "Normal", 129 },
         { "High",   130 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Retrieve-status-value */
 static
 gboolean
 mms_value_decode_retrieve(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -414,13 +623,14 @@ mms_value_decode_retrieve(
         { "Error-permanent-message-not-found",   226 },
         { "Error-permanent-content-unsupported", 227 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Read-status-value */
 static
 gboolean
 mms_value_decode_rstatus(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -430,13 +640,14 @@ mms_value_decode_rstatus(
         { "Read",    128 },
         { "Deleted", 129 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Status-value */
 static
 gboolean
 mms_value_decode_status(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -451,13 +662,14 @@ mms_value_decode_status(
         { "Indeterminate", 133 },
         { "Forwarded",     134 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Response-status-value */
 static
 gboolean
 mms_value_decode_respstat(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -491,13 +703,14 @@ mms_value_decode_respstat(
         { "Error-permanent-address-hiding-not-supported",        234 },
         { "Error-permanent-lack-of-prepaid",                     235 }
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* Encoded-string-value */
 static
 gboolean
 mms_value_decode_encoded_text(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len)
@@ -560,14 +773,14 @@ mms_value_decode_encoded_text(
     };
 
     if (type == WSP_VALUE_TYPE_TEXT) {
-        printf("%s", val);
+        header->value = g_strdup((char*)val);
         return TRUE;
     } else if (type == WSP_VALUE_TYPE_LONG) {
         unsigned int charset = 0;
         unsigned int consumed = 0;
         if (wsp_decode_integer(val, len, &charset, &consumed)) {
             const struct mms_named_value* cs;
-            cs = mms_find_named_value(nv, G_N_ELEMENTS(nv), charset);
+            cs = mms_find_named_value(nv, N_(nv), charset);
             if (cs) {
                 char* tmp = NULL;
                 const char* text = NULL;
@@ -581,7 +794,7 @@ mms_value_decode_encoded_text(
                     if (consumed <= len) text = (char*)val+consumed;
                 }
                 if (text) {
-                    printf("%s", text);
+                    header->value = g_strdup(text);
                     g_free(tmp);
                     return TRUE;
                 }
@@ -594,16 +807,17 @@ mms_value_decode_encoded_text(
 static
 gboolean
 mms_value_decode_etext(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
     unsigned int flags)
 {
-    if (mms_value_decode_encoded_text(type, val, len)) {
-        mms_value_verbose_dump(val, len, flags);
+    if (mms_value_decode_encoded_text(header, type, val, len)) {
+        mms_header_dump(header, val, len, flags);
         return TRUE;
     } else {
-        return mms_value_decode_unknown(type, val, len, flags);
+        return mms_value_decode_unknown(header, type, val, len, flags);
     }
 }
 
@@ -611,6 +825,7 @@ mms_value_decode_etext(
 static
 gboolean
 mms_value_decode_visiblty(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -620,13 +835,14 @@ mms_value_decode_visiblty(
         { "Hide", 128 },
         { "Show", 129 },
     };
-    return mms_value_decode_enum(type, val, len, nv, G_N_ELEMENTS(nv), flags);
+    return mms_value_decode_enum(header, type, val, len, nv, N_(nv), flags);
 }
 
 /* From-value */
 static
 gboolean
 mms_value_decode_from(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -639,27 +855,30 @@ mms_value_decode_from(
      */
     if (type == WSP_VALUE_TYPE_LONG && len > 0) {
         if (val[0] == 0x81) {
-            printf("<Insert-address>");
-            if (flags & MMS_DUMP_FLAG_VERBOSE) printf(" (%u)", val[0]);
+            header->value = g_strdup("<Insert-address>");
+            if (flags & MMS_DUMP_FLAG_VERBOSE) {
+                header->dump = g_strdup_printf("%u", val[0]);
+            }
             return TRUE;
         } else if (val[0] == 0x80 && len > 1) {
             enum wsp_value_type ftype;
             const void* fval = NULL;
             unsigned int flen = 0;
             if (wsp_decode_field(val+1, len-1, &ftype, &fval, &flen, NULL) &&
-                mms_value_decode_etext(ftype, fval, flen, 0)) {
-                mms_value_verbose_dump(val, len, flags);
+                mms_value_decode_etext(header, ftype, fval, flen, 0)) {
+                mms_header_dump(header, val, len, flags);
                 return TRUE;
             }
         }
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 /* Expiry-value */
 static
 gboolean
 mms_value_decode_expiry(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -677,7 +896,7 @@ mms_value_decode_expiry(
     if (type == WSP_VALUE_TYPE_LONG && len > 1 &&
         wsp_decode_field(val+1, len-1, &ftype, &fval, &flen, NULL)) {
         if (val[0] == 0x80 /* Absolute-token */) {
-            ok = mms_value_decode_date(ftype, fval, flen, 0);
+            ok = mms_value_decode_date(header, ftype, fval, flen, 0);
         } else if (val[0] == 0x81 /* Relative-token */) {
             time_t t;
             if (ftype == WSP_VALUE_TYPE_LONG && flen > 0 && flen <= sizeof(t)) {
@@ -685,23 +904,23 @@ mms_value_decode_expiry(
                 for (t=0, i=0; i<flen; i++) {
                     t = ((t << 8) | ((guint8*)fval)[i]);
                 }
-                printf("+%u sec", (unsigned int)t);
+                header->value = g_strdup_printf("+%u sec", (unsigned int)t);
                 ok = TRUE;
             }
         }
     }
     if (ok) {
-        mms_value_verbose_dump(val, len, flags);
+        mms_header_dump(header, val, len, flags);
         return TRUE;
-     } else {
-        return mms_value_decode_unknown(type, val, len, flags);
     }
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 /* Previously-sent-by-value */
 static
 gboolean
 mms_value_decode_prevby(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -717,25 +936,26 @@ mms_value_decode_prevby(
         if (wsp_decode_integer(val, len, &count, &consumed)) {
             const guint8* ptr = val + consumed;
             const unsigned int bytes_left = len - consumed;
-            enum wsp_value_type from_type;
-            const void* from_val;
-            unsigned int from_len;
-            if (wsp_decode_field(ptr, bytes_left, &from_type, &from_val,
-                &from_len, &consumed) && consumed == bytes_left &&
-                mms_value_decode_encoded_text(from_type, from_val, from_len)) {
-                printf("; count=%u", count);
-                mms_value_verbose_dump(val, len, flags);
+            enum wsp_value_type ftype;
+            const void* fval;
+            unsigned int flen;
+            if (wsp_decode_field(ptr, bytes_left, &ftype, &fval, &flen,
+                &consumed) && consumed == bytes_left &&
+                mms_value_decode_encoded_text(header, ftype, fval, flen)) {
+                mms_header_set_count_param(header, count);
+                mms_header_dump(header, val, len, flags);
                 return TRUE;
             }
         }
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 /* Previously-sent-date-value */
 static
 gboolean
 mms_value_decode_prevdate(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -759,19 +979,20 @@ mms_value_decode_prevdate(
                 &date_len, &consumed) && consumed == bytes_left &&
                 date_type == WSP_VALUE_TYPE_LONG &&
                 mms_value_decode_date_value(date_val, date_len, &t)) {
-                mms_value_print_date(t);
-                printf("; count=%u", count);
-                mms_value_verbose_dump(val, len, flags);
+                header->value = mms_value_format_date(t);
+                mms_header_set_count_param(header, count);
+                mms_header_dump(header, val, len, flags);
                 return TRUE;
             }
         }
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 static
 void
 mms_value_decode_wsp_params(
+    struct mms_header* header,
     const unsigned char* pdu,
     unsigned int len)
 {
@@ -780,8 +1001,8 @@ mms_value_decode_wsp_params(
         { "Charset",           WSP_PARAMETER_TYPE_CHARSET            },
         { "Level",             WSP_PARAMETER_TYPE_LEVEL              },
         { "Type",              WSP_PARAMETER_TYPE_TYPE               },
-        { "Name",              WSP_PARAMETER_TYPE_NAME_DEFUNCT       },
-        { "Filename",          WSP_PARAMETER_TYPE_FILENAME_DEFUNCT   },
+        { PARAM_NAME,          WSP_PARAMETER_TYPE_NAME_DEFUNCT       },
+        { PARAM_FILENAME,      WSP_PARAMETER_TYPE_FILENAME_DEFUNCT   },
         { "Differences",       WSP_PARAMETER_TYPE_DIFFERENCES        },
         { "Padding",           WSP_PARAMETER_TYPE_PADDING            },
         { "Type",              WSP_PARAMETER_TYPE_CONTENT_TYPE       },
@@ -798,8 +1019,8 @@ mms_value_decode_wsp_params(
         { "Modification-date", WSP_PARAMETER_TYPE_MODIFICATION_DATE  },
         { "Read-date",         WSP_PARAMETER_TYPE_READ_DATE          },
         { "Size",              WSP_PARAMETER_TYPE_SIZE               },
-        { "Name",              WSP_PARAMETER_TYPE_NAME               },
-        { "Filename",          WSP_PARAMETER_TYPE_FILENAME           },
+        { PARAM_NAME,          WSP_PARAMETER_TYPE_NAME               },
+        { PARAM_FILENAME,      WSP_PARAMETER_TYPE_FILENAME           },
         { "Start",             WSP_PARAMETER_TYPE_START              },
         { "Start-info",        WSP_PARAMETER_TYPE_START_INFO         },
         { "Comment",           WSP_PARAMETER_TYPE_COMMENT            },
@@ -807,38 +1028,41 @@ mms_value_decode_wsp_params(
         { "Path",              WSP_PARAMETER_TYPE_PATH               }
     };
 
+    GPtrArray* tmp = g_ptr_array_new();
     struct wsp_parameter_iter pi;
     struct wsp_parameter p;
 
     wsp_parameter_iter_init(&pi, pdu, len);
     while (wsp_parameter_iter_next(&pi, &p)) {
-        const struct mms_named_value* nv;
-        nv = mms_find_named_value(nv_p, G_N_ELEMENTS(nv_p), p.type);
-        if (nv) {
-            printf("; %s=", nv->name);
-        } else {
-            printf(";0x%02x=", p.type);
-        }
+        struct mms_header_param* hp = g_slice_new0(struct mms_header_param);
+        const struct mms_named_value* nv =
+            mms_find_named_value(nv_p, N_(nv_p), p.type);
+        hp->name = nv ? g_strdup(nv->name) : g_strdup_printf("0x%02x", p.type);
         switch (p.value) {
         case WSP_PARAMETER_VALUE_TEXT:
-            printf("%s", p.text[0] == '"' ? (p.text + 1) : p.text);
+            hp->value = g_strdup(p.text[0] == '"' ? (p.text + 1) : p.text);
             break;
         case WSP_PARAMETER_VALUE_INT:
-            printf("%u", p.integer);
+            hp->value = g_strdup_printf("%u", p.integer);
             break;
         case WSP_PARAMETER_VALUE_DATE:
-            mms_value_print_date(p.date);
+            hp->value = mms_value_format_date(p.date);
             break;
         case WSP_PARAMETER_VALUE_Q:
-            printf("%g", p.q);
+            hp->value = g_strdup_printf("%g", p.q);
             break;
         }
+        g_ptr_array_add(tmp, hp);
     }
+
+    header->num_params = tmp->len;
+    header->params = (struct mms_header_param**)g_ptr_array_free(tmp, FALSE);
 }
 
 static
 gboolean
 mms_value_decode_contdisp(
+    struct mms_header* header,
     enum wsp_value_type type,
     const guint8* val,
     unsigned int len,
@@ -866,15 +1090,15 @@ mms_value_decode_contdisp(
     if ((type == WSP_VALUE_TYPE_LONG ||
          type == WSP_VALUE_TYPE_SHORT) && len > 0) {
         const struct mms_named_value* nv;
-        nv = mms_find_named_value(nv_d, G_N_ELEMENTS(nv_d), val[0]);
+        nv = mms_find_named_value(nv_d, N_(nv_d), val[0]);
         if (nv) {
-            printf("%s", nv->name);
-            mms_value_decode_wsp_params(val + 1, len - 1);
-            mms_value_verbose_dump(val, len, flags);
+            header->value = g_strdup(nv->name);
+            mms_value_decode_wsp_params(header, val + 1, len - 1);
+            mms_header_dump(header, val, len, flags);
             return TRUE;
         }
     }
-    return mms_value_decode_unknown(type, val, len, flags);
+    return mms_value_decode_unknown(header, type, val, len, flags);
 }
 
 #define mms_value_decode_short  mms_value_decode_unknown
@@ -903,19 +1127,26 @@ mms_part_value_decoder_for_header(
 }
 
 static
-gboolean
+void
+mms_decode_header_free_func(
+    gpointer data,
+    gpointer user_data)
+{
+    mms_header_free(data);
+}
+
+static
+struct mms_headers*
 mms_decode_headers(
     struct wsp_header_iter* iter,
-    const char* prefix,
     unsigned int flags,
     const char* (*well_known_header_name)(int hdr),
     mms_value_decoder (*value_decoder_for_header)(const char* hdr))
 {
+    struct mms_headers* headers;
+    GPtrArray* tmp = g_ptr_array_new();
     while (wsp_header_iter_next(iter)) {
         const guint8* hdr = wsp_header_iter_get_hdr(iter);
-        const guint8* val = wsp_header_iter_get_val(iter);
-        unsigned int val_len = wsp_header_iter_get_val_len(iter);
-        mms_value_decoder dec;
         const char* hdr_name;
 
         switch (wsp_header_iter_get_hdr_type(iter)) {
@@ -926,40 +1157,49 @@ mms_decode_headers(
             hdr_name = (const char*)hdr;
             break;
         default:
-            return FALSE;
+            hdr_name = NULL;
+            break;
         }
-        printf("%s%s: ", prefix, hdr_name);
-        dec = value_decoder_for_header(hdr_name);
-        if (val_len > 0 &&
-            !dec(wsp_header_iter_get_val_type(iter), val, val_len, flags)) {
-            printf("ERROR!\n");
-            return FALSE;
+        if (hdr_name) {
+            const guint8* val = wsp_header_iter_get_val(iter);
+            unsigned int val_len = wsp_header_iter_get_val_len(iter);
+            enum wsp_value_type val_type = wsp_header_iter_get_val_type(iter);
+            mms_value_decoder dec = value_decoder_for_header(hdr_name);
+            struct mms_header* header = mms_header_new(hdr_name);
+            g_ptr_array_add(tmp, header);
+            if (!val_len ||
+               (dec && dec(header, val_type, val, val_len, flags))) {
+                continue;
+            }
         }
-        printf("\n");
+        g_ptr_array_foreach(tmp, mms_decode_header_free_func, NULL);
+        g_ptr_array_unref(tmp);
+        return NULL;
     }
-    return TRUE;
+    headers = g_slice_new0(struct mms_headers);
+    headers->num_headers = tmp->len;
+    headers->headers = (struct mms_header**)g_ptr_array_free(tmp, FALSE);
+    return headers;
 }
 
 static
-gboolean
+struct mms_headers*
 mms_message_decode_headers(
     struct wsp_header_iter* iter,
-    const char* prefix,
     unsigned int flags)
 {
-    return mms_decode_headers(iter, prefix, flags,
+    return mms_decode_headers(iter, flags,
         mms_message_well_known_header_name,
         mms_message_value_decoder_for_header);
 }
 
 static
-gboolean
+struct mms_headers*
 mms_part_decode_headers(
     struct wsp_header_iter* iter,
-    const char* prefix,
     unsigned int flags)
 {
-    return mms_decode_headers(iter, prefix, flags,
+    return mms_decode_headers(iter, flags,
         mms_part_well_known_header_name,
         mms_part_value_decoder_for_header);
 }
@@ -1000,6 +1240,36 @@ mms_decode_dump_data(
 }
 
 static
+void
+mms_extract_attachment(
+    int index,
+    const struct mms_header* content_type,
+    const struct mms_headers* headers,
+    const void* data,
+    unsigned int len)
+{
+    FILE* f;
+    char* tmp = NULL;
+    const char* filename = mms_headers_find_filename(content_type, headers);
+    if (!filename) {
+        if (index < 0) {
+            filename = "attachment.dat";
+        } else {
+            filename = tmp = g_strdup_printf("attachment.%03d.dat", index);
+        }
+    }
+    f = fopen(filename, "wb");
+    if (f) {
+        printf("Writing %s\n", filename);
+        fwrite(data, 1, len, f);
+        fclose(f);
+    } else {
+        printf("ERROR! Can't create %s\n", filename);
+    }
+    g_free(tmp);
+}
+
+static
 gboolean
 mms_decode_multipart(
     struct wsp_header_iter* iter,
@@ -1018,6 +1288,9 @@ mms_decode_multipart(
                 const unsigned char* body = wsp_multipart_iter_get_body(&mi);
                 unsigned int len = wsp_multipart_iter_get_body_len(&mi);
                 unsigned int off = body - wsp_header_iter_get_pdu(iter);
+                struct mms_header* ctype = mms_header_new_content_type();
+                struct mms_headers* headers;
+                const char* prefix = "  ";
                 printf("Attachment #%d:\n", i+1);
                 if (flags & MMS_DUMP_FLAG_VERBOSE) {
                     printf("Offset: %u (0x%x)\n", off, off);
@@ -1026,17 +1299,23 @@ mms_decode_multipart(
                     printf("Offset: %u\n", off);
                     printf("Length: %u\n", len);
                 }
-                printf("  Content-Type: %s", (char*)type);
-                mms_value_decode_wsp_params(ct + n, ct_len - n);
-                mms_value_verbose_dump(ct, ct_len, flags);
-                printf("\n");
+                ctype->value = g_strdup((char*)type);
+                mms_value_decode_wsp_params(ctype, ct + n, ct_len - n);
+                mms_header_dump(ctype, ct, ct_len, flags);
+                mms_header_print(ctype, prefix, flags);
                 wsp_header_iter_init(&hi, wsp_multipart_iter_get_hdr(&mi),
                     wsp_multipart_iter_get_hdr_len(&mi), 0);
-                mms_part_decode_headers(&hi, "  ", flags);
+                headers = mms_part_decode_headers(&hi, flags);
+                mms_headers_print(headers, prefix, flags);
                 if (flags & MMS_DUMP_FLAG_DATA) {
                     printf("Data:\n");
                     mms_decode_dump_data(body, len);
                 }
+                if (flags & MMS_DUMP_FLAG_EXTRACT) {
+                    mms_extract_attachment(i+1, ctype, headers, body, len);
+                }
+                mms_header_free(ctype);
+                mms_headers_free(headers);
                 if (wsp_header_iter_at_end(&hi)) continue;
             }
             return FALSE;
@@ -1057,8 +1336,10 @@ mms_decode_attachment(
     unsigned int consumed, parlen;
     const void *type = NULL;
     if (wsp_decode_content_type(pdu, len, &type, &consumed, &parlen)) {
+        struct mms_header* content_type = mms_header_new_content_type();
         unsigned int total = consumed + parlen;
         unsigned int off = iter->pos + 1 + total;
+        const unsigned char* body = iter->pdu + off;
         len -= total;
         printf("Attachment:\n");
         if (flags & MMS_DUMP_FLAG_VERBOSE) {
@@ -1068,14 +1349,18 @@ mms_decode_attachment(
             printf("Offset: %u\n", off);
             printf("Length: %u\n", len);
         }
-        printf("  Content-Type: %s", (char*)type);
-        mms_value_decode_wsp_params(pdu + consumed, parlen);
-        mms_value_verbose_dump(iter->pdu + iter->pos, total+1, flags);
-        printf("\n");
+        content_type->value = g_strdup((char*)type);
+        mms_value_decode_wsp_params(content_type, pdu + consumed, parlen);
+        mms_header_dump(content_type, iter->pdu + iter->pos, total+1, flags);
+        mms_header_print(content_type, "  ", flags);
         if (flags & MMS_DUMP_FLAG_DATA) {
             printf("Data:\n");
-            mms_decode_dump_data(iter->pdu + off, len);
+            mms_decode_dump_data(body, len);
         }
+        if (flags & MMS_DUMP_FLAG_EXTRACT) {
+            mms_extract_attachment(-1, content_type, NULL, body, len);
+        }
+        mms_header_free(content_type);
         return TRUE;
     }
     return FALSE;
@@ -1089,6 +1374,7 @@ mms_decode_data(
     unsigned int flags)
 {
     struct wsp_header_iter iter;
+    struct mms_headers* headers;
 
     /* Skip WSP Push notification header if we find one */
     if (len >= 3 && data[1] == 6 /* Push PDU */) {
@@ -1115,7 +1401,10 @@ mms_decode_data(
     printf("MMS headers:\n");
     wsp_header_iter_init(&iter, data, len, WSP_HEADER_ITER_FLAG_REJECT_CP |
         WSP_HEADER_ITER_FLAG_DETECT_MMS_MULTIPART);
-    if (mms_message_decode_headers(&iter, "  ", flags)) {
+    headers = mms_message_decode_headers(&iter, flags);
+    if (headers) {
+        mms_headers_print(headers, "  ", flags);
+        mms_headers_free(headers);
         if (wsp_header_iter_at_end(&iter)) {
             return RET_OK;
         } else if (wsp_header_iter_is_content_type(&iter)) {
@@ -1157,13 +1446,15 @@ mms_decode_file(
 int main(int argc, char* argv[])
 {
     int ret = RET_ERR_CMDLINE;
-    gboolean ok, verbose = FALSE, data = FALSE;
+    gboolean ok, verbose = FALSE, data = FALSE, extract = FALSE;
     GError* error = NULL;
     GOptionEntry entries[] = {
         { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
           "Enable verbose output", NULL },
         { "data", 'd', 0, G_OPTION_ARG_NONE, &data,
           "Dump attachment data", NULL },
+        { "extract", 'x', 0, G_OPTION_ARG_NONE, &extract,
+          "Extract attachments", NULL },
         { NULL }
     };
     GOptionContext* options = g_option_context_new("FILES");
@@ -1173,6 +1464,7 @@ int main(int argc, char* argv[])
         if (argc > 1) {
             int i, flags = 0;
             if (verbose) flags |= MMS_DUMP_FLAG_VERBOSE;
+            if (extract) flags |= MMS_DUMP_FLAG_EXTRACT;
             if (data) flags |= MMS_DUMP_FLAG_DATA;
             for (i=1; i<argc; i++) {
                 const char* fname = argv[i];
