@@ -4,16 +4,14 @@
 .PHONY: mms_lib_debug_lib mms_lib_release_lib
 
 #
-# Real test makefile defines EXE and SRC and includes this one.
+# Real test makefile defines EXE and (optionally) SRC and includes this one.
 #
-
-ifndef SRC
-${error SRC not defined}
-endif
 
 ifndef EXE
 ${error EXE not defined}
 endif
+
+SRC ?= $(EXE).c
 
 #
 # Pull in mms-lib configuration
