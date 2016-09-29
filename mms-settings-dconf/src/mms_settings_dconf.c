@@ -16,7 +16,7 @@
 #include <dconf.h>
 
 /* Logging */
-#define GLOG_MODULE_NAME mms_settings_log
+#define GLOG_MODULE_NAME mms_settings_log_dconf
 #include "mms_lib_log.h"
 #include <gutil_log.h>
 GLOG_MODULE_DEFINE("mms-settings-dconf");
@@ -439,9 +439,11 @@ mms_settings_dconf_init(
  */
 MMSSettings*
 mms_settings_dconf_new(
-    const MMSConfig* config)
+    const MMSConfig* config,
+    const MMSSettingsSimData* defaults)
 {
     MMSSettings* settings = g_object_new(MMS_TYPE_SETTINGS_DCONF, NULL);
+    mms_settings_sim_data_copy(&settings->sim_defaults, defaults);
     settings->config = config;
     return settings;
 }
