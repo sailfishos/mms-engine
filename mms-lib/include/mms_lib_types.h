@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_LIB_TYPES_H
@@ -81,10 +80,6 @@ typedef enum _MMS_CONNECTION_TYPE {
     MMS_CONNECTION_TYPE_AUTO,       /* Internally requested connection */
     MMS_CONNECTION_TYPE_USER        /* Connection requested by user */
 } MMS_CONNECTION_TYPE;
-
-/* Convenience macros */
-#define MMS_CAST(address,type,field) \
-    ((type *)((guint8*)(address) - G_STRUCT_OFFSET(type,field)))
 
 #endif /* JOLLA_MMS_LIB_TYPES_H */
 

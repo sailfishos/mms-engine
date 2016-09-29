@@ -31,6 +31,7 @@
 /* Generated code */
 #include "org.nemomobile.MmsEngine.h"
 
+#include <gutil_macros.h>
 #include <gutil_misc.h>
 #include <gutil_log.h>
 
@@ -76,7 +77,7 @@ G_DEFINE_TYPE(MMSEngine, mms_engine, G_TYPE_OBJECT)
 
 inline static MMSEngine*
 mms_engine_from_dispatcher_delegate(MMSDispatcherDelegate* delegate)
-    { return MMS_CAST(delegate,MMSEngine,dispatcher_delegate); }
+    { return G_CAST(delegate,MMSEngine,dispatcher_delegate); }
 
 static
 gboolean

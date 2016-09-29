@@ -15,6 +15,8 @@
 #include "test_handler.h"
 #include "mms_dispatcher.h"
 
+#include <gutil_macros.h>
+
 /* Logging */
 #define GLOG_MODULE_NAME mms_handler_log
 #include <gutil_log.h>
@@ -104,7 +106,7 @@ MMSHandlerRecordSend*
 mms_handler_test_record_send(MMSHandlerRecord* rec)
 {
     GASSERT(rec->type == MMS_HANDLER_RECORD_SEND);
-    return MMS_CAST(rec, MMSHandlerRecordSend, rec);
+    return G_CAST(rec, MMSHandlerRecordSend, rec);
 }
 
 static inline
@@ -112,7 +114,7 @@ MMSHandlerRecordReceive*
 mms_handler_test_record_receive(MMSHandlerRecord* rec)
 {
     GASSERT(rec->type == MMS_HANDLER_RECORD_RECEIVE);
-    return MMS_CAST(rec, MMSHandlerRecordReceive, rec);
+    return G_CAST(rec, MMSHandlerRecordReceive, rec);
 }
 
 static

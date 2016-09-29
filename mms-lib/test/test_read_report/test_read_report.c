@@ -23,6 +23,7 @@
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
 
+#include <gutil_macros.h>
 #include <gutil_log.h>
 
 #include <gio/gio.h>
@@ -80,7 +81,7 @@ test_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
-    Test* test = MMS_CAST(delegate,Test,delegate);
+    Test* test = G_CAST(delegate,Test,delegate);
     const TestDesc* desc = test->desc;
     const char* name = desc->name;
     if (test->ret == RET_OK) {

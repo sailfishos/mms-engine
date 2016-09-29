@@ -15,6 +15,8 @@
 #include "mms_attachment_image.h"
 #include "mms_file_util.h"
 
+#include <gutil_macros.h>
+
 #include <jpeglib.h>
 #include <jerror.h>
 #include <setjmp.h>
@@ -47,7 +49,7 @@ typedef struct mms_attachment_jpeg_resize {
 
 static inline MMSAttachmentJpegResize*
 mms_attachment_jpeg_resize_cast(MMSAttachmentImageResize* resize)
-    { return MMS_CAST(resize, MMSAttachmentJpegResize, pub); }
+    { return G_CAST(resize, MMSAttachmentJpegResize, pub); }
 
 static
 void

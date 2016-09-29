@@ -23,6 +23,8 @@
 #include "mms_util.h"
 #include "mms_task.h"
 
+#include <gutil_macros.h>
+
 #include <errno.h>
 
 /* Logging */
@@ -57,7 +59,7 @@ typedef struct mms_dispatcher_idle_callback {
 
 inline static MMSDispatcher*
 mms_dispatcher_from_task_delegate(MMSTaskDelegate* delegate)
-    { return MMS_CAST(delegate,MMSDispatcher,task_delegate); }
+    { return G_CAST(delegate,MMSDispatcher,task_delegate); }
 
 static
 void

@@ -25,6 +25,7 @@
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
 
+#include <gutil_macros.h>
 #include <gutil_log.h>
 #include <libsoup/soup-status.h>
 
@@ -513,7 +514,7 @@ test_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
-    Test* test = MMS_CAST(delegate,Test,delegate);
+    Test* test = G_CAST(delegate,Test,delegate);
     if (!mms_handler_test_receive_pending(test->handler, NULL)) {
         test_finish(test);
     }
