@@ -20,6 +20,7 @@
 #define MMS_LIB_LOG_MODULES(log) \
     log(mms_dispatcher_log)\
     log(mms_settings_log)\
+    log(mms_settings_log_dconf)\
     log(mms_transfer_list_log)\
     log(mms_handler_log)\
     log(mms_message_log)\

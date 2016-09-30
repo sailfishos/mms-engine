@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Jolla Ltd.
+ * Copyright (C) 2014-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_SETTINGS_H
@@ -25,6 +25,15 @@ struct mms_config {
     gboolean keep_temp_files;   /* Keep temporary files around */
     gboolean attic_enabled;     /* Keep unrecognized push message in attic */
 };
+
+typedef struct mms_config_copy {
+    MMSConfig config;           /* Config data */
+    char* root_dir;             /* Allocated copy of root_dir */
+} MMSConfigCopy;
+
+#define MMS_CONFIG_DEFAULT_ROOT_DIR     "/tmp/mms"
+#define MMS_CONFIG_DEFAULT_RETRY_SECS   (15)
+#define MMS_CONFIG_DEFAULT_IDLE_SECS    (20)
 
 /* Persistent mutable per-SIM settings */
 struct mms_settings_sim_data {
@@ -64,8 +73,8 @@ typedef struct mms_settings_class {
         const char* imsi);
 } MMSSettingsClass;
 
-/* Default values. If the GSettings backend is used (mms-settings-dconf)
- * then these should match the default values defined in the GSettings
+/* Default values. If the GSettings backend is used then these
+ * should match the default values defined in the GSettings
  * schema (org.nemomobile.mms.sim.gschema.xml) */
 #define MMS_SETTINGS_DEFAULT_USER_AGENT "Mozilla/5.0 (Sailfish; Jolla)"
 #define MMS_SETTINGS_DEFAULT_UAPROF     "http://static.jolla.com/uaprof/Jolla.xml"
@@ -98,6 +107,13 @@ mms_settings_get_sim_data(
 void
 mms_settings_sim_data_default(
     MMSSettingsSimData* data);
+
+gboolean
+mms_settings_load_defaults(
+    const char* path,
+    MMSConfigCopy* config,
+    MMSSettingsSimDataCopy* simconfig,
+    GError** error);
 
 void
 mms_settings_set_sim_defaults(

@@ -13,3 +13,4 @@ all:
 	@$(MAKE) -C test_retrieve_no_proxy $*
 	@$(MAKE) -C test_retrieve_order $*
 	@$(MAKE) -C test_send $*
+	@$(MAKE) -C test_settings $*

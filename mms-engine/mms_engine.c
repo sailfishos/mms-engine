@@ -463,7 +463,7 @@ mms_engine_handle_migrate_settings(
 MMSEngine*
 mms_engine_new(
     const MMSConfig* config,
-    const MMSSettingsSimData* override,
+    const MMSSettingsSimData* defaults,
     unsigned int flags,
     MMSLogModule* log_modules[],
     int log_count)
@@ -472,28 +472,26 @@ mms_engine_new(
     if (cm) {
         MMSEngine* mms = g_object_new(MMS_TYPE_ENGINE, NULL);
         MMSHandler* handler = mms_handler_dbus_new();
-        MMSSettings* settings = mms_settings_dconf_new(config);
+        MMSSettings* settings = mms_settings_dconf_new(config, defaults);
         MMSTransferList* txlist = mms_transfer_list_dbus_new();
+        static const struct _mms_engine_settings_flags_map {
+#define MAP_(x) \
+    MMS_ENGINE_FLAG_OVERRIDE_##x, \
+    MMS_SETTINGS_FLAG_OVERRIDE_##x
+            int engine_flag;
+            int settings_flag;
+        } flags_map [] = {
+            { MAP_(USER_AGENT)},
+            { MAP_(UAPROF) },
+            { MAP_(SIZE_LIMIT) },
+            { MAP_(MAX_PIXELS) }
+        };
 
-        if (flags & MMS_ENGINE_FLAG_OVERRIDE_USER_AGENT) {
-            settings->flags |= MMS_SETTINGS_FLAG_OVERRIDE_USER_AGENT;
-            g_free(settings->sim_defaults.user_agent);
-            settings->sim_defaults.data.user_agent =
-            settings->sim_defaults.user_agent = g_strdup(override->user_agent);
-        }
-        if (flags & MMS_ENGINE_FLAG_OVERRIDE_UAPROF) {
-            settings->flags |= MMS_SETTINGS_FLAG_OVERRIDE_UAPROF;
-            g_free(settings->sim_defaults.uaprof);
-            settings->sim_defaults.data.uaprof =
-            settings->sim_defaults.uaprof = g_strdup(override->uaprof);
-        }
-        if (flags & MMS_ENGINE_FLAG_OVERRIDE_SIZE_LIMIT) {
-            settings->flags |= MMS_SETTINGS_FLAG_OVERRIDE_SIZE_LIMIT;
-            settings->sim_defaults.data.size_limit = override->size_limit;
-        }
-        if (flags & MMS_ENGINE_FLAG_OVERRIDE_MAX_PIXELS) {
-            settings->flags |= MMS_SETTINGS_FLAG_OVERRIDE_MAX_PIXELS;
-            settings->sim_defaults.data.max_pixels = override->max_pixels;
+        unsigned int i;
+        for (i=0; i<G_N_ELEMENTS(flags_map); i++) {
+            if (flags & flags_map[i].engine_flag) {
+                settings->flags |= flags_map[i].settings_flag;
+            }
         }
 
         mms->dispatcher = mms_dispatcher_new(settings, cm, handler, txlist);

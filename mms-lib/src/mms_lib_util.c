@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_lib_util.h"
@@ -18,10 +18,6 @@
 #ifdef MMS_RESIZE_IMAGEMAGICK
 #  include <magick/api.h>
 #endif
-
-#define MMS_DEFAULT_ROOT_DIR        "/tmp/mms"
-#define MMS_DEFAULT_RETRY_SECS      (15)
-#define MMS_DEFAULT_IDLE_SECS       (20)
 
 /**
  * MMS error domain
@@ -68,9 +64,9 @@ void
 mms_lib_default_config(
     MMSConfig* config)
 {
-    config->root_dir = MMS_DEFAULT_ROOT_DIR;
-    config->retry_secs = MMS_DEFAULT_RETRY_SECS;
-    config->idle_secs = MMS_DEFAULT_IDLE_SECS;
+    config->root_dir = MMS_CONFIG_DEFAULT_ROOT_DIR;
+    config->retry_secs = MMS_CONFIG_DEFAULT_RETRY_SECS;
+    config->idle_secs = MMS_CONFIG_DEFAULT_IDLE_SECS;
     config->keep_temp_files = FALSE;
     config->attic_enabled = FALSE;
 }

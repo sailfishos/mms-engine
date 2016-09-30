@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Jolla Ltd.
+ * Copyright (C) 2014-2016 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,12 +10,29 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include "mms_settings.h"
 
-G_DEFINE_TYPE(MMSSettings, mms_settings, G_TYPE_OBJECT);
+/* Logging */
+#define GLOG_MODULE_NAME mms_settings_log
+#include "mms_lib_log.h"
+#include <gutil_log.h>
+GLOG_MODULE_DEFINE("mms-settings");
+
+#define SETTINGS_GLOBAL_GROUP               "Global"
+#define SETTINGS_GLOBAL_KEY_ROOT_DIR        "RootDir"
+#define SETTINGS_GLOBAL_KEY_RETRY_SEC       "RetryDelay"
+#define SETTINGS_GLOBAL_KEY_IDLE_SEC        "IdleTimeout"
+
+#define SETTINGS_DEFAULTS_GROUP             "Defaults"
+#define SETTINGS_DEFAULTS_KEY_USER_AGENT    "UserAgent"
+#define SETTINGS_DEFAULTS_KEY_UAPROF        "UAProfile"
+#define SETTINGS_DEFAULTS_KEY_SIZE_LIMIT    "SizeLimit"
+#define SETTINGS_DEFAULTS_KEY_MAX_PIXELS    "MaxPixels"
+#define SETTINGS_DEFAULTS_KEY_ALLOW_DR      "SendDeliveryReport"
+
+G_DEFINE_TYPE(MMSSettings, mms_settings, G_TYPE_OBJECT)
 #define MMS_SETTINGS_GET_CLASS(obj)  \
     (G_TYPE_INSTANCE_GET_CLASS((obj), MMS_TYPE_SETTINGS, MMSSettingsClass))
 #define MMS_SETTINGS(obj) \
@@ -45,6 +63,124 @@ mms_settings_sim_data_default(
     data->size_limit = MMS_SETTINGS_DEFAULT_SIZE_LIMIT;
     data->max_pixels = MMS_SETTINGS_DEFAULT_MAX_PIXELS;
     data->allow_dr = MMS_SETTINGS_DEFAULT_ALLOW_DR;
+}
+
+static
+void
+mms_settings_parse_global_config(
+    MMSConfigCopy* global,
+    GKeyFile* file)
+{
+    const char* group = SETTINGS_GLOBAL_GROUP;
+    GError* error = NULL;
+    char* s;
+    int i;
+
+    s = g_key_file_get_string(file, group,
+        SETTINGS_GLOBAL_KEY_ROOT_DIR, NULL);
+    if (s) {
+        g_free(global->root_dir);
+        global->config.root_dir = global->root_dir = s;
+        GDEBUG("%s = %s", SETTINGS_GLOBAL_KEY_ROOT_DIR, s);
+    }
+
+    i = g_key_file_get_integer(file, group,
+        SETTINGS_GLOBAL_KEY_RETRY_SEC, &error);
+    if (error) {
+        g_error_free(error);
+        error = NULL;
+    } else if (i >= 0) {
+        global->config.retry_secs = i;
+        GDEBUG("%s = %d", SETTINGS_GLOBAL_KEY_RETRY_SEC, i);
+    }
+
+    i = g_key_file_get_integer(file, group,
+        SETTINGS_GLOBAL_KEY_IDLE_SEC, &error);
+    if (error) {
+        g_error_free(error);
+        error = NULL;
+    } else if (i >= 0) {
+        global->config.idle_secs = i;
+        GDEBUG("%s = %d", SETTINGS_GLOBAL_KEY_IDLE_SEC, i);
+    }
+}
+
+static
+void
+mms_settings_parse_sim_config(
+    MMSSettingsSimDataCopy* defaults,
+    GKeyFile* file)
+{
+    const char* group = SETTINGS_DEFAULTS_GROUP;
+    GError* error = NULL;
+    gboolean b;
+    char* s;
+    int i;
+
+    s = g_key_file_get_string(file, group,
+        SETTINGS_DEFAULTS_KEY_USER_AGENT, NULL);
+    if (s) {
+        g_free(defaults->user_agent);
+        defaults->data.user_agent = defaults->user_agent = s;
+        GDEBUG("%s = %s", SETTINGS_DEFAULTS_KEY_USER_AGENT, s);
+    }
+
+    s = g_key_file_get_string(file, group,
+        SETTINGS_DEFAULTS_KEY_UAPROF, NULL);
+    if (s) {
+        g_free(defaults->uaprof);
+        defaults->data.uaprof = defaults->uaprof = s;
+        GDEBUG("%s = %s", SETTINGS_DEFAULTS_KEY_UAPROF, s);
+    }
+
+    i = g_key_file_get_integer(file, group,
+        SETTINGS_DEFAULTS_KEY_SIZE_LIMIT, &error);
+    if (error) {
+        g_error_free(error);
+        error = NULL;
+    } else if (i > 0) {
+        defaults->data.size_limit = i;
+        GDEBUG("%s = %d", SETTINGS_DEFAULTS_KEY_SIZE_LIMIT, i);
+    }
+
+    i = g_key_file_get_integer(file, group,
+        SETTINGS_DEFAULTS_KEY_MAX_PIXELS, &error);
+    if (error) {
+        g_error_free(error);
+        error = NULL;
+    } else if (i > 0) {
+        defaults->data.max_pixels = i;
+        GDEBUG("%s = %d", SETTINGS_DEFAULTS_KEY_MAX_PIXELS, i);
+    }
+
+    b = g_key_file_get_boolean(file, group,
+        SETTINGS_DEFAULTS_KEY_ALLOW_DR, &error);
+    if (error) {
+        g_error_free(error);
+        error = NULL;
+    } else {
+        GDEBUG("%s = %s", SETTINGS_DEFAULTS_KEY_ALLOW_DR, b ? "on" : "off");
+        defaults->data.allow_dr = b;
+    }
+}
+
+gboolean
+mms_settings_load_defaults(
+    const char* path,
+    MMSConfigCopy* config,
+    MMSSettingsSimDataCopy* data,
+    GError** error)
+{
+    gboolean ok = FALSE;
+    GKeyFile* file = g_key_file_new();
+    if (g_key_file_load_from_file(file, path, 0, error)) {
+        GDEBUG("Loading %s", path);
+        mms_settings_parse_global_config(config, file);
+        mms_settings_parse_sim_config(data, file);
+        ok = TRUE;
+    }
+    g_key_file_free(file);
+    return ok;
 }
 
 void

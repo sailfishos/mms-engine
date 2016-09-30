@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_ENGINE_H
@@ -31,12 +30,17 @@
 #define MMS_ENGINE_FLAG_OVERRIDE_MAX_PIXELS (0x08)
 #define MMS_ENGINE_FLAG_OVERRIDE_UAPROF     (0x10)
 
+#ifndef MMS_ENGINE_CONFIG_FILE
+/* Default config file */
+#  define MMS_ENGINE_CONFIG_FILE    "/etc/mms-engine.conf"
+#endif /* MMS_ENGINE_CONFIG_FILE */
+
 typedef struct mms_engine MMSEngine;
 
 MMSEngine*
 mms_engine_new(
     const MMSConfig* config,
-    const MMSSettingsSimData* settings,
+    const MMSSettingsSimData* defaults,
     unsigned int flags,
     MMSLogModule* log_modules[],
     int log_count);
