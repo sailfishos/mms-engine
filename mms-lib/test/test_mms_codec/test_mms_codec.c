@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
         "m-notification_1.ind",
         "m-notification_2.ind",
         "m-notification_3.ind",
+        "m-notification_4.ind",
         "m-delivery.ind",
         "m-read-orig.ind",
         "m-retrieve_1.conf",
