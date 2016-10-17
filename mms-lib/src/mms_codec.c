@@ -642,13 +642,19 @@ static gboolean extract_absolute_relative_date(struct wsp_header_iter *iter,
 	unsigned int i;
 	unsigned int seconds;
 
+	/*
+	 * Absolute-token Date-value | Relative-token Delta-seconds-value
+	 * Absolute-token = <Octet 128>
+	 * Relative-token = <Octet 129>
+	 */
 	if (wsp_header_iter_get_val_type(iter) != WSP_VALUE_TYPE_LONG)
 		return FALSE;
 
 	p = wsp_header_iter_get_val(iter);
 	l = wsp_header_iter_get_val_len(iter);
 
-	if (l < 2 || l > 5)
+	/* Token (1 byte) + value length (1 byte) + up to 4 bytes */
+	if (l < 2 || l > 6)
 		return FALSE;
 
 	if (p[0] != 128 && p[0] != 129)
