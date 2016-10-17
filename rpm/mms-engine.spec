@@ -1,6 +1,6 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.53
+Version:  1.0.54
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
@@ -15,7 +15,6 @@ Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
 #Requires: ImageMagick
 
-BuildRequires: python
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
 BuildRequires: pkgconfig(dconf)
