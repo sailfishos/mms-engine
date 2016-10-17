@@ -1083,8 +1083,11 @@ static gboolean mms_parse_headers(struct wsp_header_iter *iter,
 			continue;
 
 		/* Unsupported header, skip */
-		if (entries[h].data == NULL)
+		if (entries[h].data == NULL) {
+			entries[h].pos = i;
+			entries[h].flags |= HEADER_FLAG_MARKED;
 			continue;
+		}
 
 		/* Skip multiply present headers unless explicitly requested */
 		if ((entries[h].flags & HEADER_FLAG_MARKED) &&
@@ -1195,7 +1198,9 @@ static gboolean decode_acknowledge_ind(struct wsp_header_iter *iter,
 static gboolean decode_delivery_ind(struct wsp_header_iter *iter,
                         struct mms_message *out)
 {
-	return mms_parse_headers(iter, MMS_HEADER_MMS_VERSION,
+	return mms_parse_headers(iter, MMS_HEADER_TRANSACTION_ID,
+				HEADER_FLAG_PRESET_POS, NULL,
+				MMS_HEADER_MMS_VERSION,
 				HEADER_FLAG_MANDATORY | HEADER_FLAG_PRESET_POS,
 				&out->version,
 				MMS_HEADER_MESSAGE_ID,
@@ -1212,7 +1217,9 @@ static gboolean decode_delivery_ind(struct wsp_header_iter *iter,
 static gboolean decode_read_ind(struct wsp_header_iter *iter,
                         struct mms_message *out)
 {
-	return mms_parse_headers(iter, MMS_HEADER_MMS_VERSION,
+	return mms_parse_headers(iter, MMS_HEADER_TRANSACTION_ID,
+				HEADER_FLAG_PRESET_POS, NULL,
+				MMS_HEADER_MMS_VERSION,
 				HEADER_FLAG_MANDATORY | HEADER_FLAG_PRESET_POS,
 				&out->version,
 				MMS_HEADER_MESSAGE_ID,
