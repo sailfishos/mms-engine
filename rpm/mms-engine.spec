@@ -1,6 +1,6 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.54
+Version:  1.0.55
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
@@ -44,7 +44,8 @@ BuildRequires:  pkgconfig(Qt5Gui)
 #Requires: push-agent >= 1.1
 
 %description
-MMS engine
+MMS engine handles encoding, decoding, uploading and downloading
+of MMS messages.
 
 %package tools
 Summary:    MMS tools
