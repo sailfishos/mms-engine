@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -212,6 +212,8 @@ mms_http_transfer_new(
         soup_message_set_flags(tx->message,
             SOUP_MESSAGE_NO_REDIRECT |
             SOUP_MESSAGE_NEW_CONNECTION);
+        soup_message_headers_append(tx->message->request_headers,
+            "Connection", "close");
         if (cfg->uaprof && cfg->uaprof[0]) {
             const char* uaprof_header = "x-wap-profile";
             GVERBOSE("%s %s", uaprof_header, cfg->uaprof);
