@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@ typedef struct mms_handler_dbus {
     GHashTable* received_pending;
 } MMSHandlerDbus;
 
-G_DEFINE_TYPE(MMSHandlerDbus, mms_handler_dbus, MMS_TYPE_HANDLER);
+G_DEFINE_TYPE(MMSHandlerDbus, mms_handler_dbus, MMS_TYPE_HANDLER)
 #define MMS_TYPE_HANDLER_DBUS (mms_handler_dbus_get_type())
 #define MMS_HANDLER_DBUS(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),\
    MMS_TYPE_HANDLER_DBUS, MMSHandlerDbus))
@@ -148,7 +148,7 @@ mms_handler_dbus_connect(
     if (!dbus->proxy) {
         GError* error = NULL;
         dbus->proxy = org_nemomobile_mms_handler_proxy_new_for_bus_sync(
-            G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
+            G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES,
             "org.nemomobile.MmsHandler", "/", NULL, &error);
         if (!dbus->proxy) {
             GERR("%s", GERRMSG(error));
