@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -119,6 +119,7 @@ mms_handler_message_notify(
     const char* subject,
     time_t expiry,
     GBytes* push,
+    const char* location,
     mms_handler_message_notify_complete_fn cb,
     void* param)
 {
@@ -128,7 +129,7 @@ mms_handler_message_notify(
             if (!from) from = "";
             if (!subject) subject = "";
             return klass->fn_message_notify(h, imsi, from, subject, expiry,
-                push, cb, param);
+                push, location, cb, param);
         }
     }
     return NULL;
