@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -492,6 +492,7 @@ mms_handler_test_message_notify(
     const char* subj,
     time_t expiry,
     GBytes* data,
+    const char* location,
     mms_handler_message_notify_complete_fn cb,
     void* param)
 {
