@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -168,7 +168,7 @@ mms_task_notification_ind(
     mms_task_ref(task);
     ind->notify = mms_handler_message_notify(task->handler, task->imsi,
         mms_strip_address_type(ni->from), ni->subject, ni->expiry,
-        ind->push, mms_task_notification_done, ind);
+        ind->push, ni->location, mms_task_notification_done, ind);
 
     if (ind->notify) {
         mms_task_set_state(task, MMS_TASK_STATE_PENDING);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef JOLLA_MMS_HANDLER_H
@@ -112,6 +111,7 @@ typedef struct mms_handler_class {
         const char* subject,        /* Subject (optional) */
         time_t expiry,              /* Message expiry time */
         GBytes* push,               /* Raw push message */
+        const char* location,       /* Download URL */
         mms_handler_message_notify_complete_fn cb,
         void* param);
 
@@ -192,6 +192,7 @@ mms_handler_message_notify(
     const char* subject,            /* Subject (optional) */
     time_t expiry,                  /* Message expiry time */
     GBytes* push,                   /* Raw push message */
+    const char* location,           /* Download URL */
     mms_handler_message_notify_complete_fn cb,
     void* param);
 

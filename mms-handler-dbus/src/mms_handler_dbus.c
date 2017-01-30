@@ -201,6 +201,7 @@ mms_handler_dbus_message_notify(
     const char* subject,
     time_t expiry,
     GBytes* push,
+    const char* location,
     mms_handler_message_notify_complete_fn cb,
     void* param)
 {
@@ -215,8 +216,8 @@ mms_handler_dbus_message_notify(
 
         mms_handler_busy_inc(handler);
         call = mms_handler_notify_call_create(dbus, cb, param);
-        org_nemomobile_mms_handler_call_message_notification(
-            proxy, imsi, from, subject, expiry, bytes, call->cancellable,
+        org_nemomobile_mms_handler_call_message_notification(proxy, imsi,
+            from, subject, expiry, bytes, location, call->cancellable,
             mms_handler_dbus_message_notify_done, call);
 
         g_variant_unref(bytes);
