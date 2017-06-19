@@ -20,6 +20,8 @@
 
 #include <gutil_misc.h>
 
+#include <ctype.h>
+
 #ifndef _WIN32
 #  include <sys/ioctl.h>
 #  include <arpa/inet.h>
@@ -178,6 +180,46 @@ mms_http_create_session(
         SoupURI* proxy_uri = mms_http_uri_parse(conn->mmsproxy);
         if (proxy_uri) {
             GDEBUG("MMS proxy %s", conn->mmsproxy);
+            if (proxy_uri->host[0] == '0' || strstr(proxy_uri->host, ".0")) {
+                /*
+                 * Some operators provide IP address of the MMS proxy
+                 * prepending zeros to each number shorter then 3 digits,
+                 * e.g. "192.168.094.023" instead of "192.168.94.23".
+                 * That may look nicer but it's actually wrong because
+                 * the numbers starting with zeros are interpreted as
+                 * octal numbers. In the example above 023 actually means
+                 * 16 and 094 is not a valid number at all.
+                 *
+                 * In addition to publishing these broken settings on their
+                 * web sites, some of the operators send them over the air,
+                 * in which case we can't even blame the user for entering
+                 * an invalid IP address. We better be prepared to deal with
+                 * those.
+                 *
+                 * Since nobody in the world seems to be actually using the
+                 * octal notation to write an IP address, let's remove the
+                 * leading zeros if we find them in the host part of the MMS
+                 * proxy URL.
+                 */
+                char* host;
+                char** parts = g_strsplit(proxy_uri->host, ".", -1);
+                guint count = g_strv_length(parts);
+                if (count == 4) {
+                    char** ptr = parts;
+                    while (*ptr) {
+                        char* part = *ptr;
+                        while (part[0] == '0' && isdigit(part[1])) {
+                            memmove(part, part+1, strlen(part));
+                        }
+                        *ptr++ = part;
+                    }
+                    host = g_strjoinv(".", parts);
+                    GDEBUG("MMS proxy host %s => %s", proxy_uri->host, host);
+                    soup_uri_set_host(proxy_uri, host);
+                    g_free(host);
+                }
+                g_strfreev(parts);
+            }
             g_object_set(session, SOUP_SESSION_PROXY_URI, proxy_uri, NULL);
             soup_uri_free(proxy_uri);
         }
@@ -266,7 +308,9 @@ mms_task_http_receive_progress(
     MMSTaskHttpPriv* priv = http->priv;
     MMSHttpTransfer* tx = priv->tx;
     if (tx) {
-        GASSERT(tx->bytes_received <= tx->bytes_to_receive);
+        /* Some operators don't provide Content-Length */
+        GASSERT(!tx->bytes_to_receive ||
+            tx->bytes_received <= tx->bytes_to_receive);
         mms_transfer_list_transfer_receive_progress(http->transfers,
             http->task.id, priv->transfer_type, tx->bytes_received,
             tx->bytes_to_receive);
