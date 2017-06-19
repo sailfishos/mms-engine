@@ -33,9 +33,13 @@ for t in $TESTS ; do
     popd
 done
 
+# LCOV 1.10 has branch coverage disabled per default
+LCOV_OPT="--rc lcov_branch_coverage=1"
+GENHTML_OPT="--branch-coverage"
+
 FULL_COV="$COV_DIR/full.gcov"
 MMSLIB_COV="$COV_DIR/mms-lib.gcov"
 rm -f "$FULL_COV" "$MMSLIB_COV"
-lcov -c -d "$BASE_DIR/build/$FLAVOR" -b "$BASE_DIR" -o "$FULL_COV" || exit 1
-lcov -e "$FULL_COV" "$BASE_DIR/src/*" -o "$MMSLIB_COV" || exit 1
-genhtml "$MMSLIB_COV" --output-directory "$COV_DIR/results" || exit 1
+lcov $LCOV_OPT -c -d "$BASE_DIR/build/$FLAVOR" -b "$BASE_DIR" -o "$FULL_COV" || exit 1
+lcov $LCOV_OPT -e "$FULL_COV" "$BASE_DIR/src/*" -o "$MMSLIB_COV" || exit 1
+genhtml $GENHTML_OPT -t mms-engine "$MMSLIB_COV" --output-directory "$COV_DIR/results" || exit 1

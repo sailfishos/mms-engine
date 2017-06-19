@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -74,8 +74,8 @@ mms_connection_test_set_state(
 MMSConnection*
 mms_connection_test_new(
     const char* imsi,
-    unsigned short port,
-    gboolean proxy)
+    const char* proxy,
+    unsigned short port)
 {
     MMSConnectionTest* test = g_object_new(MMS_TYPE_CONNECTION_TEST, NULL);
     MMSConnection* conn = &test->connection;
@@ -84,7 +84,7 @@ mms_connection_test_new(
         conn->netif = test->netif = g_strdup("lo");
         if (proxy) {
             test->mmsc = g_strdup("http://mmsc");
-            test->mmsproxy = g_strdup_printf("127.0.0.1:%hu", port);
+            test->mmsproxy = g_strdup_printf("%s:%hu", proxy, port);
         } else {
             test->mmsc = g_strdup_printf("http://127.0.0.1:%hu", port);
         }
