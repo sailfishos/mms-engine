@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
+ * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #ifndef TEST_CONNMAN_H
@@ -24,6 +24,12 @@ void
 
 MMSConnMan*
 mms_connman_test_new(void);
+
+void
+mms_connman_test_set_proxy(
+    MMSConnMan* cm,
+    const char* proxy,
+    unsigned short port);
 
 void
 mms_connman_test_set_port(

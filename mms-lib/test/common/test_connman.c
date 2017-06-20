@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
+ * Copyright (C) 2013-2017 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,7 @@ typedef struct mms_connman_test {
     MMSConnMan cm;
     MMSConnection* conn;
     unsigned short port;
-    gboolean proxy;
+    char* proxy;
     char* default_imsi;
     gboolean offline;
     mms_connman_test_connect_fn connect_fn;
@@ -59,14 +59,23 @@ mms_connman_test_make_busy(
 }
 
 void
+mms_connman_test_set_proxy(
+    MMSConnMan* cm,
+    const char* proxy,
+    unsigned short port)
+{
+    MMSConnManTest* test = MMS_CONNMAN_TEST(cm);
+    test->proxy = g_strdup(proxy);
+    test->port = port;
+}
+
+void
 mms_connman_test_set_port(
     MMSConnMan* cm,
     unsigned short port,
     gboolean proxy)
 {
-    MMSConnManTest* test = MMS_CONNMAN_TEST(cm);
-    test->port = port;
-    test->proxy = proxy;
+    return mms_connman_test_set_proxy(cm, proxy ? "127.0.0.1" : NULL, port);
 }
 
 void
@@ -133,7 +142,7 @@ mms_connman_test_open_connection(
         return NULL;
     } else {
         mms_connman_test_make_busy(test);
-        test->conn = mms_connection_test_new(imsi, test->port, test->proxy);
+        test->conn = mms_connection_test_new(imsi, test->proxy, test->port);
         if (test->connect_fn) test->connect_fn(test->connect_param);
         return mms_connection_ref(test->conn);
     }
@@ -153,7 +162,9 @@ void
 mms_connman_test_finalize(
     GObject* object)
 {
-    g_free(MMS_CONNMAN_TEST(object)->default_imsi);
+    MMSConnManTest* test = MMS_CONNMAN_TEST(object);
+    g_free(test->proxy);
+    g_free(test->default_imsi);
     G_OBJECT_CLASS(mms_connman_test_parent_class)->finalize(object);
 }
 
