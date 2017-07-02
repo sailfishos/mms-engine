@@ -75,7 +75,7 @@ mms_connman_test_set_port(
     unsigned short port,
     gboolean proxy)
 {
-    return mms_connman_test_set_proxy(cm, proxy ? "127.0.0.1" : NULL, port);
+    mms_connman_test_set_proxy(cm, proxy ? "127.0.0.1" : NULL, port);
 }
 
 void
