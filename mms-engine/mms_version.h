@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Jolla Ltd.
+ * Copyright (C) 2016-2018 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 #define JOLLA_MMS_VERSION_H
 
 #ifndef MMS_ENGINE_VERSION
-#  define MMS_ENGINE_VERSION 1.0.58
+#  define MMS_ENGINE_VERSION 1.0.59
 #endif
 
 #define MMS_VERSION_STRING__(x) #x
