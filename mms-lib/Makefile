@@ -54,6 +54,9 @@ SRC = \
 
 ifeq ($(MMS_RESIZE),Qt)
 SRC_CPP += mms_attachment_qt.cpp
+ifeq ($(shell $(CROSS_COMPILE)gcc -std=c++11 -dM -E - < /dev/null > /dev/null 2>&1; echo $$?),0)
+RESIZE_CPPFLAGS += -std=c++11
+endif
 endif
 
 #
