@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2014-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2014-2018 Jolla Ltd.
+ * Copyright (C) 2014-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,17 +20,18 @@
 #include <gutil_log.h>
 GLOG_MODULE_DEFINE("mms-settings");
 
-#define SETTINGS_GLOBAL_GROUP               "Global"
-#define SETTINGS_GLOBAL_KEY_ROOT_DIR        "RootDir"
-#define SETTINGS_GLOBAL_KEY_RETRY_SEC       "RetryDelay"
-#define SETTINGS_GLOBAL_KEY_IDLE_SEC        "IdleTimeout"
+#define SETTINGS_GLOBAL_GROUP                   "Global"
+#define SETTINGS_GLOBAL_KEY_ROOT_DIR            "RootDir"
+#define SETTINGS_GLOBAL_KEY_RETRY_SEC           "RetryDelay"
+#define SETTINGS_GLOBAL_KEY_NETWORK_IDLE_SEC    "NetworkIdleTimeout"
+#define SETTINGS_GLOBAL_KEY_IDLE_SEC            "IdleTimeout"
 
-#define SETTINGS_DEFAULTS_GROUP             "Defaults"
-#define SETTINGS_DEFAULTS_KEY_USER_AGENT    "UserAgent"
-#define SETTINGS_DEFAULTS_KEY_UAPROF        "UAProfile"
-#define SETTINGS_DEFAULTS_KEY_SIZE_LIMIT    "SizeLimit"
-#define SETTINGS_DEFAULTS_KEY_MAX_PIXELS    "MaxPixels"
-#define SETTINGS_DEFAULTS_KEY_ALLOW_DR      "SendDeliveryReport"
+#define SETTINGS_DEFAULTS_GROUP                 "Defaults"
+#define SETTINGS_DEFAULTS_KEY_USER_AGENT        "UserAgent"
+#define SETTINGS_DEFAULTS_KEY_UAPROF            "UAProfile"
+#define SETTINGS_DEFAULTS_KEY_SIZE_LIMIT        "SizeLimit"
+#define SETTINGS_DEFAULTS_KEY_MAX_PIXELS        "MaxPixels"
+#define SETTINGS_DEFAULTS_KEY_ALLOW_DR          "SendDeliveryReport"
 
 G_DEFINE_TYPE(MMSSettings, mms_settings, G_TYPE_OBJECT)
 #define MMS_SETTINGS_GET_CLASS(obj)  \
@@ -66,43 +67,71 @@ mms_settings_sim_data_default(
 }
 
 static
+gboolean
+mms_settings_parse_int(
+    GKeyFile* file,
+    const char* group,
+    const char* key,
+    int* out,
+    int min_value)
+{
+    GError* error = NULL;
+    const int i = g_key_file_get_integer(file, group, key, &error);
+
+    if (error) {
+        g_error_free(error);
+    } else if (i >= min_value) {
+        *out = i;
+        GDEBUG("%s = %d", key, i);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+void
+mms_settings_parse_uint(
+    GKeyFile* file,
+    const char* group,
+    const char* key,
+    unsigned int* out)
+{
+    int value;
+
+    if (mms_settings_parse_int(file, group, key, &value, 1)) {
+        *out = value;
+    }
+}
+
+static
 void
 mms_settings_parse_global_config(
     MMSConfigCopy* global,
     GKeyFile* file)
 {
     const char* group = SETTINGS_GLOBAL_GROUP;
-    GError* error = NULL;
+    MMSConfig* config = &global->config;
     char* s;
-    int i;
 
     s = g_key_file_get_string(file, group,
         SETTINGS_GLOBAL_KEY_ROOT_DIR, NULL);
     if (s) {
         g_free(global->root_dir);
-        global->config.root_dir = global->root_dir = s;
+        config->root_dir = global->root_dir = s;
         GDEBUG("%s = %s", SETTINGS_GLOBAL_KEY_ROOT_DIR, s);
     }
 
-    i = g_key_file_get_integer(file, group,
-        SETTINGS_GLOBAL_KEY_RETRY_SEC, &error);
-    if (error) {
-        g_error_free(error);
-        error = NULL;
-    } else if (i >= 0) {
-        global->config.retry_secs = i;
-        GDEBUG("%s = %d", SETTINGS_GLOBAL_KEY_RETRY_SEC, i);
-    }
+    mms_settings_parse_int(file, group,
+        SETTINGS_GLOBAL_KEY_RETRY_SEC,
+        &config->retry_secs, 0);
 
-    i = g_key_file_get_integer(file, group,
-        SETTINGS_GLOBAL_KEY_IDLE_SEC, &error);
-    if (error) {
-        g_error_free(error);
-        error = NULL;
-    } else if (i >= 0) {
-        global->config.idle_secs = i;
-        GDEBUG("%s = %d", SETTINGS_GLOBAL_KEY_IDLE_SEC, i);
-    }
+    mms_settings_parse_int(file, group,
+        SETTINGS_GLOBAL_KEY_NETWORK_IDLE_SEC,
+        &config->network_idle_secs, 0);
+
+    mms_settings_parse_int(file, group,
+        SETTINGS_GLOBAL_KEY_IDLE_SEC,
+        &config->idle_secs, 0);
 }
 
 static
@@ -115,7 +144,6 @@ mms_settings_parse_sim_config(
     GError* error = NULL;
     gboolean b;
     char* s;
-    int i;
 
     s = g_key_file_get_string(file, group,
         SETTINGS_DEFAULTS_KEY_USER_AGENT, NULL);
@@ -133,25 +161,13 @@ mms_settings_parse_sim_config(
         GDEBUG("%s = %s", SETTINGS_DEFAULTS_KEY_UAPROF, s);
     }
 
-    i = g_key_file_get_integer(file, group,
-        SETTINGS_DEFAULTS_KEY_SIZE_LIMIT, &error);
-    if (error) {
-        g_error_free(error);
-        error = NULL;
-    } else if (i > 0) {
-        defaults->data.size_limit = i;
-        GDEBUG("%s = %d", SETTINGS_DEFAULTS_KEY_SIZE_LIMIT, i);
-    }
+    mms_settings_parse_uint(file, group,
+        SETTINGS_DEFAULTS_KEY_SIZE_LIMIT,
+        &defaults->data.size_limit);
 
-    i = g_key_file_get_integer(file, group,
-        SETTINGS_DEFAULTS_KEY_MAX_PIXELS, &error);
-    if (error) {
-        g_error_free(error);
-        error = NULL;
-    } else if (i > 0) {
-        defaults->data.max_pixels = i;
-        GDEBUG("%s = %d", SETTINGS_DEFAULTS_KEY_MAX_PIXELS, i);
-    }
+    mms_settings_parse_uint(file, group,
+        SETTINGS_DEFAULTS_KEY_MAX_PIXELS,
+        &defaults->data.max_pixels);
 
     b = g_key_file_get_boolean(file, group,
         SETTINGS_DEFAULTS_KEY_ALLOW_DR, &error);

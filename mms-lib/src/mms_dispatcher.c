@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2018 Jolla Ltd.
+ * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -200,9 +200,10 @@ mms_dispatcher_network_idle_check(
 {
     if (disp->connection && !disp->network_idle_id) {
         /* Schedule idle inactivity timeout callback */
+        const MMSConfig* config = disp->settings->config;
         GVERBOSE("Network connection is inactive");
         disp->network_idle_id = mms_dispatcher_timeout_callback_schedule(disp,
-            disp->settings->config->idle_secs, mms_dispatcher_network_idle_run);
+            config->network_idle_secs, mms_dispatcher_network_idle_run);
     }
 }
 
@@ -307,6 +308,17 @@ mms_dispatcher_is_active(
     return disp && (mms_connection_is_active(disp->connection) ||
         mms_handler_busy(disp->handler) || mms_connman_busy(disp->cm) ||
         disp->active_task || !g_queue_is_empty(disp->tasks));
+}
+
+/**
+ * Checks if dispatcher has been started. If it is then delegate may expect
+ * its done callback invoked at some point later.
+ */
+gboolean
+mms_dispatcher_is_started(
+    MMSDispatcher* disp)
+{
+    return disp && disp->started;
 }
 
 /**

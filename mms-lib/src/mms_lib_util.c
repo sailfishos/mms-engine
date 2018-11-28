@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2018 Jolla Ltd.
+ * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -66,6 +66,7 @@ mms_lib_default_config(
 {
     config->root_dir = MMS_CONFIG_DEFAULT_ROOT_DIR;
     config->retry_secs = MMS_CONFIG_DEFAULT_RETRY_SECS;
+    config->network_idle_secs = MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS;
     config->idle_secs = MMS_CONFIG_DEFAULT_IDLE_SECS;
     config->keep_temp_files = FALSE;
     config->attic_enabled = FALSE;

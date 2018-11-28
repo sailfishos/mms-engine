@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2018 Jolla Ltd.
+ * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -177,8 +177,11 @@ mms_app_parse_options(
     char* retry_secs_help = g_strdup_printf(
         "Retry period in seconds [%d]",
         opt->global.config.retry_secs);
+    char* network_idle_secs_help = g_strdup_printf(
+        "Network inactivity timeout in seconds [%d]",
+        opt->global.config.network_idle_secs);
     char* idle_secs_help = g_strdup_printf(
-        "Inactivity timeout in seconds [%d]",
+        "Service inactivity timeout in seconds [%d]",
         opt->global.config.idle_secs);
     char* description = gutil_log_description(NULL, 0);
 
@@ -194,6 +197,9 @@ mms_app_parse_options(
           &root_dir, root_dir_help, "DIR" },
         { "retry-secs", 'r', 0, G_OPTION_ARG_INT,
           &opt->global.config.retry_secs, retry_secs_help, "SEC" },
+        { "network-idle-secs", 'n', 0, G_OPTION_ARG_INT,
+          &opt->global.config.network_idle_secs,
+          network_idle_secs_help, "SEC" },
         { "idle-secs", 'i', 0, G_OPTION_ARG_INT,
           &opt->global.config.idle_secs, idle_secs_help, "SEC" },
         { "size-limit", 's', 0, G_OPTION_ARG_INT,
@@ -291,6 +297,7 @@ mms_app_parse_options(
     g_free(root_dir_help);
     g_free(retry_secs_help);
     g_free(idle_secs_help);
+    g_free(network_idle_secs_help);
     g_free(description);
 
     if (!ok) {

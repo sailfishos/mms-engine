@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2018 Jolla Ltd.
+ * Copyright (C) 2016-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,7 +31,8 @@ typedef struct test_desc {
 
 #define DEFAULT_CONFIG \
     MMS_CONFIG_DEFAULT_ROOT_DIR, MMS_CONFIG_DEFAULT_RETRY_SECS, \
-    MMS_CONFIG_DEFAULT_IDLE_SECS, FALSE, FALSE
+    MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS, MMS_CONFIG_DEFAULT_IDLE_SECS, \
+    FALSE, FALSE
 #define DEFAULT_SETTINGS \
     MMS_SETTINGS_DEFAULT_USER_AGENT, MMS_SETTINGS_DEFAULT_UAPROF, \
     MMS_SETTINGS_DEFAULT_SIZE_LIMIT, MMS_SETTINGS_DEFAULT_MAX_PIXELS, \
@@ -49,16 +50,24 @@ static const TestDesc tests [] = {
     },{
         "RootDir",
         { "TestRootDir", MMS_CONFIG_DEFAULT_RETRY_SECS,
+          MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS,
           MMS_CONFIG_DEFAULT_IDLE_SECS, FALSE, FALSE },
         { DEFAULT_SETTINGS }
     },{
         "RetryDelay",
         { MMS_CONFIG_DEFAULT_ROOT_DIR, 111,
+          MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS,
           MMS_CONFIG_DEFAULT_IDLE_SECS, FALSE, FALSE },
+        { DEFAULT_SETTINGS }
+    },{
+        "NetworkIdleTimeout",
+        { MMS_CONFIG_DEFAULT_ROOT_DIR, MMS_CONFIG_DEFAULT_RETRY_SECS,
+          111, MMS_CONFIG_DEFAULT_IDLE_SECS, FALSE, FALSE },
         { DEFAULT_SETTINGS }
     },{
         "IdleTimeout",
         { MMS_CONFIG_DEFAULT_ROOT_DIR, MMS_CONFIG_DEFAULT_RETRY_SECS,
+          MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS,
           222, FALSE, FALSE },
         { DEFAULT_SETTINGS }
     },{
@@ -102,6 +111,7 @@ test_config_equal(
 {
     return !g_strcmp0(c1->root_dir, c2->root_dir) &&
         c1->retry_secs == c2->retry_secs &&
+        c1->network_idle_secs == c2->network_idle_secs &&
         c1->idle_secs == c2->idle_secs &&
         c1->keep_temp_files == c2->keep_temp_files &&
         c1->attic_enabled == c2->attic_enabled;
@@ -121,7 +131,7 @@ test_settings_equal(
 }
 
 static
-gboolean
+int
 test_run(
     const TestDesc* test)
 {
@@ -151,7 +161,7 @@ test_run(
     g_free(global.root_dir);
     mms_settings_sim_data_reset(&defaults);
     GINFO("%s: %s", (ret == RET_OK) ? "OK" : "FAILED", test->name);
-    return FALSE;
+    return ret;
 }
 
 int main(int argc, char* argv[])
@@ -166,12 +176,12 @@ int main(int argc, char* argv[])
     };
 
     mms_lib_init(argv[0]);
-    options = g_option_context_new("[TESTS...] - MMS codec test");
+    options = g_option_context_new("[TESTS...] - MMS settings test");
     g_option_context_add_main_entries(options, entries, NULL);
     if (g_option_context_parse(options, &argc, &argv, NULL)) {
         int i;
 
-        gutil_log_set_type(GLOG_TYPE_STDOUT, "test_mms_codec");
+        gutil_log_set_type(GLOG_TYPE_STDOUT, "test_settings");
         if (verbose) {
             gutil_log_default.level = GLOG_LEVEL_VERBOSE;
         } else {
@@ -187,7 +197,7 @@ int main(int argc, char* argv[])
                 for (j=0; j<G_N_ELEMENTS(tests); j++) {
                     if (!g_strcmp0(argv[i], tests[i].name)) {
                         int ret2 = test_run(tests + i);
-                        if (ret == RET_ERR && ret2 != RET_ERR) {
+                        if (ret == RET_OK && ret2 != RET_OK) {
                             ret = ret2;
                         }
                         break;
@@ -198,7 +208,7 @@ int main(int argc, char* argv[])
             /* Default set of tests */
             for (i=0; i<G_N_ELEMENTS(tests); i++) {
                 int ret2 = test_run(tests + i);
-                if (ret == RET_ERR && ret2 != RET_ERR) {
+                if (ret == RET_OK && ret2 != RET_OK) {
                     ret = ret2;
                 }
             }

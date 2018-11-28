@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2018 Jolla Ltd.
+ * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -401,7 +401,7 @@ int main(int argc, char* argv[])
         mms_lib_default_config(&config);
         config.root_dir = dirs.root;
         config.keep_temp_files = keep_temp;
-        config.idle_secs = 0;
+        config.network_idle_secs = 0;
         if (argc < 2) {
             ret = test_order(&config, NULL, debug);
         } else {

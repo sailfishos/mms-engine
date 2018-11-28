@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2018 Jolla Ltd.
+ * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -65,7 +65,7 @@ struct mms_engine {
     gboolean stopped;
     gboolean stop_requested;
     gboolean keep_running;
-    guint start_timeout_id;
+    guint idle_timer_id;
     gulong proxy_signal_id[MMS_ENGINE_METHOD_COUNT];
 };
 
@@ -88,7 +88,7 @@ mms_engine_stop_callback(
     engine->stopped = TRUE;
     if (engine->loop) g_main_loop_quit(engine->loop);
     mms_engine_unref(engine);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static
@@ -101,36 +101,38 @@ mms_engine_stop_schedule(
 
 static
 gboolean
-mms_engine_start_timeout_callback(
+mms_engine_idle_timer_expired(
     gpointer data)
 {
     MMSEngine* engine = data;
-    GASSERT(engine->start_timeout_id);
+    GASSERT(engine->idle_timer_id);
     GINFO("Shutting down due to inactivity...");
-    engine->start_timeout_id = 0;
+    engine->idle_timer_id = 0;
     mms_engine_stop_schedule(engine);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static
 void
-mms_engine_start_timeout_cancel(
+mms_engine_idle_timer_stop(
     MMSEngine* engine)
 {
-    if (engine->start_timeout_id) {
-        g_source_remove(engine->start_timeout_id);
-        engine->start_timeout_id = 0;
+    if (engine->idle_timer_id) {
+        g_source_remove(engine->idle_timer_id);
+        engine->idle_timer_id = 0;
     }
 }
 
 static
 void
-mms_engine_start_timeout_schedule(
+mms_engine_idle_timer_check(
     MMSEngine* engine)
 {
-    mms_engine_start_timeout_cancel(engine);
-    engine->start_timeout_id = g_timeout_add_seconds(engine->config->idle_secs,
-        mms_engine_start_timeout_callback, engine);
+    mms_engine_idle_timer_stop(engine);
+    if (!mms_dispatcher_is_started(engine->dispatcher) && !engine->keep_running) {
+       engine->idle_timer_id = g_timeout_add_seconds(engine->config->idle_secs,
+           mms_engine_idle_timer_expired, engine);
+    }
 }
 
 /* org.nemomobile.MmsEngine.sendMessage */
@@ -186,9 +188,7 @@ mms_engine_handle_send_message(
             imsi_to, to_list, cc_list, bcc_list, subject, flags, parts,
             info->len, &error);
         if (imsi) {
-            if (mms_dispatcher_start(engine->dispatcher)) {
-                mms_engine_start_timeout_cancel(engine);
-            }
+            mms_dispatcher_start(engine->dispatcher);
             org_nemomobile_mms_engine_complete_send_message(proxy, call, imsi);
             g_free(imsi);
         } else {
@@ -213,6 +213,7 @@ mms_engine_handle_send_message(
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "Missing recipient");
     }
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -237,9 +238,7 @@ mms_engine_handle_receive_message(
         GError* error = NULL;
         if (mms_dispatcher_receive_message(engine->dispatcher, id, imsi,
             automatic, push, &error)) {
-            if (mms_dispatcher_start(engine->dispatcher)) {
-                mms_engine_start_timeout_cancel(engine);
-            }
+            mms_dispatcher_start(engine->dispatcher);
             org_nemomobile_mms_engine_complete_receive_message(proxy, call);
         } else {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
@@ -252,6 +251,7 @@ mms_engine_handle_receive_message(
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "Invalid parameters");
     }
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -274,9 +274,7 @@ mms_engine_handle_send_read_report(
     if (mms_dispatcher_send_read_report(engine->dispatcher, id, imsi,
         message_id, to, (read_status == 1) ? MMS_READ_STATUS_DELETED :
         MMS_READ_STATUS_READ, &error)) {
-        if (mms_dispatcher_start(engine->dispatcher)) {
-            mms_engine_start_timeout_cancel(engine);
-        }
+        mms_dispatcher_start(engine->dispatcher);
         org_nemomobile_mms_engine_complete_send_read_report(proxy, call);
     } else {
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
@@ -284,6 +282,7 @@ mms_engine_handle_send_read_report(
         g_error_free(error);
     }
     g_free(id);
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -302,6 +301,7 @@ mms_engine_handle_cancel(
     mms_dispatcher_cancel(engine->dispatcher, id);
     org_nemomobile_mms_engine_complete_cancel(proxy, call);
     g_free(id);
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -335,9 +335,7 @@ mms_engine_handle_push_notify(
         GError* err = NULL;
         GBytes* msg = g_bytes_new(bytes, len);
         if (mms_dispatcher_handle_push(engine->dispatcher, imsi, msg, &err)) {
-            if (mms_dispatcher_start(engine->dispatcher)) {
-                mms_engine_start_timeout_cancel(engine);
-            }
+            mms_dispatcher_start(engine->dispatcher);
             org_nemomobile_mms_engine_complete_push(proxy, call);
         } else {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
@@ -346,6 +344,7 @@ mms_engine_handle_push_notify(
         }
         g_bytes_unref(msg);
     }
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -392,6 +391,7 @@ mms_engine_handle_set_log_level(
         gutil_log_default.level = level;
     }
     org_nemomobile_mms_engine_complete_set_log_level(proxy, call);
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -407,6 +407,7 @@ mms_engine_handle_set_log_type(
     GDEBUG_("%s", type);
     gutil_log_set_type(type, MMS_APP_LOG_PREFIX);
     org_nemomobile_mms_engine_complete_set_log_type(proxy, call);
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -433,6 +434,7 @@ mms_engine_handle_get_version(
     GDEBUG_("oops");
     org_nemomobile_mms_engine_complete_get_version(proxy, call, 0, 0, 0, "");
 #endif
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -447,7 +449,7 @@ mms_engine_handle_migrate_settings(
 {
     char* tmp = NULL;
     /* Querying settings will migrate per-SIM settings after upgrading
-     * from 1.0.21 or older version of mme-engine */
+     * from 1.0.21 or older version of mms-engine */
     GDEBUG_("%s", imsi);
     if (!imsi || !imsi[0]) {
         imsi = tmp = mms_connman_default_imsi(engine->cm);
@@ -457,6 +459,7 @@ mms_engine_handle_migrate_settings(
     }
     org_nemomobile_mms_engine_complete_migrate_settings(proxy, call);
     g_free(tmp);
+    mms_engine_idle_timer_check(engine);
     return TRUE;
 }
 
@@ -570,11 +573,10 @@ mms_engine_run(
     engine->loop = loop;
     engine->stopped = FALSE;
     engine->stop_requested = FALSE;
-    if (!mms_dispatcher_start(engine->dispatcher) && !engine->keep_running) {
-        mms_engine_start_timeout_schedule(engine);
-    }
+    mms_dispatcher_start(engine->dispatcher);
+    mms_engine_idle_timer_check(engine);
     g_main_loop_run(loop);
-    mms_engine_start_timeout_cancel(engine);
+    mms_engine_idle_timer_stop(engine);
     engine->loop = NULL;
 }
 
@@ -627,8 +629,10 @@ mms_engine_delegate_dispatcher_done(
 {
     MMSEngine* engine = mms_engine_from_dispatcher_delegate(delegate);
     GDEBUG("All done");
-    if (!engine->keep_running || engine->stop_requested) {
+    if (engine->stop_requested) {
         mms_engine_stop_schedule(engine);
+    } else {
+        mms_engine_idle_timer_check(engine);
     }
 }
 
@@ -658,7 +662,7 @@ mms_engine_dispose(
     GVERBOSE_("%p", mms);
     GASSERT(!mms->loop);
     mms_engine_unregister(mms);
-    mms_engine_start_timeout_cancel(mms);
+    mms_engine_idle_timer_stop(mms);
     if (mms->proxy) {
         gutil_disconnect_handlers(mms->proxy, mms->proxy_signal_id,
             G_N_ELEMENTS(mms->proxy_signal_id));
