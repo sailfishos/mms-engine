@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2014-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2014-2018 Jolla Ltd.
+ * Copyright (C) 2014-2018 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,7 +21,8 @@
 struct mms_config {
     const char* root_dir;       /* Root directory for storing MMS files */
     int retry_secs;             /* Retry timeout in seconds */
-    int idle_secs;              /* Idle timeout */
+    int network_idle_secs;      /* Network inactivity timeout */
+    int idle_secs;              /* Service inactivity timeout */
     gboolean keep_temp_files;   /* Keep temporary files around */
     gboolean attic_enabled;     /* Keep unrecognized push message in attic */
 };
@@ -31,9 +32,10 @@ typedef struct mms_config_copy {
     char* root_dir;             /* Allocated copy of root_dir */
 } MMSConfigCopy;
 
-#define MMS_CONFIG_DEFAULT_ROOT_DIR     "/tmp/mms"
-#define MMS_CONFIG_DEFAULT_RETRY_SECS   (15)
-#define MMS_CONFIG_DEFAULT_IDLE_SECS    (20)
+#define MMS_CONFIG_DEFAULT_ROOT_DIR             "/tmp/mms"
+#define MMS_CONFIG_DEFAULT_RETRY_SECS           (15)
+#define MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS    (10)
+#define MMS_CONFIG_DEFAULT_IDLE_SECS            (30)
 
 /* Persistent mutable per-SIM settings */
 struct mms_settings_sim_data {
