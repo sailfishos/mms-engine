@@ -13,7 +13,8 @@ Requires: libwspcodec >= 2.2
 Requires: libgofono >= 2.0.0
 Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
-#Requires: ImageMagick
+Requires(post): glib2
+Requires(postun): glib2
 
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
@@ -27,8 +28,7 @@ BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil) >= 1.0.11
-BuildRequires:  pkgconfig(Qt5Gui)
-#BuildRequires: pkgconfig(ImageMagick)
+BuildRequires: pkgconfig(Qt5Gui)
 
 %define src mms-engine
 %define exe mms-engine
@@ -41,8 +41,6 @@ BuildRequires:  pkgconfig(Qt5Gui)
 
 # Activation method:
 %define pushconfig %{_sysconfdir}/ofono/push_forwarder.d
-#define pushconfig {_sysconfdir}/push-agent
-#Requires: push-agent >= 1.1
 
 %description
 MMS engine handles encoding, decoding, uploading and downloading
