@@ -3,10 +3,12 @@ TARGET = mms-send
 CONFIG -= qt
 
 CONFIG += link_pkgconfig
-PKGCONFIG +=  gio-unix-2.0 gio-2.0 glib-2.0
+PKGCONFIG += libglibutil gio-unix-2.0 gio-2.0 glib-2.0
 QMAKE_CFLAGS += -Wno-unused-parameter
 
 SOURCES += mms-send.c
+
+OTHER_FILES += Makefile
 
 DBUS_SPEC_DIR = $$_PRO_FILE_PWD_/../mms-engine
 
