@@ -13,7 +13,8 @@ Requires: libwspcodec >= 2.2
 Requires: libgofono >= 2.0.0
 Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
-#Requires: ImageMagick
+Requires(post): glib2
+Requires(postun): glib2
 
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
@@ -27,8 +28,7 @@ BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil) >= 1.0.11
-BuildRequires:  pkgconfig(Qt5Gui)
-#BuildRequires: pkgconfig(ImageMagick)
+BuildRequires: pkgconfig(Qt5Gui)
 
 %define src mms-engine
 %define exe mms-engine
@@ -37,11 +37,10 @@ BuildRequires:  pkgconfig(Qt5Gui)
 %define dbusconfig %{_datadir}/dbus-1/system-services
 %define dbuspolicy %{_sysconfdir}/dbus-1/system.d
 %define glibschemas  %{_datadir}/glib-2.0/schemas
+%define systemdconfig %{_libdir}/systemd/system
 
 # Activation method:
 %define pushconfig %{_sysconfdir}/ofono/push_forwarder.d
-#define pushconfig {_sysconfdir}/push-agent
-#Requires: push-agent >= 1.1
 
 %description
 MMS engine handles encoding, decoding, uploading and downloading
@@ -65,12 +64,14 @@ make -C mms-send KEEP_SYMBOLS=1 release
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
+mkdir -p %{buildroot}%{systemdconfig}
 mkdir -p %{buildroot}%{dbusconfig}
 mkdir -p %{buildroot}%{dbuspolicy}
 mkdir -p %{buildroot}%{pushconfig}
 mkdir -p %{buildroot}%{glibschemas}
 mkdir -p %{buildroot}%{_prefix}/bin/
 cp %{src}/build/release/%{exe} %{buildroot}%{_sbindir}/
+cp %{src}/dbus-%{dbusname}.service %{buildroot}%{systemdconfig}/
 cp %{src}/%{dbusname}.service %{buildroot}%{dbusconfig}/
 cp %{src}/%{dbusname}.dbus.conf %{buildroot}%{dbuspolicy}/%{dbusname}.conf
 cp %{src}/%{dbusname}.push.conf %{buildroot}%{pushconfig}/%{dbusname}.conf
@@ -93,6 +94,7 @@ make -C mms-lib/test test
 %config %{dbuspolicy}/%{dbusname}.conf
 %config %{pushconfig}/%{dbusname}.conf
 %{dbusconfig}/%{dbusname}.service
+%{systemdconfig}/dbus-%{dbusname}.service
 %{_sbindir}/%{exe}
 
 %files tools

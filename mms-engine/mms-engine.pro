@@ -42,6 +42,7 @@ OTHER_FILES += \
   org.nemomobile.MmsEngine.push.conf \
   org.nemomobile.MmsEngine.dbus.conf \
   org.nemomobile.MmsEngine.service \
+  dbus-org.nemomobile.MmsEngine.service \
   org.nemomobile.MmsEngine.xml
 
 CONFIG(debug, debug|release) {

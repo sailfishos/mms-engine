@@ -1,0 +1,8 @@
+[Unit]
+Description=MMS engine service
+
+[Service]
+Type=dbus
+BusName=org.nemomobile.MmsEngine
+ExecStart=/usr/sbin/mms-engine -o syslog
+
