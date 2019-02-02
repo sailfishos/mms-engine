@@ -1,6 +1,6 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.62
+Version:  1.0.63
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
@@ -28,6 +28,7 @@ BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil) >= 1.0.11
+#BuildRequires: pkgconfig(ImageMagick)
 BuildRequires: pkgconfig(Qt5Gui)
 
 %define src mms-engine
