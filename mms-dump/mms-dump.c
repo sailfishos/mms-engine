@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2019 Jolla Ltd.
+ * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1087,15 +1087,23 @@ mms_value_decode_contdisp(
         { "Inline",     130 }
     };
 
-    if ((type == WSP_VALUE_TYPE_LONG ||
-         type == WSP_VALUE_TYPE_SHORT) && len > 0) {
+    if (len > 0) {
         const struct mms_named_value* nv;
-        nv = mms_find_named_value(nv_d, N_(nv_d), val[0]);
-        if (nv) {
-            header->value = g_strdup(nv->name);
-            mms_value_decode_wsp_params(header, val + 1, len - 1);
+        switch (type) {
+        case WSP_VALUE_TYPE_TEXT:
+        case WSP_VALUE_TYPE_LONG:
+            header->value = g_strndup((char*)val, len);
             mms_header_dump(header, val, len, flags);
             return TRUE;
+        case WSP_VALUE_TYPE_SHORT:
+            nv = mms_find_named_value(nv_d, N_(nv_d), val[0]);
+            if (nv) {
+                header->value = g_strdup(nv->name);
+                mms_value_decode_wsp_params(header, val + 1, len - 1);
+                mms_header_dump(header, val, len, flags);
+                return TRUE;
+            }
+            break;
         }
     }
     return mms_value_decode_unknown(header, type, val, len, flags);
