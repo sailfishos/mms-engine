@@ -5,4 +5,5 @@ Description=MMS engine service
 Type=dbus
 BusName=org.nemomobile.MmsEngine
 ExecStart=/usr/sbin/mms-engine -o syslog
-
+User=nemo
+Group=privileged
