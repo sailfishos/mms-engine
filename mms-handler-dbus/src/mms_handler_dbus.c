@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Jolla Ltd.
+ * Copyright (C) 2013-2019 Jolla Ltd.
  * Contact: Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -280,7 +280,7 @@ mms_handler_dbus_message_received(
         MMSHandlerDbus* dbus = MMS_HANDLER_DBUS(handler);
         const char* nothing = NULL;
         const char* subject = msg->subject ? msg->subject : "";
-        const char* from = msg->from ? msg->from : "<hidden>";
+        const char* from = msg->from ? msg->from : "";
         const char** to = msg->to ? (const char**)msg->to : &nothing;
         const char** cc = msg->cc ? (const char**)msg->cc : &nothing;
         GSList* list = msg->parts;
