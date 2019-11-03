@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2019 Jolla Ltd.
+ * Copyright (C) 2016-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,6 +25,12 @@
 /* Generated code */
 #include "org.nemomobile.MmsEngine.TransferList.h"
 
+/* D-Bus interface */
+#define MMS_TRANSFER_INTERFACE "org.nemomobile.MmsEngine.Transfer"
+#define MMS_TRANSFER_SIGNAL_SEND_PROGRESS_CHANGED "SendProgressChanged"
+#define MMS_TRANSFER_SIGNAL_RECEIVE_PROGRESS_CHANGED "ReceiveProgressChanged"
+#define MMS_TRANSFER_SIGNAL_FINISHED "Finished"
+
 /* Class definition */
 
 enum mms_transfer_dbus_method {
@@ -37,13 +44,11 @@ enum mms_transfer_dbus_method {
 };
 
 typedef enum mms_transfer_flags {
+    MMS_TRANSFER_FLAG_NONE = 0x00,
     MMS_TRANSFER_FLAG_SEND_UPDATES_ENABLED = 0x01,
-    MMS_TRANSFER_FLAG_RECEIVE_UPDATES_ENABLED = 0x02
+    MMS_TRANSFER_FLAG_RECEIVE_UPDATES_ENABLED = 0x02,
+    MMS_TRANSFER_FLAG_FINISHED = 0x10 /* Internal flag */
 } MMS_TRANSFER_FLAGS;
-
-#define MMS_TRANSFER_FLAGS_UPDATES_ENABLED (\
-    MMS_TRANSFER_FLAG_SEND_UPDATES_ENABLED |\
-    MMS_TRANSFER_FLAG_RECEIVE_UPDATES_ENABLED)
 
 typedef GObjectClass MMSTransferDbusClass;
 struct mms_transfer_dbus_priv {
@@ -51,7 +56,7 @@ struct mms_transfer_dbus_priv {
     char* type;
     char* path;
     GDBusConnection* bus;
-    OrgNemomobileMmsEngineTransfer* proxy;
+    OrgNemomobileMmsEngineTransfer* skeleton;
     gulong proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_COUNT];
     GHashTable* clients;
     guint last_update_cookie;
@@ -65,33 +70,57 @@ struct mms_transfer_dbus_priv {
 typedef struct mms_transfer_dbus_client {
     gulong watch_id;
     GHashTable* requests;
+    MMS_TRANSFER_FLAGS flags;
 } MMSTransferDbusClient;
 
 G_DEFINE_TYPE(MMSTransferDbus, mms_transfer_dbus, G_TYPE_OBJECT)
 
 #define MMS_TRANSFER_DBUS_INTERFACE_VERSION (1)
 
-MMSTransferDbus*
-mms_transfer_dbus_new(
-    GDBusConnection* bus,
-    const char* id,
-    const char* type)
+/*
+ * Sends signals only to registered clients. That's not much of an overhead
+ * because there's usually no more than one client (i.e. Messages app).
+ */
+static
+void
+mms_transfer_dbus_emit_signal(
+    MMSTransferDbus* self,
+    MMS_TRANSFER_FLAGS flags,
+    const char* signal,
+    GVariant* args)  /* floating */
 {
-    MMSTransferDbus* self = g_object_new(MMS_TYPE_TRANSFER_DBUS, NULL);
     MMSTransferDbusPriv* priv = self->priv;
-    GError* error = NULL;
 
-    self->key.id = priv->id = g_strdup(id);
-    self->key.type = priv->type = g_strdup(type);
-    self->path = priv->path = g_strconcat("/msg/", id, "/", type, NULL);
-    priv->bus = g_object_ref(bus);
-    if (!g_dbus_interface_skeleton_export(
-        G_DBUS_INTERFACE_SKELETON(priv->proxy),
-        priv->bus, priv->path, &error)) {
-        GERR("%s", GERRMSG(error));
-        g_error_free(error);
+    g_variant_ref_sink(args);
+    if (priv->clients && g_hash_table_size(priv->clients)) {
+        gpointer key, value;
+        GHashTableIter it;
+
+        g_hash_table_iter_init(&it, priv->clients);
+        while (g_hash_table_iter_next(&it, &key, &value)) {
+            const char* dest = key;
+            MMSTransferDbusClient* client = value;
+
+            if (client->flags & flags) {
+                GError* error = NULL;
+                GDBusMessage* message = g_dbus_message_new_signal(
+                    g_dbus_interface_skeleton_get_object_path
+                    (G_DBUS_INTERFACE_SKELETON(priv->skeleton)),
+                    MMS_TRANSFER_INTERFACE, signal);
+
+                g_dbus_message_set_body(message, args);
+                g_dbus_message_set_destination(message, dest);
+                g_dbus_connection_send_message(priv->bus, message,
+                    G_DBUS_SEND_MESSAGE_FLAGS_NONE, NULL, &error);
+                g_object_unref(message);
+                if (error) {
+                    GERR("%s => %s failed: %s", signal, dest, error->message);
+                    g_error_free(error);
+                }
+            }
+        }
     }
-    return self;
+    g_variant_unref(args);
 }
 
 void
@@ -101,13 +130,16 @@ mms_transfer_dbus_send_progress(
     guint total)
 {
     MMSTransferDbusPriv* priv = self->priv;
+
     if (priv->bytes_sent != sent ||
         priv->bytes_to_send != total) {
         priv->bytes_sent = sent;
         priv->bytes_to_send = total;
         if (priv->flags & MMS_TRANSFER_FLAG_SEND_UPDATES_ENABLED) {
-            org_nemomobile_mms_engine_transfer_emit_send_progress_changed(
-                priv->proxy, sent, total);
+            mms_transfer_dbus_emit_signal(self,
+                MMS_TRANSFER_FLAG_SEND_UPDATES_ENABLED,
+                MMS_TRANSFER_SIGNAL_SEND_PROGRESS_CHANGED,
+                g_variant_new("(uu)", sent, total));
         }
     }
 }
@@ -119,13 +151,16 @@ mms_transfer_dbus_receive_progress(
     guint total)
 {
     MMSTransferDbusPriv* priv = self->priv;
+
     if (priv->bytes_received != received ||
         priv->bytes_to_receive != total) {
         priv->bytes_received = received;
         priv->bytes_to_receive = total;
         if (priv->flags & MMS_TRANSFER_FLAG_RECEIVE_UPDATES_ENABLED) {
-            org_nemomobile_mms_engine_transfer_emit_receive_progress_changed(
-                priv->proxy, received, total);
+            mms_transfer_dbus_emit_signal(self,
+                MMS_TRANSFER_FLAG_RECEIVE_UPDATES_ENABLED,
+                MMS_TRANSFER_SIGNAL_RECEIVE_PROGRESS_CHANGED,
+                g_variant_new("(uu)", received, total));
         }
     }
 }
@@ -135,8 +170,12 @@ mms_transfer_dbus_finished(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
-    if (priv->flags & MMS_TRANSFER_FLAGS_UPDATES_ENABLED) {
-        org_nemomobile_mms_engine_transfer_emit_finished(priv->proxy);
+
+    if (priv->flags & MMS_TRANSFER_FLAG_FINISHED) {
+        mms_transfer_dbus_emit_signal(self,
+            MMS_TRANSFER_FLAG_FINISHED,
+            MMS_TRANSFER_SIGNAL_FINISHED,
+            g_variant_new("()"));
     }
 }
 
@@ -146,26 +185,10 @@ mms_transfer_dbus_client_destroy(
     gpointer data)
 {
     MMSTransferDbusClient* client = data;
+
     g_bus_unwatch_name(client->watch_id);
     g_hash_table_destroy(client->requests);
-    g_slice_free(MMSTransferDbusClient, client);
-}
-
-static
-MMS_TRANSFER_FLAGS
-mms_transfer_dbus_client_flags(
-    MMSTransferDbusClient* client)
-{
-    MMS_TRANSFER_FLAGS flags = 0;
-    if (g_hash_table_size(client->requests)) {
-        gpointer value;
-        GHashTableIter it;
-        g_hash_table_iter_init(&it, client->requests);
-        while (g_hash_table_iter_next(&it, NULL, &value)) {
-            flags |= GPOINTER_TO_INT(value);
-        }
-    }
-    return flags;
+    g_slice_free1(sizeof(*client), client);
 }
 
 static
@@ -175,17 +198,19 @@ mms_transfer_dbus_update_flags(
 {
     MMSTransferDbusPriv* priv = self->priv;
     MMS_TRANSFER_FLAGS flags = 0;
+
     if (g_hash_table_size(priv->clients)) {
         gpointer value;
         GHashTableIter it;
+
         g_hash_table_iter_init(&it, priv->clients);
         while (g_hash_table_iter_next(&it, NULL, &value)) {
-            flags |= mms_transfer_dbus_client_flags(value);
+            flags |= ((MMSTransferDbusClient*)value)->flags;
         }
     }
     if (priv->flags != flags) {
         priv->flags = flags;
-        GDEBUG("Update flags => %u", priv->flags);
+        GDEBUG("Update flags => 0x%02x", priv->flags);
     }
 }
 
@@ -198,6 +223,7 @@ mms_transfer_dbus_client_vanished(
 {
     MMSTransferDbus* self = MMS_TRANSFER_DBUS(user_data);
     MMSTransferDbusPriv* priv = self->priv;
+
     GDEBUG("Name '%s' has disappeared", name);
     g_hash_table_remove(priv->clients, name);
     mms_transfer_dbus_update_flags(self);
@@ -212,6 +238,7 @@ mms_transfer_dbus_handle_get_all(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
+
     org_nemomobile_mms_engine_transfer_complete_get_all(proxy, call,
         MMS_TRANSFER_DBUS_INTERFACE_VERSION,
         priv->bytes_sent,
@@ -236,8 +263,11 @@ mms_transfer_dbus_handle_enable_updates(
     if (flags) {
         MMSTransferDbusClient* client = NULL;
         const char* sender = g_dbus_method_invocation_get_sender(call);
+
+        /* All registered clients get "Finished" signal */
+        flags |= MMS_TRANSFER_FLAG_FINISHED;
         cookie = ++(priv->last_update_cookie);
-        GVERBOSE_("%s %u -> %u", sender, cookie, flags);
+        GVERBOSE_("%s %u -> 0x%02x", sender, cookie, flags);
 
         /* Create client context if necessary */
         if (priv->clients) {
@@ -255,11 +285,12 @@ mms_transfer_dbus_handle_enable_updates(
             g_hash_table_insert(priv->clients, g_strdup(sender), client);
         }
 
+        client->flags |= flags;
         g_hash_table_insert(client->requests, GINT_TO_POINTER(cookie),
             GINT_TO_POINTER(flags));
         if ((priv->flags & flags) != flags) {
             priv->flags |= flags;
-            GDEBUG("Update flags => %u", priv->flags);
+            GDEBUG("Update flags => 0x%02x", priv->flags);
         }
     } else {
         GWARN("Client provided no update flags!");
@@ -290,7 +321,16 @@ mms_transfer_dbus_handle_disable_updates(
         client = g_hash_table_lookup(priv->clients, sender);
     }
     if (client) {
+        gpointer value;
+        GHashTableIter it;
+
+        /* Update client flags */
+        client->flags = 0;
         g_hash_table_remove(client->requests, GINT_TO_POINTER(cookie));
+        g_hash_table_iter_init(&it, client->requests);
+        while (g_hash_table_iter_next(&it, NULL, &value)) {
+            client->flags |= GPOINTER_TO_INT(value);
+        }
         mms_transfer_dbus_update_flags(self);
     }
 
@@ -319,6 +359,7 @@ mms_transfer_dbus_handle_get_send_progress(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
+
     org_nemomobile_mms_engine_transfer_complete_get_send_progress(proxy,
         call, priv->bytes_sent, priv->bytes_to_send);
     return TRUE;
@@ -333,39 +374,53 @@ mms_transfer_dbus_handle_get_receive_progress(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
+
     org_nemomobile_mms_engine_transfer_complete_get_receive_progress(proxy,
         call, priv->bytes_received, priv->bytes_to_receive);
     return TRUE;
 }
 
-/**
- * First stage of deinitialization (release all references).
- * May be called more than once in the lifetime of the object.
- */
-static
-void
-mms_transfer_dbus_dispose(
-    GObject* object)
+MMSTransferDbus*
+mms_transfer_dbus_new(
+    GDBusConnection* bus,
+    const char* id,
+    const char* type)
 {
-    MMSTransferDbus* self = MMS_TRANSFER_DBUS(object);
+    MMSTransferDbus* self = g_object_new(MMS_TYPE_TRANSFER_DBUS, NULL);
     MMSTransferDbusPriv* priv = self->priv;
-    if (priv->clients) {
-        g_hash_table_destroy(priv->clients);
-        priv->clients = NULL;
+    GError* error = NULL;
+
+    self->key.id = priv->id = g_strdup(id);
+    self->key.type = priv->type = g_strdup(type);
+    self->path = priv->path = g_strconcat("/msg/", id, "/", type, NULL);
+    priv->bus = g_object_ref(bus);
+
+	priv->skeleton = org_nemomobile_mms_engine_transfer_skeleton_new();
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_ALL] =
+	    g_signal_connect(priv->skeleton, "handle-get-all",
+	    G_CALLBACK(mms_transfer_dbus_handle_get_all), self);
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES] =
+	    g_signal_connect(priv->skeleton, "handle-enable-updates",
+	    G_CALLBACK(mms_transfer_dbus_handle_enable_updates), self);
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES] =
+	    g_signal_connect(priv->skeleton, "handle-disable-updates",
+	    G_CALLBACK(mms_transfer_dbus_handle_disable_updates), self);
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_INTERFACE_VERSION] =
+	    g_signal_connect(priv->skeleton, "handle-get-interface-version",
+	    G_CALLBACK(mms_transfer_dbus_handle_get_interface_version), self);
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS] =
+	    g_signal_connect(priv->skeleton, "handle-get-send-progress",
+	    G_CALLBACK(mms_transfer_dbus_handle_get_send_progress), self);
+	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS] =
+	    g_signal_connect(priv->skeleton, "handle-get-receive-progress",
+	    G_CALLBACK(mms_transfer_dbus_handle_get_receive_progress), self);
+    if (!g_dbus_interface_skeleton_export(
+        G_DBUS_INTERFACE_SKELETON(priv->skeleton),
+        priv->bus, priv->path, &error)) {
+        GERR("%s", GERRMSG(error));
+        g_error_free(error);
     }
-    if (priv->proxy) {
-        g_dbus_interface_skeleton_unexport(
-            G_DBUS_INTERFACE_SKELETON(priv->proxy));
-        gutil_disconnect_handlers(priv->proxy, priv->proxy_signal_id,
-            G_N_ELEMENTS(priv->proxy_signal_id));
-        g_object_unref(priv->proxy);
-        priv->proxy = NULL;
-    }
-    if (priv->bus) {
-        g_object_unref(priv->bus);
-        priv->bus = NULL;
-    }
-    G_OBJECT_CLASS(mms_transfer_dbus_parent_class)->dispose(object);
+    return self;
 }
 
 /**
@@ -378,6 +433,20 @@ mms_transfer_dbus_finalize(
 {
     MMSTransferDbus* self = MMS_TRANSFER_DBUS(object);
     MMSTransferDbusPriv* priv = self->priv;
+
+    if (priv->clients) {
+        g_hash_table_destroy(priv->clients);
+    }
+    if (priv->skeleton) {
+        g_dbus_interface_skeleton_unexport(
+            G_DBUS_INTERFACE_SKELETON(priv->skeleton));
+        gutil_disconnect_handlers(priv->skeleton, priv->proxy_signal_id,
+            G_N_ELEMENTS(priv->proxy_signal_id));
+        g_object_unref(priv->skeleton);
+    }
+    if (priv->bus) {
+        g_object_unref(priv->bus);
+    }
     g_free(priv->id);
     g_free(priv->type);
     g_free(priv->path);
@@ -392,28 +461,8 @@ void
 mms_transfer_dbus_init(
     MMSTransferDbus* self)
 {
-    MMSTransferDbusPriv* priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
         MMS_TYPE_TRANSFER_DBUS, MMSTransferDbusPriv);
-    self->priv = priv;
-    priv->proxy = org_nemomobile_mms_engine_transfer_skeleton_new();
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_ALL] =
-        g_signal_connect(priv->proxy, "handle-get-all",
-        G_CALLBACK(mms_transfer_dbus_handle_get_all), self);
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES] =
-        g_signal_connect(priv->proxy, "handle-enable-updates",
-        G_CALLBACK(mms_transfer_dbus_handle_enable_updates), self);
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES] =
-        g_signal_connect(priv->proxy, "handle-disable-updates",
-        G_CALLBACK(mms_transfer_dbus_handle_disable_updates), self);
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_INTERFACE_VERSION] =
-        g_signal_connect(priv->proxy, "handle-get-interface-version",
-        G_CALLBACK(mms_transfer_dbus_handle_get_interface_version), self);
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS] =
-        g_signal_connect(priv->proxy, "handle-get-send-progress",
-        G_CALLBACK(mms_transfer_dbus_handle_get_send_progress), self);
-    priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS] =
-        g_signal_connect(priv->proxy, "handle-get-receive-progress",
-        G_CALLBACK(mms_transfer_dbus_handle_get_receive_progress), self);
 }
 
 /**
@@ -425,8 +474,8 @@ mms_transfer_dbus_class_init(
     MMSTransferDbusClass* klass)
 {
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
+
     g_type_class_add_private(klass, sizeof(MMSTransferDbusPriv));
-    object_class->dispose = mms_transfer_dbus_dispose;
     object_class->finalize = mms_transfer_dbus_finalize;
 }
 
