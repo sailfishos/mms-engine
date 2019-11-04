@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2019 Jolla Ltd.
+ * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,7 +16,7 @@
 #include "mms_connman.h"
 
 /* Logging */
-#define MMS_LOG_MODULE_NAME mms_connman_log
+#define GLOG_MODULE_NAME mms_connman_log
 #include <gutil_log.h>
 
 G_DEFINE_ABSTRACT_TYPE(MMSConnMan, mms_connman, G_TYPE_OBJECT)
