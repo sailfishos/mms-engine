@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2014-2018 Jolla Ltd.
- * Copyright (C) 2014-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2014-2019 Jolla Ltd.
+ * Copyright (C) 2014-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -116,6 +117,12 @@ mms_settings_load_defaults(
     MMSConfigCopy* config,
     MMSSettingsSimDataCopy* simconfig,
     GError** error);
+
+void
+mms_settings_parse(
+    GKeyFile* file,
+    MMSConfigCopy* config,
+    MMSSettingsSimDataCopy* data);
 
 void
 mms_settings_set_sim_defaults(

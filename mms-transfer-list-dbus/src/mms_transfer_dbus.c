@@ -18,9 +18,9 @@
 
 #include <gutil_misc.h>
 
-/* Logging */
-#define GLOG_MODULE_NAME mms_transfer_list_log
-#include <gutil_log.h>
+#include <dbusaccess_peer.h>
+#include <dbusaccess_policy.h>
+
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.TransferList.h"
@@ -33,14 +33,11 @@
 
 /* Class definition */
 
-enum mms_transfer_dbus_method {
-    MMS_TRANSFER_DBUS_METHOD_GET_ALL,
-    MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES,
-    MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES,
-    MMS_TRANSFER_DBUS_METHOD_GET_INTERFACE_VERSION,
-    MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS,
-    MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS,
-    MMS_TRANSFER_DBUS_METHOD_COUNT
+enum mms_transfer_dbus_methods {
+    #define MMS_TRANSFER_METHOD_(id) MMS_TRANSFER_METHOD_##id,
+    MMS_TRANSFER_DBUS_METHODS(MMS_TRANSFER_METHOD_)
+    #undef MMS_TRANSFER_METHOD_
+    MMS_TRANSFER_METHOD_COUNT
 };
 
 typedef enum mms_transfer_flags {
@@ -57,7 +54,9 @@ struct mms_transfer_dbus_priv {
     char* path;
     GDBusConnection* bus;
     OrgNemomobileMmsEngineTransfer* skeleton;
-    gulong proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_COUNT];
+    gulong proxy_signal_id[MMS_TRANSFER_METHOD_COUNT];
+    DA_BUS da_bus;
+    DAPolicy* dbus_access;
     GHashTable* clients;
     guint last_update_cookie;
     MMS_TRANSFER_FLAGS flags;
@@ -224,9 +223,34 @@ mms_transfer_dbus_client_vanished(
     MMSTransferDbus* self = MMS_TRANSFER_DBUS(user_data);
     MMSTransferDbusPriv* priv = self->priv;
 
-    GDEBUG("Name '%s' has disappeared", name);
+    GDEBUG("Client '%s' has disappeared", name);
     g_hash_table_remove(priv->clients, name);
     mms_transfer_dbus_update_flags(self);
+}
+
+static
+gboolean
+mms_transfer_dbus_access_allowed(
+    MMSTransferDbusPriv* priv,
+    GDBusMethodInvocation* call,
+    MMS_TRANSFER_ACTION action)
+{
+    const char* sender = g_dbus_method_invocation_get_sender(call);
+    DAPeer* peer = da_peer_get(priv->da_bus, sender);
+
+    if (peer && da_policy_check(priv->dbus_access, &peer->cred, action, 0,
+        DA_ACCESS_ALLOW) == DA_ACCESS_ALLOW) {
+        return TRUE;
+    } else {
+        const char* iface = g_dbus_method_invocation_get_interface_name(call);
+        const char* method = g_dbus_method_invocation_get_method_name(call);
+
+        GWARN("Client %s is not allowed to call %s.%s", sender, iface, method);
+        g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+            G_DBUS_ERROR_FAILED, "Client %s is not allowed to call %s.%s",
+            sender, iface, method);
+        return FALSE;
+    }
 }
 
 /* org.nemomobile.MmsEngine.Transfer.GetAll */
@@ -239,12 +263,19 @@ mms_transfer_dbus_handle_get_all(
 {
     MMSTransferDbusPriv* priv = self->priv;
 
-    org_nemomobile_mms_engine_transfer_complete_get_all(proxy, call,
-        MMS_TRANSFER_DBUS_INTERFACE_VERSION,
-        priv->bytes_sent,
-        priv->bytes_to_send,
-        priv->bytes_received,
-        priv->bytes_to_receive);
+    /*
+     * mms_transfer_dbus_access_allowed() completes the call if access
+     * is denied.
+     */
+    if (mms_transfer_dbus_access_allowed(priv, call,
+        MMS_TRANSFER_ACTION_GET_ALL)) {
+        org_nemomobile_mms_engine_transfer_complete_get_all(proxy, call,
+            MMS_TRANSFER_DBUS_INTERFACE_VERSION,
+            priv->bytes_sent,
+            priv->bytes_to_send,
+            priv->bytes_received,
+            priv->bytes_to_receive);
+    }
     return TRUE;
 }
 
@@ -258,9 +289,12 @@ mms_transfer_dbus_handle_enable_updates(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
-    guint cookie = 0;
 
-    if (flags) {
+    if (!mms_transfer_dbus_access_allowed(priv, call,
+        MMS_TRANSFER_ACTION_ENABLE_UPDATES)) {
+        /* mms_transfer_dbus_access_allowed() has completes the call */
+    } else if (flags) {
+        guint cookie = 0;
         MMSTransferDbusClient* client = NULL;
         const char* sender = g_dbus_method_invocation_get_sender(call);
 
@@ -278,7 +312,7 @@ mms_transfer_dbus_handle_enable_updates(
         }
         if (!client) {
             client = g_slice_new0(MMSTransferDbusClient);
-            client->requests = g_hash_table_new(g_direct_hash, g_direct_equal);
+            client->requests = g_hash_table_new(g_direct_hash,g_direct_equal);
             client->watch_id = g_bus_watch_name_on_connection(priv->bus,
                 sender, G_BUS_NAME_WATCHER_FLAGS_NONE, NULL,
                 mms_transfer_dbus_client_vanished, self, NULL);
@@ -292,12 +326,13 @@ mms_transfer_dbus_handle_enable_updates(
             priv->flags |= flags;
             GDEBUG("Update flags => 0x%02x", priv->flags);
         }
+        org_nemomobile_mms_engine_transfer_complete_enable_updates
+            (proxy, call, cookie);
     } else {
         GWARN("Client provided no update flags!");
+        org_nemomobile_mms_engine_transfer_complete_enable_updates
+            (proxy, call, 0);
     }
-
-    org_nemomobile_mms_engine_transfer_complete_enable_updates(proxy,
-        call, cookie);
     return TRUE;
 }
 
@@ -311,29 +346,36 @@ mms_transfer_dbus_handle_disable_updates(
     MMSTransferDbus* self)
 {
     MMSTransferDbusPriv* priv = self->priv;
-    MMSTransferDbusClient* client = NULL;
-    const char* sender = g_dbus_method_invocation_get_sender(call);
 
-    GVERBOSE_("%s %u", sender, cookie);
-    org_nemomobile_mms_engine_transfer_complete_disable_updates(proxy, call);
+    /*
+     * mms_transfer_dbus_access_allowed() completes the call if access
+     * is denied.
+     */
+    if (mms_transfer_dbus_access_allowed(priv, call,
+        MMS_TRANSFER_ACTION_DISABLE_UPDATES)) {
+        MMSTransferDbusClient* client = NULL;
+        const char* sender = g_dbus_method_invocation_get_sender(call);
 
-    if (priv->clients) {
-        client = g_hash_table_lookup(priv->clients, sender);
-    }
-    if (client) {
-        gpointer value;
-        GHashTableIter it;
-
-        /* Update client flags */
-        client->flags = 0;
-        g_hash_table_remove(client->requests, GINT_TO_POINTER(cookie));
-        g_hash_table_iter_init(&it, client->requests);
-        while (g_hash_table_iter_next(&it, NULL, &value)) {
-            client->flags |= GPOINTER_TO_INT(value);
+        GVERBOSE_("%s %u", sender, cookie);
+        if (priv->clients) {
+            client = g_hash_table_lookup(priv->clients, sender);
         }
-        mms_transfer_dbus_update_flags(self);
-    }
+        if (client) {
+            gpointer value;
+            GHashTableIter it;
 
+            /* Update client flags */
+            client->flags = 0;
+            g_hash_table_remove(client->requests, GINT_TO_POINTER(cookie));
+            g_hash_table_iter_init(&it, client->requests);
+            while (g_hash_table_iter_next(&it, NULL, &value)) {
+                client->flags |= GPOINTER_TO_INT(value);
+            }
+            mms_transfer_dbus_update_flags(self);
+        }
+        org_nemomobile_mms_engine_transfer_complete_disable_updates
+            (proxy, call);
+    }
     return TRUE;
 }
 
@@ -345,8 +387,15 @@ mms_transfer_dbus_handle_get_interface_version(
     GDBusMethodInvocation* call,
     MMSTransferDbus* self)
 {
-    org_nemomobile_mms_engine_transfer_complete_get_interface_version(proxy,
-        call, MMS_TRANSFER_DBUS_INTERFACE_VERSION);
+    /*
+     * mms_transfer_dbus_access_allowed() completes the call if access
+     * is denied.
+     */
+    if (mms_transfer_dbus_access_allowed(self->priv, call,
+        MMS_TRANSFER_ACTION_GET_INTERFACE_VERSION)) {
+        org_nemomobile_mms_engine_transfer_complete_get_interface_version
+            (proxy, call, MMS_TRANSFER_DBUS_INTERFACE_VERSION);
+    }
     return TRUE;
 }
 
@@ -360,8 +409,15 @@ mms_transfer_dbus_handle_get_send_progress(
 {
     MMSTransferDbusPriv* priv = self->priv;
 
-    org_nemomobile_mms_engine_transfer_complete_get_send_progress(proxy,
-        call, priv->bytes_sent, priv->bytes_to_send);
+    /*
+     * mms_transfer_dbus_access_allowed() completes the call if access
+     * is denied.
+     */
+    if (mms_transfer_dbus_access_allowed(priv, call,
+        MMS_TRANSFER_ACTION_GET_SEND_PROGRESS)) {
+        org_nemomobile_mms_engine_transfer_complete_get_send_progress
+            (proxy, call, priv->bytes_sent, priv->bytes_to_send);
+    }
     return TRUE;
 }
 
@@ -375,14 +431,23 @@ mms_transfer_dbus_handle_get_receive_progress(
 {
     MMSTransferDbusPriv* priv = self->priv;
 
-    org_nemomobile_mms_engine_transfer_complete_get_receive_progress(proxy,
-        call, priv->bytes_received, priv->bytes_to_receive);
+    /*
+     * mms_transfer_dbus_access_allowed() completes the call if access
+     * is denied.
+     */
+    if (mms_transfer_dbus_access_allowed(priv, call,
+        MMS_TRANSFER_ACTION_GET_RECEIVE_PROGRESS)) {
+        org_nemomobile_mms_engine_transfer_complete_get_receive_progress
+            (proxy, call, priv->bytes_received, priv->bytes_to_receive);
+    }
     return TRUE;
 }
 
 MMSTransferDbus*
 mms_transfer_dbus_new(
     GDBusConnection* bus,
+    DA_BUS da_bus,
+    DAPolicy* access,
     const char* id,
     const char* type)
 {
@@ -394,24 +459,26 @@ mms_transfer_dbus_new(
     self->key.type = priv->type = g_strdup(type);
     self->path = priv->path = g_strconcat("/msg/", id, "/", type, NULL);
     priv->bus = g_object_ref(bus);
+    priv->da_bus = da_bus;
+    priv->dbus_access = da_policy_ref(access);
 
 	priv->skeleton = org_nemomobile_mms_engine_transfer_skeleton_new();
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_ALL] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_GET_ALL] =
 	    g_signal_connect(priv->skeleton, "handle-get-all",
 	    G_CALLBACK(mms_transfer_dbus_handle_get_all), self);
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_ENABLE_UPDATES] =
 	    g_signal_connect(priv->skeleton, "handle-enable-updates",
 	    G_CALLBACK(mms_transfer_dbus_handle_enable_updates), self);
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_DISABLE_UPDATES] =
 	    g_signal_connect(priv->skeleton, "handle-disable-updates",
 	    G_CALLBACK(mms_transfer_dbus_handle_disable_updates), self);
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_INTERFACE_VERSION] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_GET_INTERFACE_VERSION] =
 	    g_signal_connect(priv->skeleton, "handle-get-interface-version",
 	    G_CALLBACK(mms_transfer_dbus_handle_get_interface_version), self);
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_GET_SEND_PROGRESS] =
 	    g_signal_connect(priv->skeleton, "handle-get-send-progress",
 	    G_CALLBACK(mms_transfer_dbus_handle_get_send_progress), self);
-	priv->proxy_signal_id[MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS] =
+    priv->proxy_signal_id[MMS_TRANSFER_METHOD_GET_RECEIVE_PROGRESS] =
 	    g_signal_connect(priv->skeleton, "handle-get-receive-progress",
 	    G_CALLBACK(mms_transfer_dbus_handle_get_receive_progress), self);
     if (!g_dbus_interface_skeleton_export(
@@ -450,6 +517,7 @@ mms_transfer_dbus_finalize(
     g_free(priv->id);
     g_free(priv->type);
     g_free(priv->path);
+    da_policy_unref(priv->dbus_access);
     G_OBJECT_CLASS(mms_transfer_dbus_parent_class)->finalize(object);
 }
 
@@ -473,10 +541,8 @@ void
 mms_transfer_dbus_class_init(
     MMSTransferDbusClass* klass)
 {
-    GObjectClass* object_class = G_OBJECT_CLASS(klass);
-
     g_type_class_add_private(klass, sizeof(MMSTransferDbusPriv));
-    object_class->finalize = mms_transfer_dbus_finalize;
+    G_OBJECT_CLASS(klass)->finalize = mms_transfer_dbus_finalize;
 }
 
 /*

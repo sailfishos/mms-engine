@@ -19,6 +19,9 @@
 
 #include <gutil_strv.h>
 
+#include <dbusaccess_peer.h>
+#include <dbusaccess_policy.h>
+
 /* Generated code */
 #include "org.nemomobile.MmsEngine.TransferList.h"
 
@@ -27,12 +30,18 @@
 #define MMS_TRANSFER_LIST_SIGNAL_TRANSFER_STARTED "TransferStarted"
 #define MMS_TRANSFER_LIST_SIGNAL_TRANSFER_FINISHED "TransferFinished"
 
+#define MMS_TRANSFER_LIST_DBUS_PATH "/"
+#define MMS_TRANSFER_LIST_DBUS_BUS  G_BUS_TYPE_SYSTEM
+#define MMS_TRANSFER_LIST_DA_BUS    DA_BUS_SYSTEM
+
 /* Class definition */
 typedef MMSTransferListClass MMSTransferListDbusClass;
 struct mms_transfer_list_dbus {
     MMSTransferList super;
     GDBusConnection* bus;
     OrgNemomobileMmsEngineTransferList* skeleton;
+    DAPolicy* tx_list_access;
+    DAPolicy* tx_access;
     gulong list_transfers_id;
     GHashTable* transfers;
     GHashTable* clients;
@@ -43,9 +52,6 @@ G_DEFINE_TYPE(MMSTransferListDbus, mms_transfer_list_dbus, \
 #define MMS_TYPE_TRANSFER_LIST_DBUS (mms_transfer_list_dbus_get_type())
 #define MMS_TRANSFER_LIST_DBUS(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
     MMS_TYPE_TRANSFER_LIST_DBUS, MMSTransferListDbus))
-
-#define MMS_TRANSFER_LIST_DBUS_PATH "/"
-#define MMS_TRANSFER_LIST_DBUS_BUS  G_BUS_TYPE_SYSTEM
 
 /*
  * Sends signals only to registered clients. That's not much of an overhead
@@ -160,10 +166,14 @@ mms_transfer_list_dbus_bus_cb(
 }
 
 MMSTransferList*
-mms_transfer_list_dbus_new()
+mms_transfer_list_dbus_new(
+    DAPolicy* tx_list_access,
+    DAPolicy* tx_access)
 {
     MMSTransferListDbus* self = g_object_new(MMS_TYPE_TRANSFER_LIST_DBUS, 0);
 
+    self->tx_list_access = da_policy_ref(tx_list_access);
+    self->tx_access = da_policy_ref(tx_access);
     g_bus_get(MMS_TRANSFER_LIST_DBUS_BUS, NULL, mms_transfer_list_dbus_bus_cb,
         g_object_ref(self));
     return &self->super;
@@ -177,7 +187,8 @@ mms_transfer_list_dbus_transfer_started(
     char* type)                     /* Transfer type */
 {
     MMSTransferListDbus* self = MMS_TRANSFER_LIST_DBUS(list);
-    MMSTransferDbus* transfer = mms_transfer_dbus_new(self->bus, id, type);
+    MMSTransferDbus* transfer = mms_transfer_dbus_new(self->bus,
+        MMS_TRANSFER_LIST_DA_BUS, self->tx_access, id, type);
 
     GDEBUG("Transfer %s started", transfer->path);
     transfer->list = self;
@@ -284,47 +295,62 @@ mms_transfer_list_dbus_handle_get(
     MMSTransferListDbus* self)
 {
     const char* sender = g_dbus_method_invocation_get_sender(call);
-    const char* null = NULL;
-    const gchar* const* list = &null;
-    const gchar** paths = NULL;
-    guint n = g_hash_table_size(self->transfers);
+    DAPeer* peer = da_peer_get(MMS_TRANSFER_LIST_DA_BUS, sender);
 
-    /* Store the sender's name */
-    if (!self->clients) {
-        self->clients = /* sender => watch id */
-            g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
-    }
-    if (!g_hash_table_contains(self->clients, sender)) {
-        /* New client */
-        gulong watch_id = g_bus_watch_name_on_connection(self->bus,
-            sender, G_BUS_NAME_WATCHER_FLAGS_NONE, NULL,
-            mms_transfer_list_dbus_client_vanished, self, NULL);
+    if (peer && da_policy_check(self->tx_list_access, &peer->cred,
+        MMS_TRANSFER_LIST_ACTION_GET, 0, DA_ACCESS_ALLOW) ==
+        DA_ACCESS_ALLOW) {
+        const char* null = NULL;
+        const gchar* const* list = &null;
+        const gchar** paths = NULL;
+        guint n = g_hash_table_size(self->transfers);
 
-        g_hash_table_insert(self->clients, g_strdup(sender),
-            GUINT_TO_POINTER(watch_id));
-    }
-
-    if (n) {
-        guint i = 0;
-        gpointer value;
-        GHashTableIter it;
-
-        g_hash_table_iter_init(&it, self->transfers);
-        paths = g_new(const char*, n+1);
-        GVERBOSE("%u transfer(s)", n);
-        while (i < n && g_hash_table_iter_next(&it, NULL, &value)) {
-            MMSTransferDbus* transfer = value;
-            GVERBOSE("  %s", transfer->path);
-            paths[i++] = transfer->path;
+        /* Store the sender's name */
+        if (!self->clients) {
+            self->clients = /* sender => watch id */
+                g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
         }
-        paths[i++] = NULL;
-        list = paths;
+        if (!g_hash_table_contains(self->clients, sender)) {
+            /* New client */
+            gulong watch_id = g_bus_watch_name_on_connection(self->bus,
+                sender, G_BUS_NAME_WATCHER_FLAGS_NONE, NULL,
+                mms_transfer_list_dbus_client_vanished, self, NULL);
+
+            g_hash_table_insert(self->clients, g_strdup(sender),
+                GUINT_TO_POINTER(watch_id));
+        }
+
+        if (n) {
+            guint i = 0;
+            gpointer value;
+            GHashTableIter it;
+
+            g_hash_table_iter_init(&it, self->transfers);
+            paths = g_new(const char*, n+1);
+            GVERBOSE("%u transfer(s)", n);
+            while (i < n && g_hash_table_iter_next(&it, NULL, &value)) {
+                MMSTransferDbus* transfer = value;
+                GVERBOSE("  %s", transfer->path);
+                paths[i++] = transfer->path;
+            }
+            paths[i++] = NULL;
+            list = paths;
+        } else {
+            GVERBOSE("No transfers");
+            list = &null;
+        }
+        org_nemomobile_mms_engine_transfer_list_complete_get
+            (skeleton, call, list);
+        g_free(paths);
     } else {
-        GVERBOSE("No transfers");
-        list = &null;
+        const char* iface = g_dbus_method_invocation_get_interface_name(call);
+        const char* method = g_dbus_method_invocation_get_method_name(call);
+
+        GWARN("Client %s is not allowed to call %s.%s", sender, iface, method);
+        g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+            G_DBUS_ERROR_FAILED, "Client %s is not allowed to call %s.%s",
+            sender, iface, method);
     }
-    org_nemomobile_mms_engine_transfer_list_complete_get(skeleton, call, list);
-    g_free(paths);
     return TRUE;
 }
 
@@ -348,6 +374,8 @@ mms_transfer_list_dbus_finalize(
     if (self->bus) {
         g_object_unref(self->bus);
     }
+    da_policy_unref(self->tx_list_access);
+    da_policy_unref(self->tx_access);
     G_OBJECT_CLASS(mms_transfer_list_dbus_parent_class)->finalize(object);
 }
 

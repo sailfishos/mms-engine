@@ -4,7 +4,7 @@ Version:  1.0.67
 Release:  1
 Group:    Communications/Telephony and IM
 License:  GPLv2
-URL:      https://git.merproject.org/mer-core/mms-engine
+URL:      https://git.sailfishos.org/mer-core/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 Requires: dbus
 Requires: ofono
@@ -13,6 +13,7 @@ Requires: libwspcodec >= 2.2
 Requires: libgofono >= 2.0.0
 Requires: libgofonoext >= 1.0.4
 Requires: libglibutil >= 1.0.5
+Requires: libdbusaccess >= 1.0.10
 Requires(post): glib2
 Requires(postun): glib2
 
@@ -28,6 +29,7 @@ BuildRequires: pkgconfig(libwspcodec) >= 2.2
 BuildRequires: pkgconfig(libgofono) >= 2.0.0
 BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
 BuildRequires: pkgconfig(libglibutil) >= 1.0.11
+BuildRequires: pkgconfig(libdbusaccess)
 #BuildRequires: pkgconfig(ImageMagick)
 BuildRequires: pkgconfig(Qt5Gui)
 
