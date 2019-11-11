@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2019 Jolla Ltd.
+ * Copyright (C) 2016-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,7 +18,6 @@
 /* Logging */
 #define GLOG_MODULE_NAME mms_transfer_list_log
 #include <gutil_log.h>
-GLOG_MODULE_DEFINE("mms-transfer-list-test");
 
 /* Class definition */
 typedef MMSTransferListClass MMSTransferListTestClass;

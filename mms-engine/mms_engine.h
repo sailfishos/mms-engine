@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2019 Jolla Ltd.
+ * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,6 +17,8 @@
 #define JOLLA_MMS_ENGINE_H
 
 #include <gio/gio.h>
+#include <dbusaccess_types.h>
+
 #include "mms_settings.h"
 #include "mms_version.h"
 
@@ -35,15 +38,42 @@
 #  define MMS_ENGINE_CONFIG_FILE    "/etc/mms-engine.conf"
 #endif /* MMS_ENGINE_CONFIG_FILE */
 
+#define MMS_ENGINE_DBUS_METHODS(m) \
+    m(CANCEL) \
+    m(RECEIVE_MESSAGE) \
+    m(SEND_READ_REPORT) \
+    m(SEND_MESSAGE) \
+    m(PUSH) \
+    m(PUSH_NOTIFY) \
+    m(SET_LOG_LEVEL) \
+    m(SET_LOG_TYPE) \
+    m(GET_VERSION) \
+    m(MIGRATE_SETTINGS)
+
+typedef enum mms_engine_action {
+    /* Action ids must be non-zero, shift those by one */
+    MMS_ENGINE_ACTION_NONE = 0,
+    #define MMS_ENGINE_ACTION_(id) MMS_ENGINE_ACTION_##id,
+    MMS_ENGINE_DBUS_METHODS(MMS_ENGINE_ACTION_)
+    #undef MMS_ENGINE_ACTION_
+} MMS_ENGINE_ACTION;
+
 typedef struct mms_engine MMSEngine;
+
+typedef struct engine_dbus_config {
+    GBusType type;
+    DAPolicy* engine_access;
+    DAPolicy* tx_list_access;
+    DAPolicy* tx_access;
+} MMSEngineDbusConfig;
 
 MMSEngine*
 mms_engine_new(
     const MMSConfig* config,
     const MMSSettingsSimData* defaults,
-    unsigned int flags,
-    MMSLogModule* log_modules[],
-    int log_count);
+    const MMSEngineDbusConfig* dbus_config,
+    MMSLogModule* log_modules[], /* NULL terminated */
+    unsigned int flags);
 
 MMSEngine*
 mms_engine_ref(

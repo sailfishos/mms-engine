@@ -17,7 +17,7 @@ include ../mms-lib/Config.mak
 # Required packages
 #
 
-PKGS = gio-unix-2.0 gio-2.0 libglibutil
+PKGS = gio-unix-2.0 gio-2.0 libdbusaccess libglibutil
 LIB_PKGS = libwspcodec gmime-2.6 libgofono libsoup-2.4 dconf
 
 ifdef SAILFISH

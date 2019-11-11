@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2019 Jolla Ltd.
+ * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,23 +21,123 @@
 #include "mms_lib_util.h"
 #include "mms_settings.h"
 
+#include "mms_transfer_list_dbus.h"
+
 #ifdef SAILFISH
 #  include "mms_connman_nemo_log.h"
 #else
 #  include "mms_connman_ofono_log.h"
 #endif
 
+#include <dbusaccess_policy.h>
 #include <gutil_log.h>
 
 #define RET_OK  (0)
 #define RET_ERR (1)
 
+typedef struct mms_app_dbus_policy {
+    const char* spec;
+    const DA_ACTION* actions;
+} MMSAppDBusPolicy;
+
+#define RADIO_USER "radio"              /* ofono */
+#define RADIO_GROUP "radio"
+
+#define PRIVILEGED_GROUP "privileged"   /* commhistoryd */
+#define MMS_GROUP "sailfish-mms"
+
+/* org.nemomobile.MmsEngine */
+#define MMS_ENGINE_DBUS_METHOD_CANCEL           "cancel"
+#define MMS_ENGINE_DBUS_METHOD_RECEIVE_MESSAGE  "receiveMessage"
+#define MMS_ENGINE_DBUS_METHOD_SEND_READ_REPORT "sendReadReport"
+#define MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE     "sendMessage"
+#define MMS_ENGINE_DBUS_METHOD_PUSH             "push"
+#define MMS_ENGINE_DBUS_METHOD_PUSH_NOTIFY      "pushNotify"
+#define MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL    "setLogLevel"
+#define MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE     "setLogType"
+#define MMS_ENGINE_DBUS_METHOD_GET_VERSION      "getVersion"
+#define MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS "migrateSettings"
+
+static const DA_ACTION mms_engine_dbus_actions[] = {
+    #define INIT_DA_ACTION(id) \
+        {MMS_ENGINE_DBUS_METHOD_##id, MMS_ENGINE_ACTION_##id, 0},
+    MMS_ENGINE_DBUS_METHODS(INIT_DA_ACTION)
+    #undef INIT_DA_ACTION
+    { NULL }
+};
+
+static const MMSAppDBusPolicy mms_engine_default_dbus_policy = {
+    "((!group("PRIVILEGED_GROUP"))&(!group("MMS_GROUP"))&("
+    MMS_ENGINE_DBUS_METHOD_CANCEL "()|"
+    MMS_ENGINE_DBUS_METHOD_RECEIVE_MESSAGE "()|"
+    MMS_ENGINE_DBUS_METHOD_SEND_READ_REPORT"()|"
+    MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE"()|"
+    MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL"()|"
+    MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE"()|"
+    MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()))|"
+    "((!(user("RADIO_USER")&group("RADIO_GROUP")))&("
+    MMS_ENGINE_DBUS_METHOD_PUSH"()|"
+    MMS_ENGINE_DBUS_METHOD_PUSH_NOTIFY "()))=deny",
+    mms_engine_dbus_actions
+};
+
+/* org.nemomobile.MmsEngine.TransferList */
+#define MMS_TRANSFER_LIST_DBUS_METHOD_GET  "Get"
+
+static const DA_ACTION mms_tx_list_dbus_actions[] = {
+    #define INIT_DA_ACTION(id) \
+        {MMS_TRANSFER_LIST_DBUS_METHOD_##id, \
+            MMS_TRANSFER_LIST_ACTION_##id, 0},
+    MMS_TRANSFER_LIST_DBUS_METHODS(INIT_DA_ACTION)
+    #undef INIT_DA_ACTION
+    { NULL }
+};
+
+static const MMSAppDBusPolicy mms_tx_list_default_dbus_policy = {
+    "(!group("PRIVILEGED_GROUP"))&(!group("MMS_GROUP"))&"
+    MMS_TRANSFER_LIST_DBUS_METHOD_GET "()=deny",
+    mms_tx_list_dbus_actions
+};
+
+/* org.nemomobile.MmsEngine.Transfer */
+#define MMS_TRANSFER_DBUS_METHOD_GET_ALL                "GetAll"
+#define MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES         "EnableUpdates"
+#define MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES        "DisableUpdates"
+#define MMS_TRANSFER_DBUS_METHOD_GET_INTERFACE_VERSION  "GetInterfaceVersion"
+#define MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS      "GetSendProgress"
+#define MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS   "GetReceiveProgress"
+
+static const DA_ACTION mms_tx_dbus_actions[] = {
+    #define INIT_DA_ACTION(id) \
+        {MMS_TRANSFER_DBUS_METHOD_##id, MMS_TRANSFER_ACTION_##id, 0},
+    MMS_TRANSFER_DBUS_METHODS(INIT_DA_ACTION)
+    #undef INIT_DA_ACTION
+    { NULL }
+};
+
+static const MMSAppDBusPolicy mms_tx_default_dbus_policy = {
+    "(!group("PRIVILEGED_GROUP"))&(!group("MMS_GROUP"))&("
+    MMS_TRANSFER_DBUS_METHOD_GET_ALL "()|"
+    MMS_TRANSFER_DBUS_METHOD_ENABLE_UPDATES"()|"
+    MMS_TRANSFER_DBUS_METHOD_DISABLE_UPDATES"()|"
+    MMS_TRANSFER_DBUS_METHOD_GET_SEND_PROGRESS"()|"
+    MMS_TRANSFER_DBUS_METHOD_GET_RECEIVE_PROGRESS"())=deny",
+    mms_tx_dbus_actions
+};
+
+/* Config groups and keys */
+static const char SETTINGS_DBUS_GROUP[] = "DBus";
+static const char SETTINGS_DBUS_TYPE[] = "Bus";
+static const char SETTINGS_DBUS_ENGINE_ACCESS[] = "MmsEngineAccess";
+static const char SETTINGS_DBUS_TRANSFER_ACCESS[] = "TransferAccess";
+static const char SETTINGS_DBUS_TRANSFER_LIST_ACCESS[] = "TransferListAccess";
+
 /* Options configurable from the command line */
 typedef struct mms_app_options {
-    GBusType bus_type;
     int flags;
     MMSConfigCopy global;
     MMSSettingsSimDataCopy settings;
+    MMSEngineDbusConfig dbus;
 } MMSAppOptions;
 
 /* All known log modules */
@@ -46,6 +147,7 @@ static MMSLogModule* mms_app_log_modules[] = {
     MMS_LIB_LOG_MODULES(MMS_LIB_LOG_MODULE)
     MMS_CONNMAN_LOG_MODULES(MMS_LIB_LOG_MODULE)
 #undef MMS_LIB_LOG_MODULE
+    NULL
 };
 
 /* Signal handler */
@@ -109,8 +211,10 @@ mms_app_option_loglevel(
     gpointer data,
     GError** error)
 {
-    return gutil_log_parse_option(value, mms_app_log_modules,
-        G_N_ELEMENTS(mms_app_log_modules), error);
+    int count = 0;
+    MMSLogModule** ptr = mms_app_log_modules;
+    while (*ptr++) count++;
+    return gutil_log_parse_option(value, mms_app_log_modules, count, error);
 }
 
 static
@@ -142,6 +246,116 @@ mms_app_option_verbose(
 {
     gutil_log_default.level = GLOG_LEVEL_VERBOSE;
     return TRUE;
+}
+
+/* Load settings from config file */
+
+static
+DAPolicy*
+mms_app_dbus_policy_new(
+    const MMSAppDBusPolicy* policy)
+{
+    if (policy) {
+        DAPolicy* access = da_policy_new_full(policy->spec, policy->actions);
+
+        if (access) {
+            return access;
+        }
+        GWARN("Invalid D-Bus policy \"%s\"", policy->spec);
+    }
+    return NULL;
+}
+
+static
+DAPolicy*
+mms_app_dbus_config_update(
+    DAPolicy* current_policy,
+    GKeyFile* file,
+    const char* group,
+    const char* key,
+    const MMSAppDBusPolicy* default_policy)
+{
+    char* value = g_key_file_get_string(file, group, key, NULL);
+    DAPolicy* policy = NULL;
+
+    if (value) {
+        policy = da_policy_new_full(value, default_policy->actions);
+        if (policy) {
+            GDEBUG("Using %s policy \"%s\"", key, value);
+        } else {
+            GWARN("Invalid %s policy \"%s\"", key, value);
+        }
+        g_free(value);
+    }
+    if (policy) {
+        da_policy_unref(current_policy);
+        return policy;
+    } else if (!current_policy) {
+        return mms_app_dbus_policy_new(default_policy);
+    } else {
+        return current_policy;
+    }
+}
+
+static
+void
+mms_app_dbus_config_init(
+    MMSEngineDbusConfig* dbus)
+{
+    dbus->engine_access =
+        mms_app_dbus_policy_new(&mms_engine_default_dbus_policy);
+    dbus->tx_list_access =
+        mms_app_dbus_policy_new(&mms_tx_list_default_dbus_policy);
+    dbus->tx_access =
+        mms_app_dbus_policy_new(&mms_tx_default_dbus_policy);
+}
+
+static
+void
+mms_app_dbus_config_clear(
+    MMSEngineDbusConfig* dbus)
+{
+    da_policy_unref(dbus->engine_access);
+    da_policy_unref(dbus->tx_list_access);
+    da_policy_unref(dbus->tx_access);
+}
+
+static
+void
+mms_app_dbus_config_parse(
+    GKeyFile* file,
+    MMSEngineDbusConfig* dbus)
+{
+    const char* group = SETTINGS_DBUS_GROUP;
+
+    dbus->engine_access = mms_app_dbus_config_update(dbus->engine_access,
+        file, group, SETTINGS_DBUS_ENGINE_ACCESS,
+        &mms_engine_default_dbus_policy);
+    dbus->tx_list_access = mms_app_dbus_config_update(dbus->tx_list_access,
+        file, group, SETTINGS_DBUS_TRANSFER_LIST_ACCESS,
+        &mms_tx_list_default_dbus_policy);
+    dbus->tx_access = mms_app_dbus_config_update(dbus->tx_access,
+        file, group, SETTINGS_DBUS_TRANSFER_ACCESS,
+        &mms_tx_default_dbus_policy);
+}
+
+static
+gboolean
+mms_app_config_load(
+    const char* config_file,
+    MMSAppOptions* opt,
+    GError** error)
+{
+    GKeyFile* file = g_key_file_new();
+    gboolean ok = g_key_file_load_from_file(file, config_file, 0, error);
+
+    if (ok) {
+        GDEBUG("Loading %s", config_file);
+        mms_settings_parse(file, &opt->global, &opt->settings);
+        mms_app_dbus_config_parse(file, &opt->dbus);
+    }
+    g_key_file_free(file);
+    return ok;
 }
 
 /**
@@ -218,7 +432,7 @@ mms_app_parse_options(
         { "attic", 'a', 0, G_OPTION_ARG_NONE,
           &opt->global.config.attic_enabled,
           "Store unrecognized push messages in the attic", NULL },
-#define OPT_VERBOSE_INDEX 12
+#define OPT_VERBOSE_INDEX 13
         { "verbose", 'v', G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
           mms_app_option_verbose, "Be verbose (equivalent to -l=verbose)",
           NULL },
@@ -270,13 +484,11 @@ mms_app_parse_options(
     if (ok) {
         if (config_file) {
             /* Config file was specified on the command line */
-            ok = mms_settings_load_defaults(config_file,
-                &opt->global, &opt->settings, &error);
+            ok = mms_app_config_load(config_file, opt, &error);
         } else {
             /* The default config file may be (and usually is) missing */
             if (g_file_test(MMS_ENGINE_CONFIG_FILE, G_FILE_TEST_EXISTS)) {
-                mms_settings_load_defaults(MMS_ENGINE_CONFIG_FILE,
-                    &opt->global, &opt->settings, NULL);
+                mms_app_config_load(MMS_ENGINE_CONFIG_FILE, opt, NULL);
             }
         }
         if (ok) {
@@ -305,9 +517,12 @@ mms_app_parse_options(
         g_error_free(error);
         *result = RET_ERR;
     } else if (log_modules) {
-        unsigned int i;
-        for (i=0; i<G_N_ELEMENTS(mms_app_log_modules); i++) {
-            printf("%s\n", mms_app_log_modules[i]->name);
+        MMSLogModule** ptr = mms_app_log_modules;
+
+        while (*ptr) {
+            MMSLogModule* log = *ptr++;
+
+            printf("%s\n", log->name);
         }
         *result = RET_OK;
         ok = FALSE;
@@ -351,10 +566,10 @@ mms_app_parse_options(
         if (keep_running) opt->flags |= MMS_ENGINE_FLAG_KEEP_RUNNING;
         if (session_bus) {
             GDEBUG("Attaching to session bus");
-            opt->bus_type = G_BUS_TYPE_SESSION;
+            opt->dbus.type = G_BUS_TYPE_SESSION;
         } else {
             GDEBUG("Attaching to system bus");
-            opt->bus_type = G_BUS_TYPE_SYSTEM;
+            opt->dbus.type = G_BUS_TYPE_SYSTEM;
         }
         *result = RET_OK;
     }
@@ -378,12 +593,13 @@ int main(int argc, char* argv[])
     memset(&opt, 0, sizeof(opt));
     mms_lib_default_config(config);
     mms_settings_sim_data_default(settings);
+    mms_app_dbus_config_init(&opt.dbus);
     if (mms_app_parse_options(&opt, argc, argv, &result)) {
         MMSEngine* engine;
 
         /* Create engine instance. This may fail */
-        engine = mms_engine_new(config, settings, opt.flags,
-            mms_app_log_modules, G_N_ELEMENTS(mms_app_log_modules));
+        engine = mms_engine_new(config, settings, &opt.dbus,
+            mms_app_log_modules, opt.flags);
         if (engine) {
 
             /* Setup main loop */
@@ -392,7 +608,7 @@ int main(int argc, char* argv[])
             guint sigint = g_unix_signal_add(SIGINT, mms_app_signal, engine);
 
             /* Acquire name, don't allow replacement */
-            guint name_id = g_bus_own_name(opt.bus_type, MMS_ENGINE_SERVICE,
+            guint name_id = g_bus_own_name(opt.dbus.type, MMS_ENGINE_SERVICE,
                 G_BUS_NAME_OWNER_FLAGS_REPLACE, mms_app_bus_acquired,
                 mms_app_name_acquired, mms_app_name_lost, engine, NULL);
 
@@ -413,6 +629,7 @@ int main(int argc, char* argv[])
     }
     g_free(opt.global.root_dir);
     mms_settings_sim_data_reset(&opt.settings);
+    mms_app_dbus_config_clear(&opt.dbus);
     mms_lib_deinit();
     return result;
 }

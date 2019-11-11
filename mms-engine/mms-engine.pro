@@ -1,7 +1,7 @@
 TEMPLATE = app
 CONFIG += link_pkgconfig
 PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf
-PKGCONFIG += libwspcodec libgofono libglibutil
+PKGCONFIG += libwspcodec libgofono libdbusaccess libglibutil
 QMAKE_CFLAGS += -Wno-unused-parameter
 
 include(../mms-lib/mms-lib-config.pri)

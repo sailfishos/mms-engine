@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2019 Jolla Ltd.
+ * Copyright (C) 2016-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,7 +17,7 @@
 #ifndef JOLLA_MMS_TRANSFER_DBUS_H
 #define JOLLA_MMS_TRANSFER_DBUS_H
 
-#include "mms_lib_types.h"
+#include "mms_transfer_list_dbus.h"
 
 #include <gio/gio.h>
 
@@ -43,6 +44,8 @@ GType mms_transfer_dbus_get_type(void);
 MMSTransferDbus*
 mms_transfer_dbus_new(
     GDBusConnection* bus,
+    DA_BUS da_bus,
+    DAPolicy* access,
     const char* id,
     const char* type);
 

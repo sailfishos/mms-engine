@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2014-2018 Jolla Ltd.
- * Copyright (C) 2014-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2014-2019 Jolla Ltd.
+ * Copyright (C) 2014-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -187,16 +188,25 @@ mms_settings_load_defaults(
     MMSSettingsSimDataCopy* data,
     GError** error)
 {
-    gboolean ok = FALSE;
     GKeyFile* file = g_key_file_new();
-    if (g_key_file_load_from_file(file, path, 0, error)) {
+    gboolean ok = g_key_file_load_from_file(file, path, 0, error);
+
+    if (ok) {
         GDEBUG("Loading %s", path);
-        mms_settings_parse_global_config(config, file);
-        mms_settings_parse_sim_config(data, file);
-        ok = TRUE;
+        mms_settings_parse(file, config, data);
     }
     g_key_file_free(file);
     return ok;
+}
+
+void
+mms_settings_parse(
+    GKeyFile* file,
+    MMSConfigCopy* config,
+    MMSSettingsSimDataCopy* data)
+{
+    mms_settings_parse_global_config(config, file);
+    mms_settings_parse_sim_config(data, file);
 }
 
 void
