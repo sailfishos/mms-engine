@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2019 Jolla Ltd.
- * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -302,6 +302,7 @@ void
 mms_app_dbus_config_init(
     MMSEngineDbusConfig* dbus)
 {
+    dbus->type = G_BUS_TYPE_SYSTEM;
     dbus->engine_access =
         mms_app_dbus_policy_new(&mms_engine_default_dbus_policy);
     dbus->tx_list_access =
@@ -327,7 +328,21 @@ mms_app_dbus_config_parse(
     MMSEngineDbusConfig* dbus)
 {
     const char* group = SETTINGS_DBUS_GROUP;
+    char* type = g_key_file_get_string(file, group, SETTINGS_DBUS_TYPE, NULL);
 
+    if (type) {
+        static const char SYSTEM_BUS[] = "system";
+        static const char SESSION_BUS[] = "session";
+
+        if (!g_strcmp0(type, SYSTEM_BUS)) {
+            dbus->type = G_BUS_TYPE_SYSTEM;
+        } else if (!g_strcmp0(type, SESSION_BUS)) {
+            dbus->type = G_BUS_TYPE_SESSION;
+        } else {
+            GWARN("Invalid D-Bys type \"%s\"", type);
+        }
+        g_free(type);
+    }
     dbus->engine_access = mms_app_dbus_config_update(dbus->engine_access,
         file, group, SETTINGS_DBUS_ENGINE_ACCESS,
         &mms_engine_default_dbus_policy);
@@ -493,6 +508,7 @@ mms_app_parse_options(
         }
         if (ok) {
             /* Parse the rest of the command line */
+            session_bus = (opt->dbus.type == G_BUS_TYPE_SESSION);
             ok = g_option_context_parse(options, &argc, &argv, &error);
         } else if (error) {
             /* Improve error message by prepending the file name */
