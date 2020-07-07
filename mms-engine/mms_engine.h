@@ -49,7 +49,8 @@
     m(SET_LOG_LEVEL) \
     m(SET_LOG_TYPE) \
     m(GET_VERSION) \
-    m(MIGRATE_SETTINGS)
+    m(MIGRATE_SETTINGS) \
+    m(EXIT)
 
 typedef enum mms_engine_action {
     /* Action ids must be non-zero, shift those by one */

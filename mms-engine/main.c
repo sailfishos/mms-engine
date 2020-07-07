@@ -57,6 +57,7 @@ typedef struct mms_app_dbus_policy {
 #define MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE     "setLogType"
 #define MMS_ENGINE_DBUS_METHOD_GET_VERSION      "getVersion"
 #define MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS "migrateSettings"
+#define MMS_ENGINE_DBUS_METHOD_EXIT             "exit"
 
 static const DA_ACTION mms_engine_dbus_actions[] = {
     #define INIT_DA_ACTION(id) \
@@ -74,7 +75,8 @@ static const MMSAppDBusPolicy mms_engine_default_dbus_policy = {
     MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE"()|"
-    MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()))|"
+    MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()|"
+    MMS_ENGINE_DBUS_METHOD_EXIT"()))|"
     "((!(user("RADIO_USER")&group("RADIO_GROUP")))&("
     MMS_ENGINE_DBUS_METHOD_PUSH"()|"
     MMS_ENGINE_DBUS_METHOD_PUSH_NOTIFY "()))=deny",

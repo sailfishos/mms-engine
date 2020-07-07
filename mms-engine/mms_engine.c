@@ -547,6 +547,23 @@ mms_engine_handle_migrate_settings(
     return TRUE;
 }
 
+/* org.nemomobile.MmsEngine.exit */
+static
+gboolean
+mms_engine_handle_exit(
+    OrgNemomobileMmsEngine* proxy,
+    GDBusMethodInvocation* call,
+    MMSEngine* engine)
+{
+    /* mms_engine_dbus_access_allowed completes the call if access is denied */
+    if (mms_engine_dbus_access_allowed(engine, call, MMS_ENGINE_ACTION_EXIT)) {
+        GDEBUG("Exit requested over D-Bus");
+        mms_engine_stop(engine);
+        org_nemomobile_mms_engine_complete_exit(proxy, call);
+    }
+    return TRUE;
+}
+
 MMSEngine*
 mms_engine_new(
     const MMSConfig* config,
@@ -636,6 +653,9 @@ mms_engine_new(
         mms->proxy_signal_id[MMS_ENGINE_METHOD_MIGRATE_SETTINGS] =
             g_signal_connect(mms->proxy, "handle-migrate-settings",
             G_CALLBACK(mms_engine_handle_migrate_settings), mms);
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_EXIT] =
+            g_signal_connect(mms->proxy, "handle-exit",
+            G_CALLBACK(mms_engine_handle_exit), mms);
 
         return mms;
     }
