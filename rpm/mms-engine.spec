@@ -5,33 +5,46 @@ Release:  1
 License:  GPLv2
 URL:      https://git.sailfishos.org/mer-core/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
+
+%define glib_version 2.32
+%define libsoup_version 2.38
+%define libwspcodec_version 2.2
+%define libgofono_version 2.0.0
+%define libgofonoext_version 1.0.4
+%define libglibutil_version 1.0.11
+%define libdbusaccess_version 1.0.10
+%define libdbuslog_version 1.0.19
+
 Requires: dbus
 Requires: ofono
-Requires: libsoup >= 2.38
-Requires: libwspcodec >= 2.2
-Requires: libgofono >= 2.0.0
-Requires: libgofonoext >= 1.0.4
-Requires: libglibutil >= 1.0.5
-Requires: libdbusaccess >= 1.0.10
+Requires: glib2 >= %{glib_version}
+Requires: libsoup >= %{libsoup_version}
+Requires: libwspcodec >= %{libwspcodec_version}
+Requires: libgofono >= %{libgofono_version}
+Requires: libgofonoext >= %{libgofonoext_version}
+Requires: libglibutil >= %{libglibutil_version}
+Requires: libdbusaccess >= %{libdbusaccess_version}
+Requires: libdbuslogserver-gio >= %{libdbuslog_version}
 Requires(post): glib2
 Requires(postun): glib2
 
+BuildRequires: systemd
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
 BuildRequires: pkgconfig(dconf)
 BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
 BuildRequires: pkgconfig(gmime-2.6)
-BuildRequires: pkgconfig(glib-2.0) >= 2.32
-BuildRequires: pkgconfig(libsoup-2.4) >= 2.38
-BuildRequires: pkgconfig(libwspcodec) >= 2.2
-BuildRequires: pkgconfig(libgofono) >= 2.0.0
-BuildRequires: pkgconfig(libgofonoext) >= 1.0.4
-BuildRequires: pkgconfig(libglibutil) >= 1.0.11
-BuildRequires: pkgconfig(libdbusaccess)
+BuildRequires: pkgconfig(glib-2.0) >= %{glib_version}
+BuildRequires: pkgconfig(libsoup-2.4) >= %{libsoup_version}
+BuildRequires: pkgconfig(libwspcodec) >= %{libwspcodec_version}
+BuildRequires: pkgconfig(libgofono) >= %{libgofono_version}
+BuildRequires: pkgconfig(libgofonoext) >= %{libgofonoext_version}
+BuildRequires: pkgconfig(libglibutil) >= %{libglibutil_version}
+BuildRequires: pkgconfig(libdbusaccess) >= %{libdbusaccess_version}
+BuildRequires: pkgconfig(libdbuslogserver-gio) >= %{libdbuslog_version}
 #BuildRequires: pkgconfig(ImageMagick)
 BuildRequires: pkgconfig(Qt5Gui)
-BuildRequires: systemd
 
 %define src mms-engine
 %define exe mms-engine

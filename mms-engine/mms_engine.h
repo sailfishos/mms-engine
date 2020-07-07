@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2019 Jolla Ltd.
- * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -32,6 +32,7 @@
 #define MMS_ENGINE_FLAG_OVERRIDE_SIZE_LIMIT (0x04)
 #define MMS_ENGINE_FLAG_OVERRIDE_MAX_PIXELS (0x08)
 #define MMS_ENGINE_FLAG_OVERRIDE_UAPROF     (0x10)
+#define MMS_ENGINE_FLAG_DISABLE_DBUS_LOG    (0x20)
 
 #ifndef MMS_ENGINE_CONFIG_FILE
 /* Default config file */

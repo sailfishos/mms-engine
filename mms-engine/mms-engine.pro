@@ -1,7 +1,7 @@
 TEMPLATE = app
 CONFIG += link_pkgconfig
 PKGCONFIG += gmime-2.6 gio-unix-2.0 gio-2.0 glib-2.0 libsoup-2.4 dconf
-PKGCONFIG += libwspcodec libgofono libdbusaccess libglibutil
+PKGCONFIG += libwspcodec libgofono libdbusaccess libglibutil libdbuslogserver-gio
 QMAKE_CFLAGS += -Wno-unused-parameter
 
 include(../mms-lib/mms-lib-config.pri)
@@ -34,9 +34,11 @@ INCLUDEPATH += $$MMS_TRANSFER_LIST_DIR/include
 
 SOURCES += \
   main.c \
-  mms_engine.c
+  mms_engine.c \
+  mms_log.c
 HEADERS += \
   mms_engine.h \
+  mms_log.h \
   mms_version.h
 OTHER_FILES += \
   org.nemomobile.MmsEngine.push.conf \

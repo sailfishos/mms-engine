@@ -398,6 +398,7 @@ mms_app_parse_options(
     char* root_dir = NULL;
     gboolean log_modules = FALSE;
     gboolean keep_running = FALSE;
+    gboolean disable_dbus_log = FALSE;
     gint size_limit_kb = -1;
     gdouble megapixels = -1;
     char* root_dir_help = g_strdup_printf(
@@ -455,6 +456,8 @@ mms_app_parse_options(
           "Log output (stdout|syslog|glib) [stdout]", "TYPE" },
         { "log-level", 'l', 0, G_OPTION_ARG_CALLBACK, mms_app_option_loglevel,
           "Set log level (repeatable)", "[MODULE:]LEVEL" },
+        { "disable-dbus-log", 'D', 0, G_OPTION_ARG_NONE, &disable_dbus_log,
+          "Disable logging over D-Bus", NULL },
         { "log-modules", 0, 0, G_OPTION_ARG_NONE, &log_modules,
           "List available log modules", NULL },
 #ifdef MMS_VERSION_STRING
@@ -580,6 +583,7 @@ mms_app_parse_options(
             root_dir = NULL;
         }
         if (keep_running) opt->flags |= MMS_ENGINE_FLAG_KEEP_RUNNING;
+        if (disable_dbus_log) opt->flags |= MMS_ENGINE_FLAG_DISABLE_DBUS_LOG;
         if (session_bus) {
             GDEBUG("Attaching to session bus");
             opt->dbus.type = G_BUS_TYPE_SESSION;
