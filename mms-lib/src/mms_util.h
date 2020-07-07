@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,7 +35,7 @@ mms_decode_bytes(
     GBytes* bytes);
 
 /* NULL-resistant variant of g_strstrip */
-G_INLINE_FUNC char* mms_strip(char* str)
+static inline char* mms_strip(char* str)
     { return str ? g_strstrip(str) : NULL; }
 
 /* Address type suffices */

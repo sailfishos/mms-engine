@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,6 +11,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+
+#define GLIB_DISABLE_DEPRECATION_WARNINGS
 
 #include "mms_task.h"
 #include "mms_handler.h"

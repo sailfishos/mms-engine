@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016-2019 Jolla Ltd.
- * Copyright (C) 2016-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2020 Jolla Ltd.
+ * Copyright (C) 2016-2020 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -12,6 +12,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+
+#define GLIB_DISABLE_DEPRECATION_WARNINGS
 
 #include "mms_transfer_dbus.h"
 #include "mms_transfer_list_dbus_log.h"
