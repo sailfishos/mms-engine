@@ -211,5 +211,8 @@
       <arg type="s" name="imsi" direction="in"/>
     </method>
 
+    <!-- Since 1.0.70 -->
+    <method name="exit"/>
+
   </interface>
 </node>

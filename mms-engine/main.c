@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2019 Jolla Ltd.
- * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -57,6 +57,7 @@ typedef struct mms_app_dbus_policy {
 #define MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE     "setLogType"
 #define MMS_ENGINE_DBUS_METHOD_GET_VERSION      "getVersion"
 #define MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS "migrateSettings"
+#define MMS_ENGINE_DBUS_METHOD_EXIT             "exit"
 
 static const DA_ACTION mms_engine_dbus_actions[] = {
     #define INIT_DA_ACTION(id) \
@@ -74,7 +75,8 @@ static const MMSAppDBusPolicy mms_engine_default_dbus_policy = {
     MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE"()|"
-    MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()))|"
+    MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()|"
+    MMS_ENGINE_DBUS_METHOD_EXIT"()))|"
     "((!(user("RADIO_USER")&group("RADIO_GROUP")))&("
     MMS_ENGINE_DBUS_METHOD_PUSH"()|"
     MMS_ENGINE_DBUS_METHOD_PUSH_NOTIFY "()))=deny",
@@ -302,6 +304,7 @@ void
 mms_app_dbus_config_init(
     MMSEngineDbusConfig* dbus)
 {
+    dbus->type = G_BUS_TYPE_SYSTEM;
     dbus->engine_access =
         mms_app_dbus_policy_new(&mms_engine_default_dbus_policy);
     dbus->tx_list_access =
@@ -327,7 +330,21 @@ mms_app_dbus_config_parse(
     MMSEngineDbusConfig* dbus)
 {
     const char* group = SETTINGS_DBUS_GROUP;
+    char* type = g_key_file_get_string(file, group, SETTINGS_DBUS_TYPE, NULL);
 
+    if (type) {
+        static const char SYSTEM_BUS[] = "system";
+        static const char SESSION_BUS[] = "session";
+
+        if (!g_strcmp0(type, SYSTEM_BUS)) {
+            dbus->type = G_BUS_TYPE_SYSTEM;
+        } else if (!g_strcmp0(type, SESSION_BUS)) {
+            dbus->type = G_BUS_TYPE_SESSION;
+        } else {
+            GWARN("Invalid D-Bys type \"%s\"", type);
+        }
+        g_free(type);
+    }
     dbus->engine_access = mms_app_dbus_config_update(dbus->engine_access,
         file, group, SETTINGS_DBUS_ENGINE_ACCESS,
         &mms_engine_default_dbus_policy);
@@ -383,6 +400,7 @@ mms_app_parse_options(
     char* root_dir = NULL;
     gboolean log_modules = FALSE;
     gboolean keep_running = FALSE;
+    gboolean disable_dbus_log = FALSE;
     gint size_limit_kb = -1;
     gdouble megapixels = -1;
     char* root_dir_help = g_strdup_printf(
@@ -440,6 +458,8 @@ mms_app_parse_options(
           "Log output (stdout|syslog|glib) [stdout]", "TYPE" },
         { "log-level", 'l', 0, G_OPTION_ARG_CALLBACK, mms_app_option_loglevel,
           "Set log level (repeatable)", "[MODULE:]LEVEL" },
+        { "disable-dbus-log", 'D', 0, G_OPTION_ARG_NONE, &disable_dbus_log,
+          "Disable logging over D-Bus", NULL },
         { "log-modules", 0, 0, G_OPTION_ARG_NONE, &log_modules,
           "List available log modules", NULL },
 #ifdef MMS_VERSION_STRING
@@ -493,6 +513,7 @@ mms_app_parse_options(
         }
         if (ok) {
             /* Parse the rest of the command line */
+            session_bus = (opt->dbus.type == G_BUS_TYPE_SESSION);
             ok = g_option_context_parse(options, &argc, &argv, &error);
         } else if (error) {
             /* Improve error message by prepending the file name */
@@ -564,6 +585,7 @@ mms_app_parse_options(
             root_dir = NULL;
         }
         if (keep_running) opt->flags |= MMS_ENGINE_FLAG_KEEP_RUNNING;
+        if (disable_dbus_log) opt->flags |= MMS_ENGINE_FLAG_DISABLE_DBUS_LOG;
         if (session_bus) {
             GDEBUG("Attaching to session bus");
             opt->dbus.type = G_BUS_TYPE_SESSION;

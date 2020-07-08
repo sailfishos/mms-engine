@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2019 Jolla Ltd.
- * Copyright (C) 2013-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2019 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -14,6 +14,8 @@
  */
 
 #include "mms_engine.h"
+#include "mms_log.h"
+
 #include "mms_dispatcher.h"
 #include "mms_settings.h"
 #include "mms_lib_util.h"
@@ -31,6 +33,8 @@
 
 /* Generated code */
 #include "org.nemomobile.MmsEngine.h"
+
+#include <dbuslog_util.h>
 
 #include <dbusaccess_peer.h>
 #include <dbusaccess_policy.h>
@@ -54,7 +58,7 @@ struct mms_engine {
     MMSSettings* settings;
     MMSDispatcher* dispatcher;
     MMSDispatcherDelegate dispatcher_delegate;
-    MMSLogModule** log_modules;
+    MMSLog* log;
     DAPolicy* dbus_access;
     DA_BUS da_bus;
     GDBusConnection* engine_bus;
@@ -63,6 +67,7 @@ struct mms_engine {
     gboolean stopped;
     gboolean stop_requested;
     gboolean keep_running;
+    gboolean disable_dbus_log;
     guint idle_timer_id;
     gulong proxy_signal_id[MMS_ENGINE_METHOD_COUNT];
 };
@@ -453,20 +458,9 @@ mms_engine_handle_set_log_level(
     if (mms_engine_dbus_access_allowed(engine, call,
         MMS_ENGINE_ACTION_SET_LOG_LEVEL)) {
         GDEBUG_("%s:%d", module, level);
-        if (module && module[0]) {
-            MMSLogModule** ptr = engine->log_modules;
-
-            while (*ptr) {
-                MMSLogModule* log = *ptr++;
-
-                if (log->name && log->name[0] && !strcmp(log->name, module)) {
-                    log->level = level;
-                    break;
-                }
-            }
-        } else {
-            gutil_log_default.level = level;
-        }
+        dbus_log_server_set_category_level(engine->log->server,
+            module[0] ? module : gutil_log_default.name,
+            dbus_log_level_from_gutil(level));
         org_nemomobile_mms_engine_complete_set_log_level(proxy, call);
     }
     mms_engine_idle_timer_check(engine);
@@ -553,6 +547,23 @@ mms_engine_handle_migrate_settings(
     return TRUE;
 }
 
+/* org.nemomobile.MmsEngine.exit */
+static
+gboolean
+mms_engine_handle_exit(
+    OrgNemomobileMmsEngine* proxy,
+    GDBusMethodInvocation* call,
+    MMSEngine* engine)
+{
+    /* mms_engine_dbus_access_allowed completes the call if access is denied */
+    if (mms_engine_dbus_access_allowed(engine, call, MMS_ENGINE_ACTION_EXIT)) {
+        GDEBUG("Exit requested over D-Bus");
+        mms_engine_stop(engine);
+        org_nemomobile_mms_engine_complete_exit(proxy, call);
+    }
+    return TRUE;
+}
+
 MMSEngine*
 mms_engine_new(
     const MMSConfig* config,
@@ -599,10 +610,14 @@ mms_engine_new(
             mms->keep_running = TRUE;
         }
 
+        if (flags & MMS_ENGINE_FLAG_DISABLE_DBUS_LOG) {
+            mms->disable_dbus_log = TRUE;
+        }
+
         mms->cm = cm;
         mms->config = config;
         mms->settings = settings;
-        mms->log_modules = log_modules;
+        mms->log = mms_log_new(dbus->type, log_modules);
         mms->dbus_access = da_policy_ref(dbus->engine_access);
         mms->da_bus = (dbus->type == G_BUS_TYPE_SESSION) ?
             DA_BUS_SESSION : DA_BUS_SYSTEM;
@@ -638,6 +653,9 @@ mms_engine_new(
         mms->proxy_signal_id[MMS_ENGINE_METHOD_MIGRATE_SETTINGS] =
             g_signal_connect(mms->proxy, "handle-migrate-settings",
             G_CALLBACK(mms_engine_handle_migrate_settings), mms);
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_EXIT] =
+            g_signal_connect(mms->proxy, "handle-exit",
+            G_CALLBACK(mms_engine_handle_exit), mms);
 
         return mms;
     }
@@ -664,14 +682,19 @@ mms_engine_run(
     MMSEngine* engine,
     GMainLoop* loop)
 {
+    DBusLogServer* logger = engine->disable_dbus_log ? NULL :
+        engine->log->server;
+
     GASSERT(!engine->loop);
     engine->loop = loop;
     engine->stopped = FALSE;
     engine->stop_requested = FALSE;
     mms_dispatcher_start(engine->dispatcher);
+    dbus_log_server_start(logger);
     mms_engine_idle_timer_check(engine);
     g_main_loop_run(loop);
     mms_engine_idle_timer_stop(engine);
+    dbus_log_server_stop(logger);
     engine->loop = NULL;
 }
 
@@ -777,8 +800,22 @@ mms_engine_dispose(
         mms_connman_unref(mms->cm);
         mms->cm = NULL;
     }
-    da_policy_unref(mms->dbus_access);
     G_OBJECT_CLASS(mms_engine_parent_class)->dispose(object);
+}
+
+/**
+ * Final stage of deinitialization
+ */
+static
+void
+mms_engine_finalize(
+    GObject* object)
+{
+    MMSEngine* engine = MMS_ENGINE(object);
+    GVERBOSE_("%p", engine);
+    da_policy_unref(engine->dbus_access);
+    mms_log_free(engine->log);
+    G_OBJECT_CLASS(mms_engine_parent_class)->finalize(object);
 }
 
 /**
@@ -792,6 +829,7 @@ mms_engine_class_init(
     GObjectClass* object_class = G_OBJECT_CLASS(klass);
     GASSERT(object_class);
     object_class->dispose = mms_engine_dispose;
+    object_class->finalize = mms_engine_finalize;
     GVERBOSE_("done");
 }
 
