@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2014-2019 Jolla Ltd.
- * Copyright (C) 2014-2019 Slava Monich <slava.monich@jolla.com>
- * Copyright (C) 2019 Open Mobile Platform LLC.
+ * Copyright (C) 2014-2020 Jolla Ltd.
+ * Copyright (C) 2014-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,6 +26,7 @@ GLOG_MODULE_DEFINE("mms-settings");
 #define SETTINGS_GLOBAL_KEY_RETRY_SEC           "RetryDelay"
 #define SETTINGS_GLOBAL_KEY_NETWORK_IDLE_SEC    "NetworkIdleTimeout"
 #define SETTINGS_GLOBAL_KEY_IDLE_SEC            "IdleTimeout"
+#define SETTINGS_GLOBAL_KEY_COVERT_TO_UTF8      "ConvertToUTF8"
 
 #define SETTINGS_DEFAULTS_GROUP                 "Defaults"
 #define SETTINGS_DEFAULTS_KEY_USER_AGENT        "UserAgent"
@@ -106,6 +107,24 @@ mms_settings_parse_uint(
 
 static
 void
+mms_settings_parse_bool(
+    GKeyFile* file,
+    const char* group,
+    const char* key,
+    gboolean* out)
+{
+    GError* error = NULL;
+    gboolean value = g_key_file_get_boolean(file, group, key, &error);
+
+    if (error) {
+        g_error_free(error);
+    } else {
+        *out = value;
+    }
+}
+
+static
+void
 mms_settings_parse_global_config(
     MMSConfigCopy* global,
     GKeyFile* file)
@@ -133,6 +152,10 @@ mms_settings_parse_global_config(
     mms_settings_parse_int(file, group,
         SETTINGS_GLOBAL_KEY_IDLE_SEC,
         &config->idle_secs, 0);
+
+    mms_settings_parse_bool(file, group,
+        SETTINGS_GLOBAL_KEY_COVERT_TO_UTF8,
+        &config->convert_to_utf8);
 }
 
 static

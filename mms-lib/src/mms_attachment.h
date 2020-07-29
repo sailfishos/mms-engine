@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2013-2014 Jolla Ltd.
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,8 +14,8 @@
  *
  */
 
-#ifndef JOLLA_MMS_ATTACHMENT_H
-#define JOLLA_MMS_ATTACHMENT_H
+#ifndef SAILFISH_MMS_ATTACHMENT_H
+#define SAILFISH_MMS_ATTACHMENT_H
 
 #include "mms_lib_types.h"
 
@@ -30,13 +32,17 @@ struct _mms_attachment {
     unsigned int flags;                 /* Flags: */
 
 #define MMS_ATTACHMENT_SMIL         (0x01)
-#define MMS_ATTACHMENT_KEEP_FILES   (0x02)
-#define MMS_ATTACHMENT_RESIZABLE    (0x04)
-
+#define MMS_ATTACHMENT_RESIZABLE    (0x02)
 };
+
+#define CONTENT_TYPE_PARAM_NAME         "name"
+#define CONTENT_TYPE_PARAM_CHARSET      "charset"
+#define MMS_DEFAULT_CHARSET             "utf-8"
 
 typedef struct mms_attachment_class {
     GObjectClass parent;
+    gboolean (*fn_init)(
+        MMSAttachment* attachment);
     void (*fn_reset)(
         MMSAttachment* attachment);
     gboolean (*fn_resize)(
@@ -45,9 +51,11 @@ typedef struct mms_attachment_class {
 } MMSAttachmentClass;
 
 GType mms_attachment_get_type(void);
+GType mms_attachment_text_get_type(void);
 GType mms_attachment_image_get_type(void);
 GType mms_attachment_jpeg_get_type(void);
 #define MMS_TYPE_ATTACHMENT         (mms_attachment_get_type())
+#define MMS_TYPE_ATTACHMENT_TEXT    (mms_attachment_text_get_type())
 #define MMS_TYPE_ATTACHMENT_IMAGE   (mms_attachment_image_get_type())
 #define MMS_TYPE_ATTACHMENT_JPEG    (mms_attachment_jpeg_get_type())
 
@@ -77,16 +85,12 @@ void
 mms_attachment_reset(
     MMSAttachment* attachment);
 
-char*
-mms_attachment_guess_content_type(
-    const char* path);
-
 gboolean
 mms_attachment_resize(
     MMSAttachment* attachment,
     const MMSSettingsSimData* settings);
 
-#endif /* JOLLA_MMS_ATTACHMENT_H */
+#endif /* SAILFISH_MMS_ATTACHMENT_H */
 
 /*
  * Local Variables:

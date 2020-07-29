@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -90,6 +91,28 @@ mms_remove_file_and_dir(
         }
         g_free(dir);
     }
+}
+
+/**
+ * Builds a file name with the same basename but in the subdirectory
+ * relative to the original file. Creates the subdirectory.
+ */
+char*
+mms_prepare_filename(
+    const char* file,
+    const char* subdir)
+{
+    char* dir = g_path_get_dirname(file);
+    char* fname = g_path_get_basename(file);
+    char* newdir = g_build_filename(dir, subdir, NULL);
+    char* out;
+
+    g_mkdir_with_parents(newdir, MMS_DIR_PERM);
+    out = g_build_filename(newdir, fname, NULL);
+    g_free(dir);
+    g_free(fname);
+    g_free(newdir);
+    return out;
 }
 
 /**

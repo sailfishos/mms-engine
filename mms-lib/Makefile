@@ -28,6 +28,7 @@ SRC = \
   mms_attachment.c \
   mms_attachment_image.c \
   mms_attachment_jpeg.c \
+  mms_attachment_text.c \
   mms_codec.c \
   mms_connection.c \
   mms_connman.c \

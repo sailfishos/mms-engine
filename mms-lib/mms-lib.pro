@@ -28,6 +28,7 @@ SOURCES += \
   src/mms_attachment.c \
   src/mms_attachment_image.c \
   src/mms_attachment_jpeg.c \
+  src/mms_attachment_text.c \
   src/mms_attachment_qt.cpp \
   src/mms_codec.c \
   src/mms_connection.c \

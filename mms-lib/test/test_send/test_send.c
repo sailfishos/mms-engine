@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -56,6 +57,7 @@ typedef struct test_desc {
 
 #define TEST_FLAG_CANCEL                  (0x1000)
 #define TEST_FLAG_NO_SIM                  (0x2000)
+#define TEST_FLAG_DONT_CONVERT_TO_UTF8    (0x4000)
 #define TEST_FLAG_REQUEST_DELIVERY_REPORT MMS_SEND_FLAG_REQUEST_DELIVERY_REPORT
 #define TEST_FLAG_REQUEST_READ_REPORT     MMS_SEND_FLAG_REQUEST_READ_REPORT
 
@@ -65,7 +67,8 @@ typedef struct test_desc {
   TEST_FLAG_REQUEST_READ_REPORT     )
 #define TEST_PRIVATE_FLAGS (\
   TEST_FLAG_CANCEL         |\
-  TEST_FLAG_NO_SIM         )
+  TEST_FLAG_NO_SIM         |\
+  TEST_FLAG_DONT_CONVERT_TO_UTF8)
 G_STATIC_ASSERT(!(TEST_PRIVATE_FLAGS & TEST_DISPATCHER_FLAGS));
 
 typedef struct test {
@@ -104,7 +107,7 @@ static const MMSAttachmentInfo test_files_reject [] = {
 };
 
 static const MMSAttachmentInfo test_txt [] = {
-    { "test.txt", "text/plain", "text" }
+    { "test.txt", NULL, "text" }
 };
 
 #define ATTACHMENTS(a) a, G_N_ELEMENTS(a)
@@ -248,6 +251,22 @@ static const TestDesc send_tests[] = {
         NULL,
         NULL,
         0,
+        NULL,
+        NULL,
+        SOUP_STATUS_INTERNAL_SERVER_ERROR,
+        MMS_SEND_STATE_TOO_BIG,
+        NULL,
+        NULL
+    },{
+        "DontConvertToUtf8",
+        ATTACHMENTS(test_txt),
+        100,
+        "No conversion to UTF-8",
+        "+1234567890",
+        NULL,
+        NULL,
+        NULL,
+        TEST_FLAG_DONT_CONVERT_TO_UTF8,
         NULL,
         NULL,
         SOUP_STATUS_INTERNAL_SERVER_ERROR,
@@ -445,6 +464,9 @@ test_run_once(
 {
     Test test;
     MMSConfig test_config = *config;
+    if (desc->flags & TEST_FLAG_DONT_CONVERT_TO_UTF8) {
+        test_config.convert_to_utf8 = FALSE;
+    }
     if (test_init(&test, &test_config, desc)) {
         GError* error = NULL;
         char* imsi = desc->imsi ? g_strdup(desc->imsi) :

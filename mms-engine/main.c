@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
- * Copyright (C) 2019 Open Mobile Platform LLC.
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -403,18 +403,21 @@ mms_app_parse_options(
     gboolean disable_dbus_log = FALSE;
     gint size_limit_kb = -1;
     gdouble megapixels = -1;
+    MMSConfig* config = &opt->global.config;
+    MMSSettingsSimDataCopy* settings = &opt->settings;
+
     char* root_dir_help = g_strdup_printf(
         "Root directory for MMS files [%s]",
-        opt->global.config.root_dir);
+        config->root_dir);
     char* retry_secs_help = g_strdup_printf(
         "Retry period in seconds [%d]",
-        opt->global.config.retry_secs);
+        config->retry_secs);
     char* network_idle_secs_help = g_strdup_printf(
         "Network inactivity timeout in seconds [%d]",
-        opt->global.config.network_idle_secs);
+        config->network_idle_secs);
     char* idle_secs_help = g_strdup_printf(
         "Service inactivity timeout in seconds [%d]",
-        opt->global.config.idle_secs);
+        config->idle_secs);
     char* description = gutil_log_description(NULL, 0);
 
     GOptionContext* options;
@@ -428,12 +431,12 @@ mms_app_parse_options(
         { "root-dir", 'd', 0, G_OPTION_ARG_FILENAME,
           &root_dir, root_dir_help, "DIR" },
         { "retry-secs", 'r', 0, G_OPTION_ARG_INT,
-          &opt->global.config.retry_secs, retry_secs_help, "SEC" },
+          &config->retry_secs, retry_secs_help, "SEC" },
         { "network-idle-secs", 'n', 0, G_OPTION_ARG_INT,
-          &opt->global.config.network_idle_secs,
+          &config->network_idle_secs,
           network_idle_secs_help, "SEC" },
         { "idle-secs", 'i', 0, G_OPTION_ARG_INT,
-          &opt->global.config.idle_secs, idle_secs_help, "SEC" },
+          &config->idle_secs, idle_secs_help, "SEC" },
         { "size-limit", 's', 0, G_OPTION_ARG_INT,
           &size_limit_kb, "Maximum size for outgoing messages", "KB" },
         { "pix-limit", 'p', 0, G_OPTION_ARG_DOUBLE,
@@ -445,12 +448,15 @@ mms_app_parse_options(
         { "keep-running", 'k', 0, G_OPTION_ARG_NONE, &keep_running,
           "Keep running after everything is done", NULL },
         { "keep-temp-files", 't', 0, G_OPTION_ARG_NONE,
-           &opt->global.config.keep_temp_files,
+           &config->keep_temp_files,
           "Don't delete temporary files", NULL },
+        { "preserve-encoding", 'e', G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE,
+           &config->convert_to_utf8,
+          "Don't convert text parts to UTF-8", NULL },
         { "attic", 'a', 0, G_OPTION_ARG_NONE,
-          &opt->global.config.attic_enabled,
+          &config->attic_enabled,
           "Store unrecognized push messages in the attic", NULL },
-#define OPT_VERBOSE_INDEX 13
+#define OPT_VERBOSE_INDEX 14
         { "verbose", 'v', G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
           mms_app_option_verbose, "Be verbose (equivalent to -l=verbose)",
           NULL },
@@ -560,28 +566,28 @@ mms_app_parse_options(
         GINFO("Starting");
 #endif
         if (size_limit_kb >= 0) {
-            opt->settings.data.size_limit = size_limit_kb * 1024;
+            settings->data.size_limit = size_limit_kb * 1024;
             opt->flags |= MMS_ENGINE_FLAG_OVERRIDE_SIZE_LIMIT;
         }
         if (megapixels >= 0) {
-            opt->settings.data.max_pixels = (int)(megapixels*1000)*1000;
+            settings->data.max_pixels = (int)(megapixels*1000)*1000;
             opt->flags |= MMS_ENGINE_FLAG_OVERRIDE_MAX_PIXELS;
         }
         if (ua) {
-            g_free(opt->settings.user_agent);
-            opt->settings.data.user_agent = opt->settings.user_agent = ua;
+            g_free(settings->user_agent);
+            settings->data.user_agent = settings->user_agent = ua;
             opt->flags |= MMS_ENGINE_FLAG_OVERRIDE_USER_AGENT;
             ua = NULL;
         }
         if (uaprof) {
-            g_free(opt->settings.uaprof);
-            opt->settings.data.uaprof = opt->settings.uaprof = uaprof;
+            g_free(settings->uaprof);
+            settings->data.uaprof = settings->uaprof = uaprof;
             opt->flags |= MMS_ENGINE_FLAG_OVERRIDE_UAPROF;
             uaprof = NULL;
         }
         if (root_dir) {
             g_free(opt->global.root_dir);
-            opt->global.config.root_dir = opt->global.root_dir = root_dir;
+            config->root_dir = opt->global.root_dir = root_dir;
             root_dir = NULL;
         }
         if (keep_running) opt->flags |= MMS_ENGINE_FLAG_KEEP_RUNNING;
