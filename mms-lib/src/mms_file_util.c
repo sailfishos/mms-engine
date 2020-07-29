@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -108,7 +108,7 @@ mms_create_file(
     int fd = -1;
     int err = g_mkdir_with_parents(dir, MMS_DIR_PERM);
     if (!err || errno == EEXIST) {
-        char* fname = g_strconcat(dir, "/", file, NULL);
+        char* fname = g_build_filename(dir, file, NULL);
         fd = open(fname, O_CREAT|O_RDWR|O_TRUNC|O_BINARY, MMS_FILE_PERM);
         if (fd < 0) {
             MMS_ERROR(error, MMS_LIB_ERROR_IO,
@@ -140,7 +140,7 @@ mms_write_file(
     int err = g_mkdir_with_parents(dir, MMS_DIR_PERM);
     if (!err || errno == EEXIST) {
         GError* error = NULL;
-        char* fname = g_strconcat(dir, "/", file, NULL);
+        char* fname = g_build_filename(dir, file, NULL);
         unlink(fname);
         if (g_file_set_contents(fname, data, size, &error)) {
             GVERBOSE("Created %s", fname);

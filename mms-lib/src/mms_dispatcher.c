@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -800,7 +800,7 @@ mms_dispatcher_finalize(
 {
     MMSTask* task;
     const char* root_dir = disp->settings->config->root_dir;
-    char* msg_dir = g_strconcat(root_dir, "/" MMS_MESSAGE_DIR "/", NULL);
+    char* msg_dir = g_build_filename(root_dir, MMS_MESSAGE_DIR, NULL);
     GVERBOSE_("");
     mms_handler_remove_callback(disp->handler, disp->handler_done_id);
     mms_connman_remove_callback(disp->cm, disp->connman_done_id);

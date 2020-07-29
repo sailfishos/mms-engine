@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -122,7 +122,7 @@ mms_task_decode_part(
     orig_file = mms_task_decode_add_file_name(part_files, default_name);
     g_free(default_name);
 
-    part->orig = g_strconcat(dir, "/", orig_file, NULL);
+    part->orig = g_build_filename(dir, orig_file, NULL);
     if (rename(part->file, part->orig) == 0) {
         GError* error = NULL;
         if (!mms_file_decode(part->orig, part->file, enc, &error)) {
@@ -202,7 +202,7 @@ mms_task_decode_retrieve_conf(
         break;
     }
 
-    msg->parts_dir = g_strconcat(dir, "/" , MMS_PARTS_DIR, NULL);
+    msg->parts_dir = g_build_filename(dir, MMS_PARTS_DIR, NULL);
     for (i=0, entry = pdu->attachments; entry; entry = entry->next, i++) {
         struct mms_attachment* attach = entry->data;
         const char* name =  attach->content_location ?

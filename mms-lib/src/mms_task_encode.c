@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -426,13 +426,13 @@ mms_task_encode_generate_path(
     }
 
     /* Most likely the very first check would succeed */
-    path = g_strconcat(dir, "/", file, NULL);
+    path = g_build_filename(dir, file, NULL);
     if (g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
         for (i=0; i<100; i++) {
             char* newfile = g_strconcat("_", file, NULL);
             g_free(tmpfile);
             g_free(path);
-            path = g_strconcat(dir, "/", newfile, NULL);
+            path = g_build_filename(dir, newfile, NULL);
             file = tmpfile = newfile;
             if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) break;
         }

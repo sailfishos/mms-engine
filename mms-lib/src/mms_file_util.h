@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2015 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,8 +13,8 @@
  *
  */
 
-#ifndef JOLLA_MMS_FILE_UTIL_H
-#define JOLLA_MMS_FILE_UTIL_H
+#ifndef SAILFISH_MMS_FILE_UTIL_H
+#define SAILFISH_MMS_FILE_UTIL_H
 
 #include "mms_lib_types.h"
 
@@ -86,14 +86,14 @@ mms_file_decode(
     GError** error);
 
 #define mms_message_dir(config,id) \
-    (g_strconcat((config)->root_dir, "/" MMS_MESSAGE_DIR "/" , id, NULL))
+    (g_build_filename((config)->root_dir, MMS_MESSAGE_DIR, id, NULL))
 #define mms_task_dir(task) \
     mms_message_dir(task_config(task),(task)->id)
 #define mms_task_file(task,file) \
-    (g_strconcat(task_config(task)->root_dir, "/" MMS_MESSAGE_DIR "/" , \
-    (task)->id, "/", file, NULL))
+    (g_build_filename(task_config(task)->root_dir, MMS_MESSAGE_DIR, \
+    (task)->id, file, NULL))
 
-#endif /* JOLLA_MMS_FILE_UTIL_H */
+#endif /* SAILFISH_MMS_FILE_UTIL_H */
 
 /*
  * Local Variables:

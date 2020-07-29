@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -59,13 +59,12 @@ mms_attachment_image_prepare_filename(
         image->attachment.file_name = image->attachment.original_file;
     } else {
         char* dir = g_path_get_dirname(image->attachment.original_file);
-        char* subdir = g_strconcat(dir, "/"  MMS_RESIZE_DIR, NULL);
+        char* fname = g_path_get_basename(image->attachment.original_file);
+        char* subdir = g_build_filename(dir, MMS_RESIZE_DIR, NULL);
         g_mkdir_with_parents(subdir, MMS_DIR_PERM);
-        G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
-        image->resized = g_strconcat(subdir, "/",
-            g_basename(image->attachment.original_file), NULL);
-        G_GNUC_END_IGNORE_DEPRECATIONS;
+        image->resized = g_build_filename(subdir, fname, NULL);
         g_free(dir);
+        g_free(fname);
         g_free(subdir);
     }
     return image->resized;

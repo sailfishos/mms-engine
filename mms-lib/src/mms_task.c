@@ -359,10 +359,10 @@ mms_task_make_id(
 {
     if (!task->id || !task->id[0]) {
         const char* root_dir = task_config(task)->root_dir;
-        char* msgdir = g_strconcat(root_dir, "/", MMS_MESSAGE_DIR, NULL);
+        char* msgdir = g_build_filename(root_dir, MMS_MESSAGE_DIR, NULL);
         int err = g_mkdir_with_parents(msgdir, MMS_DIR_PERM);
         if (!err || errno == EEXIST) {
-            char* tmpl = g_strconcat(msgdir, "/XXXXXX" , NULL);
+            char* tmpl = g_build_filename(msgdir, "XXXXXX", NULL);
             char* taskdir = g_mkdtemp_full(tmpl, MMS_DIR_PERM);
             if (taskdir) {
                 g_free(task->id);

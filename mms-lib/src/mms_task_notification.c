@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2017 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -93,7 +93,7 @@ mms_task_notification_done(
             GDEBUG("  Database id: %s", id);
             if (task->id) {
                 char* olddir = mms_task_dir(task);
-                char* file = g_strconcat(olddir, "/"
+                char* file = g_build_filename(olddir,
                     MMS_NOTIFICATION_IND_FILE, NULL);
                 /* Replace fake id with the real one */
                 g_free(task->id);
