@@ -11,7 +11,7 @@ Source0:  %{name}-%{version}.tar.bz2
 %define libwspcodec_version 2.2
 %define libgofono_version 2.0.0
 %define libgofonoext_version 1.0.4
-%define libglibutil_version 1.0.11
+%define libglibutil_version 1.0.47
 %define libdbusaccess_version 1.0.10
 %define libdbuslog_version 1.0.19
 

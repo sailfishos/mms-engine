@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,7 +30,7 @@
 #define MMS_MESSAGE_DIR                 "msg"
 #define MMS_PARTS_DIR                   "parts"
 #define MMS_ENCODE_DIR                  "encode"
-#define MMS_RESIZE_DIR                  "resize"
+#define MMS_CONVERT_DIR                 "convert"
 
 #define MMS_NOTIFICATION_IND_FILE       "m-notification.ind"
 #define MMS_NOTIFYRESP_IND_FILE         "m-notifyresp.ind"
@@ -50,12 +51,19 @@ void
 mms_remove_file_and_dir(
     const char* file);
 
+char*
+mms_prepare_filename(
+    const char* file,
+    const char* subdir)
+    G_GNUC_WARN_UNUSED_RESULT;
+
 int
 mms_create_file(
     const char* dir,
     const char* fname,
     char** path,
-    GError** error);
+    GError** error)
+    G_GNUC_WARN_UNUSED_RESULT;
 
 gboolean
 mms_write_file(

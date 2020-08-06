@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2014-2019 Jolla Ltd.
- * Copyright (C) 2014-2019 Slava Monich <slava.monich@jolla.com>
- * Copyright (C) 2019 Open Mobile Platform LLC.
+ * Copyright (C) 2014-2020 Jolla Ltd.
+ * Copyright (C) 2014-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,8 +13,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef JOLLA_MMS_SETTINGS_H
-#define JOLLA_MMS_SETTINGS_H
+#ifndef SAILFISH_MMS_SETTINGS_H
+#define SAILFISH_MMS_SETTINGS_H
 
 #include "mms_lib_types.h"
 
@@ -24,6 +24,7 @@ struct mms_config {
     int retry_secs;             /* Retry timeout in seconds */
     int network_idle_secs;      /* Network inactivity timeout */
     int idle_secs;              /* Service inactivity timeout */
+    gboolean convert_to_utf8;   /* Convert text parts to UTF-8 */
     gboolean keep_temp_files;   /* Keep temporary files around */
     gboolean attic_enabled;     /* Keep unrecognized push message in attic */
 };
@@ -145,7 +146,7 @@ mms_settings_sim_data_copy(
 #define mms_settings_sim_data_reset(data) \
     mms_settings_sim_data_copy(data,NULL)
 
-#endif /* JOLLA_MMS_SETTINGS_H */
+#endif /* SAILFISH_MMS_SETTINGS_H */
 
 /*
  * Local Variables:

@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -70,6 +71,7 @@ mms_lib_default_config(
     config->idle_secs = MMS_CONFIG_DEFAULT_IDLE_SECS;
     config->keep_temp_files = FALSE;
     config->attic_enabled = FALSE;
+    config->convert_to_utf8 = TRUE;
 }
 
 /*

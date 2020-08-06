@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -192,7 +193,7 @@ mms_encode_job_encode(
         }
 
         close(fd);
-        if (!ok) {
+        if (!ok && job->path) {
             unlink(job->path);
             g_free(job->path);
             job->path = NULL;
@@ -233,7 +234,9 @@ mms_encode_job_run(
     if (size > 0 && (!size_limit || size <= size_limit)) {
         job->state = MMS_ENCODE_STATE_DONE;
     } else {
-        unlink(job->path);
+        if (job->path) {
+            unlink(job->path);
+        }
         g_free(job->path);
         job->path = NULL;
         job->state = (size > 0) ? MMS_ENCODE_STATE_TOO_BIG :
@@ -456,13 +459,8 @@ mms_task_encode_prepare_attachments(
     for (i=0; i<nparts; i++) {
         MMSAttachment* attachment = NULL;
         MMSAttachmentInfo info = parts[i];
-        char* detected_type = NULL;
         char* path;
 
-        if (!info.content_type || !info.content_type[0]) {
-            detected_type = mms_attachment_guess_content_type(info.file_name);
-            info.content_type = detected_type;
-        }
         G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
         path = mms_task_encode_generate_path(dir,
             g_basename(info.file_name), info.content_type);
@@ -482,7 +480,6 @@ mms_task_encode_prepare_attachments(
             GERR("%s", GERRMSG(*error));
         }
 
-        g_free(detected_type);
         g_free(path);
         if (!attachment) break;
     }

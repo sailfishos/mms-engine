@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -54,18 +55,12 @@ const char*
 mms_attachment_image_prepare_filename(
     MMSAttachmentImage* image)
 {
+    char* original = image->attachment.original_file;
     if (image->resized) {
         remove(image->resized);
-        image->attachment.file_name = image->attachment.original_file;
+        image->attachment.file_name = original;
     } else {
-        char* dir = g_path_get_dirname(image->attachment.original_file);
-        char* fname = g_path_get_basename(image->attachment.original_file);
-        char* subdir = g_build_filename(dir, MMS_RESIZE_DIR, NULL);
-        g_mkdir_with_parents(subdir, MMS_DIR_PERM);
-        image->resized = g_build_filename(subdir, fname, NULL);
-        g_free(dir);
-        g_free(fname);
-        g_free(subdir);
+        image->resized = mms_prepare_filename(original, MMS_CONVERT_DIR);
     }
     return image->resized;
 }
@@ -300,8 +295,7 @@ mms_attachment_image_finalize(
     GObject* object)
 {
     MMSAttachmentImage* image = MMS_ATTACHMENT_IMAGE(object);
-    if (!image->attachment.config->keep_temp_files &&
-        !(image->attachment.flags & MMS_ATTACHMENT_KEEP_FILES)) {
+    if (!image->attachment.config->keep_temp_files) {
         mms_remove_file_and_dir(image->resized);
     }
     g_free(image->resized);
