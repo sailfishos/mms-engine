@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2020 Jolla Ltd.
+ * Copyright (C) 2016-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +18,12 @@
 
 #include "mms_lib_types.h"
 
+typedef struct test_opt {
+    int flags;
+} TestOpt;
+
+#define TEST_FLAG_DEBUG (0x01)
+
 typedef struct test_dirs {
     char* root;
     char* msg;
@@ -33,6 +39,13 @@ void
 test_dirs_cleanup(
     TestDirs* dirs,
     gboolean remove);
+
+/* Should be invoked after g_test_init */
+void
+test_init(
+    TestOpt* opt,
+    int* argc,
+    char** argv);
 
 #endif /* TEST_UTIL_H */
 

@@ -1,6 +1,6 @@
 # -*- Mode: makefile-gmake -*-
 
 EXE = test_media_type
-SRC = $(EXE).c
+COMMON_SRC = test_util.c
 
 include ../common/Makefile

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,8 +12,13 @@
  * GNU General Public License for more details.
  */
 
+#include "test_util.h"
+
 #include "mms_codec.h"
+
 #include <gutil_log.h>
+
+static TestOpt test_opt;
 
 typedef struct test_desc {
     const char* name;
@@ -64,62 +69,51 @@ static const TestDesc media_type_tests[] = {
 };
 
 static
-gboolean
+void
 run_test(
-    const TestDesc* test)
+    gconstpointer data)
 {
-    gboolean ok = FALSE;
+    const TestDesc* test = data;
     char** parsed = mms_parse_http_content_type(test->input);
+
     if (parsed) {
         if (test->output) {
             char* unparsed = mms_unparse_http_content_type(parsed);
-            if (!strcmp(unparsed, test->output)) {
-                char** p1 = parsed;
-                char** p2 = test->parsed;
-                ok = TRUE;
-                while (*p1 && ok) {
-                    if (*p2) {
-                        ok = !strcmp(*p1++, *p2++);
-                    } else {
-                        ok = FALSE;
-                        break;
-                    }
-                }
-                if (*p2) ok = FALSE;
-                g_free(unparsed);
+            char** p1 = parsed;
+            char** p2 = test->parsed;
+
+            g_assert(unparsed);
+            g_assert_cmpstr(unparsed, == ,test->output);
+            while (*p1) {
+                g_assert(*p2);
+                g_assert_cmpstr(*p1, == ,*p2);
+                p1++;
+                p2++;
             }
+            g_free(unparsed);
         }
-    } else if (!test->output) {
-        /* Test is expected to fail */
-        ok = TRUE;
+        g_strfreev(parsed);
+    } else {
+        g_assert(!test->output); /* Test is expected to fail */
     }
-    g_strfreev(parsed);
-    GINFO("%s: %s", ok ? "OK" : "FAILED", test->name);
-    return ok;
 }
 
-static
-gboolean
-run_tests(
-    const TestDesc* tests,
-    int count)
-{
-    int i;
-    gboolean ok = TRUE;
-    for (i=0; i<count; i++) {
-        if (!run_test(tests + i)) {
-            ok = FALSE;
-        }
-    }
-    return ok;
-}
+#define TEST_(x) "/MediaType/" x
 
 int main(int argc, char* argv[])
 {
-    gutil_log_set_type(GLOG_TYPE_STDOUT, "test_media_type");
-    gutil_log_timestamp = FALSE;
-    gutil_log_default.level = GLOG_LEVEL_INFO;
-    return !run_tests(media_type_tests, G_N_ELEMENTS(media_type_tests));
+    guint i;
+
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(media_type_tests); i++) {
+        const TestDesc* test = media_type_tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
+
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
+    }
+    return g_test_run();
 }
 
 /*
