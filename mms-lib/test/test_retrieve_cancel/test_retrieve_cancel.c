@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -8,10 +8,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
+#include "test_util.h"
 #include "test_connman.h"
 #include "test_handler.h"
 
@@ -22,9 +23,7 @@
 #include <gutil_log.h>
 #include <gutil_macros.h>
 
-#define RET_OK      (0)
-#define RET_ERR     (1)
-#define RET_TIMEOUT (2)
+static TestOpt test_opt;
 
 typedef struct test_desc {
     const char* name;
@@ -44,9 +43,7 @@ typedef struct test {
     GBytes* pdu;
     GMainLoop* loop;
     guint cancel_id;
-    guint timeout_id;
     char* id;
-    int ret;
 } Test;
 
 static
@@ -56,70 +53,8 @@ test_done(
     MMSDispatcher* dispatcher)
 {
     Test* test = G_CAST(delegate,Test,delegate);
-    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED",
-        test->desc->name);
+
     g_main_loop_quit(test->loop);
-}
-
-static
-gboolean
-test_timeout(
-    gpointer data)
-{
-    Test* test = data;
-    test->timeout_id = 0;
-    test->ret = RET_TIMEOUT;
-    GINFO("%s TIMEOUT", test->desc->name);
-    mms_dispatcher_cancel(test->disp, NULL);
-    return FALSE;
-}
-
-static
-void
-test_init(
-    Test* test,
-    MMSConfig* config,
-    const TestDesc* desc)
-{
-    MMSSettings* settings = mms_settings_default_new(config);
-    memset(test, 0, sizeof(*test));
-    config->retry_secs = desc->retry_secs;
-    test->desc = desc;
-    test->cm = mms_connman_test_new();
-    test->handler = mms_handler_test_new();
-    test->disp = mms_dispatcher_new(settings, test->cm, test->handler, NULL);
-    test->pdu = g_bytes_new_static(desc->pdu, desc->pdusize);
-    test->loop = g_main_loop_new(NULL, FALSE);
-    test->delegate.fn_done = test_done;
-    mms_dispatcher_set_delegate(test->disp, &test->delegate);
-    test->timeout_id = g_timeout_add_seconds(10, test_timeout, test);
-    mms_settings_unref(settings);
-    if (desc->prenotify_fn) {
-        mms_handler_test_set_prenotify_fn(test->handler,
-            desc->prenotify_fn, test);
-    }
-    if (desc->postnotify_fn) {
-        mms_handler_test_set_postnotify_fn(test->handler,
-            desc->postnotify_fn, test);
-    }
-    test->ret = RET_ERR;
-}
-
-static
-void
-test_finalize(
-    Test* test)
-{
-    if (test->timeout_id) {
-        g_source_remove(test->timeout_id);
-        test->timeout_id = 0;
-    }
-    mms_connman_unref(test->cm);
-    mms_handler_unref(test->handler);
-    mms_dispatcher_unref(test->disp);
-    g_bytes_unref(test->pdu);
-    g_main_loop_unref(test->loop);
-    g_free(test->id);
 }
 
 static
@@ -128,10 +63,11 @@ test_cancel(
     void* param)
 {
     Test* test = param;
+
     test->cancel_id = 0;
     GDEBUG("Asynchronous cancel %s", test->id ? test->id : "all");
     mms_dispatcher_cancel(test->disp, test->id);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 static
@@ -142,6 +78,7 @@ test_postnotify_cancel_async(
     void* param)
 {
     Test* test = param;
+
     GASSERT(!test->id);
     GASSERT(!test->cancel_id);
     GDEBUG("Scheduling asynchronous cancel for %s", id);
@@ -157,6 +94,7 @@ test_postnotify_cancel(
     void* param)
 {
     Test* test = param;
+
     GDEBUG("Cancel all");
     mms_dispatcher_cancel(test->disp, NULL);
 }
@@ -173,6 +111,7 @@ test_prenotify_cancel_async(
     void* param)
 {
     Test* test = param;
+
     GASSERT(!test->cancel_id);
     /* High priority item gets executed before notification is completed */
     GDEBUG("Scheduling asynchronous cancel");
@@ -181,120 +120,136 @@ test_prenotify_cancel_async(
 }
 
 static
-int
-test_once(
-    const TestDesc* desc)
+void
+run_test(
+    gconstpointer data)
 {
+    const TestDesc* desc = data;
     Test test;
     MMSConfig config;
+    MMSSettings* settings;
     GError* error = NULL;
-    GVERBOSE(">>>>>>>>>>>>>> %s <<<<<<<<<<<<<<", desc->name);
+
     mms_lib_default_config(&config);
     config.root_dir = "."; /* Dispatcher will attempt to create it */
-    test_init(&test, &config, desc);
-    if (mms_dispatcher_handle_push(test.disp, "IMSI", test.pdu, &error)) {
-        if (mms_dispatcher_start(test.disp)) {
-            test.ret = RET_OK;
-            g_main_loop_run(test.loop);
-        }
-    } else {
-        g_error_free(error);
+    config.retry_secs = desc->retry_secs;
+
+    memset(&test, 0, sizeof(test));
+    settings = mms_settings_default_new(&config);
+    test.desc = desc;
+    test.cm = mms_connman_test_new();
+    test.handler = mms_handler_test_new();
+    test.disp = mms_dispatcher_new(settings, test.cm, test.handler, NULL);
+    test.pdu = g_bytes_new_static(desc->pdu, desc->pdusize);
+    test.loop = g_main_loop_new(NULL, FALSE);
+    test.delegate.fn_done = test_done;
+    mms_dispatcher_set_delegate(test.disp, &test.delegate);
+    mms_settings_unref(settings);
+    if (desc->prenotify_fn) {
+        mms_handler_test_set_prenotify_fn(test.handler,
+            desc->prenotify_fn, &test);
     }
-    test_finalize(&test);
-    return test.ret;
+    if (desc->postnotify_fn) {
+        mms_handler_test_set_postnotify_fn(test.handler,
+            desc->postnotify_fn, &test);
+    }
+
+    g_assert(mms_dispatcher_handle_push(test.disp, "IMSI", test.pdu, &error));
+    g_assert(mms_dispatcher_start(test.disp));
+    test_run_loop(&test_opt, test.loop);
+
+    mms_connman_unref(test.cm);
+    mms_handler_unref(test.handler);
+    mms_dispatcher_unref(test.disp);
+    g_bytes_unref(test.pdu);
+    g_main_loop_unref(test.loop);
+    g_free(test.id);
 }
 
-static
-int
-test_run()
-{
-    /*
-     * WSP header:
-     *   application/vnd.wap.mms-message
-     * MMS headers:
-     *   X-Mms-Message-Type: M-Notification.ind
-     *   X-Mms-Transaction-Id: Ad0b9pXNC
-     *   X-Mms-MMS-Version: 1.2
-     *   From: +358540000000/TYPE=PLMN
-     *   X-Mms-Delivery-Report: No
-     *   X-Mms-Message-Class: Personal
-     *   X-Mms-Message-Size: 137105
-     *   X-Mms-Expiry: +259199 sec
-     *   X-Mms-Content-Location: http://mmsc42:10021/mmsc/4_2?Ad0b9pXNC
-     */
-    static const guint8 plus_259199_sec[] = {
-        0x8c,0x82,0x98,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,
-        0x00,0x8d,0x92,0x89,0x19,0x80,0x2b,0x33,0x35,0x38,0x35,0x34,
-        0x30,0x30,0x30,0x30,0x30,0x30,0x30,0x2f,0x54,0x59,0x50,0x45,
-        0x3d,0x50,0x4c,0x4d,0x4e,0x00,0x86,0x81,0x8a,0x80,0x8e,0x03,
-        0x02,0x17,0x91,0x88,0x05,0x81,0x03,0x03,0xf4,0x7f,0x83,0x68,
-        0x74,0x74,0x70,0x3a,0x2f,0x2f,0x6d,0x6d,0x73,0x63,0x34,0x32,
-        0x3a,0x31,0x30,0x30,0x32,0x31,0x2f,0x6d,0x6d,0x73,0x63,0x2f,
-        0x34,0x5f,0x32,0x3f,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,
-        0x43,0x00
-    };
+/*
+ * WSP header:
+ *   application/vnd.wap.mms-message
+ * MMS headers:
+ *   X-Mms-Message-Type: M-Notification.ind
+ *   X-Mms-Transaction-Id: Ad0b9pXNC
+ *   X-Mms-MMS-Version: 1.2
+ *   From: +358540000000/TYPE=PLMN
+ *   X-Mms-Delivery-Report: No
+ *   X-Mms-Message-Class: Personal
+ *   X-Mms-Message-Size: 137105
+ *   X-Mms-Expiry: +259199 sec
+ *   X-Mms-Content-Location: http://mmsc42:10021/mmsc/4_2?Ad0b9pXNC
+ */
+static const guint8 plus_259199_sec[] = {
+    0x8c,0x82,0x98,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,
+    0x00,0x8d,0x92,0x89,0x19,0x80,0x2b,0x33,0x35,0x38,0x35,0x34,
+    0x30,0x30,0x30,0x30,0x30,0x30,0x30,0x2f,0x54,0x59,0x50,0x45,
+    0x3d,0x50,0x4c,0x4d,0x4e,0x00,0x86,0x81,0x8a,0x80,0x8e,0x03,
+    0x02,0x17,0x91,0x88,0x05,0x81,0x03,0x03,0xf4,0x7f,0x83,0x68,
+    0x74,0x74,0x70,0x3a,0x2f,0x2f,0x6d,0x6d,0x73,0x63,0x34,0x32,
+    0x3a,0x31,0x30,0x30,0x32,0x31,0x2f,0x6d,0x6d,0x73,0x63,0x2f,
+    0x34,0x5f,0x32,0x3f,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,
+    0x43,0x00
+};
 
-    /*
-     * WSP header:
-     *   application/vnd.wap.mms-message
-     * MMS headers:
-     *   X-Mms-Message-Type: M-Notification.ind
-     *   X-Mms-Transaction-Id: Ad0b9pXNC
-     *   X-Mms-MMS-Version: 1.2
-     *   From: +358540000000/TYPE=PLMN
-     *   X-Mms-Delivery-Report: No
-     *   X-Mms-Message-Class: Personal
-     *   X-Mms-Message-Size: 137105
-     *   X-Mms-Expiry: +1 sec
-     *   X-Mms-Content-Location: http://mmsc42:10021/mmsc/4_2?Ad0b9pXNC
-     */
-    static const guint8 plus_1_sec[] = {
-        0x8c,0x82,0x98,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,
-        0x00,0x8d,0x92,0x89,0x19,0x80,0x2b,0x33,0x35,0x38,0x35,0x34,
-        0x30,0x30,0x30,0x30,0x30,0x30,0x30,0x2f,0x54,0x59,0x50,0x45,
-        0x3d,0x50,0x4c,0x4d,0x4e,0x00,0x86,0x81,0x8a,0x80,0x8e,0x03,
-        0x02,0x17,0x91,0x88,0x03,0x81,0x01,0x01,0x83,0x68,0x74,0x74,
-        0x70,0x3a,0x2f,0x2f,0x6d,0x6d,0x73,0x63,0x34,0x32,0x3a,0x31,
-        0x30,0x30,0x32,0x31,0x2f,0x6d,0x6d,0x73,0x63,0x2f,0x34,0x5f,
-        0x32,0x3f,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,0x00
-    };
+/*
+ * WSP header:
+ *   application/vnd.wap.mms-message
+ * MMS headers:
+ *   X-Mms-Message-Type: M-Notification.ind
+ *   X-Mms-Transaction-Id: Ad0b9pXNC
+ *   X-Mms-MMS-Version: 1.2
+ *   From: +358540000000/TYPE=PLMN
+ *   X-Mms-Delivery-Report: No
+ *   X-Mms-Message-Class: Personal
+ *   X-Mms-Message-Size: 137105
+ *   X-Mms-Expiry: +1 sec
+ *   X-Mms-Content-Location: http://mmsc42:10021/mmsc/4_2?Ad0b9pXNC
+ */
+static const guint8 plus_1_sec[] = {
+    0x8c,0x82,0x98,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,
+    0x00,0x8d,0x92,0x89,0x19,0x80,0x2b,0x33,0x35,0x38,0x35,0x34,
+    0x30,0x30,0x30,0x30,0x30,0x30,0x30,0x2f,0x54,0x59,0x50,0x45,
+    0x3d,0x50,0x4c,0x4d,0x4e,0x00,0x86,0x81,0x8a,0x80,0x8e,0x03,
+    0x02,0x17,0x91,0x88,0x03,0x81,0x01,0x01,0x83,0x68,0x74,0x74,
+    0x70,0x3a,0x2f,0x2f,0x6d,0x6d,0x73,0x63,0x34,0x32,0x3a,0x31,
+    0x30,0x30,0x32,0x31,0x2f,0x6d,0x6d,0x73,0x63,0x2f,0x34,0x5f,
+    0x32,0x3f,0x41,0x64,0x30,0x62,0x39,0x70,0x58,0x4e,0x43,0x00
+};
 
-    static const TestDesc tests[] = {
-        {
-            "SyncCancel", plus_259199_sec, sizeof(plus_259199_sec), 0,
-            NULL, test_postnotify_cancel
-        },{
-            "AsyncCancelBefore", plus_259199_sec, sizeof(plus_259199_sec), 0,
-            test_prenotify_cancel_async, NULL
-        },{
-            "AsyncCancelAfter", plus_259199_sec, sizeof(plus_259199_sec), 0,
-            NULL, test_postnotify_cancel_async
-        },{
-            "Reject", plus_1_sec, sizeof(plus_1_sec), 1, NULL, NULL
-        }
-    };
-
-    int i, ret = RET_OK;
-    for (i=0; i<G_N_ELEMENTS(tests); i++) {
-        int test_status = test_once(tests + i);
-        if (ret == RET_OK && test_status != RET_OK) ret = test_status;
+static const TestDesc tests[] = {
+    {
+        "SyncCancel", plus_259199_sec, sizeof(plus_259199_sec), 0,
+        NULL, test_postnotify_cancel
+    },{
+        "AsyncCancelBefore", plus_259199_sec, sizeof(plus_259199_sec), 0,
+        test_prenotify_cancel_async, NULL
+    },{
+        "AsyncCancelAfter", plus_259199_sec, sizeof(plus_259199_sec), 0,
+        NULL, test_postnotify_cancel_async
+    },{
+        "Reject", plus_1_sec, sizeof(plus_1_sec), 1, NULL, NULL
     }
-    return ret;
-}
+};
+
+#define TEST_(x) "/RetrieveCancel/" x
 
 int main(int argc, char* argv[])
 {
     int ret;
+    guint i;
+
     mms_lib_init(argv[0]);
-    gutil_log_default.name = "test_retrieve_cancel";
-    if (argc > 1 && !strcmp(argv[1], "-v")) {
-        gutil_log_timestamp = TRUE;
-        gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-    } else {
-        gutil_log_timestamp = FALSE;
-        gutil_log_default.level = GLOG_LEVEL_INFO;
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(tests); i++) {
+        const TestDesc* test = tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
+
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
     }
-    ret = test_run();
+    ret = g_test_run();
     mms_lib_deinit();
     return ret;
 }
