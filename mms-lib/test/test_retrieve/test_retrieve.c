@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,16 +29,12 @@
 #include <gutil_log.h>
 #include <libsoup/soup-status.h>
 
-#define RET_OK      (0)
-#define RET_ERR     (1)
-#define RET_TIMEOUT (2)
-
 #define MMS_MESSAGE_TYPE_NONE (0)
 
-#define DATA_DIR  "data/"
+#define DATA_DIR  "data"
 #define LOCALHOST "127.0.0.1"
 
-#define TEST_TIMEOUT (10) /* seconds */
+static TestOpt test_opt;
 
 typedef struct test_part_desc {
     const char* content_type;
@@ -80,10 +76,8 @@ typedef struct test {
     GMappedFile* notification_ind;
     GMappedFile* retrieve_conf;
     GMainLoop* loop;
-    guint timeout_id;
     gulong msgreceived_id;
     TestHttp* http;
-    int ret;
 } Test;
 
 static const TestPartDesc retrieve_success1_parts [] = {
@@ -372,158 +366,86 @@ static const TestDesc retrieve_tests[] = {
 };
 
 static
-gboolean
-test_files_equal(
-    const char* path1,
-    const char* path2)
-{
-    gboolean equal = FALSE;
-    if (path1 && path2) {
-        GError* error = NULL;
-        GMappedFile* f1 = g_mapped_file_new(path1, FALSE, &error);
-        if (f1) {
-            GMappedFile* f2 = g_mapped_file_new(path2, FALSE, &error);
-            if (f2) {
-                const gsize size = g_mapped_file_get_length(f1);
-                if (g_mapped_file_get_length(f2) == size) {
-                    const void* data1 = g_mapped_file_get_contents(f1);
-                    const void* data2 = g_mapped_file_get_contents(f2);
-                    equal = !memcmp(data1, data2, size);
-                }
-                g_mapped_file_unref(f2);
-            }
-            g_mapped_file_unref(f1);
-        }
-    }
-    if (!equal) {
-        GERR("%s is not identical to %s", path1, path2);
-    }
-    return equal;
-}
-
-static
-int
-test_validate_parts(
+void
+retrieve_test_validate_parts(
     Test* test)
 {
     const TestDesc* desc = test->desc;
     MMSMessage* msg = mms_handler_test_get_received_message(test->handler,NULL);
-    if (!desc->nparts && (!msg || !g_slist_length(msg->parts))) {
-        return RET_OK;
-    } else {
+
+    if (desc->nparts || (msg && msg->parts)) {
         const char* dir = desc->dir ? desc->dir : desc->name;
-        const unsigned int nparts = g_slist_length(msg->parts);
-        if (desc->nparts == nparts) {
-            const TestPartDesc* expect = test->desc->parts;
-            GSList* list = msg->parts;
-            while (list) {
-                const MMSMessagePart* part = list->data;
-                char* sample = g_strconcat(DATA_DIR, dir, "/parts/",
-                    expect->file_name, NULL);
-                const gboolean match = test_files_equal(part->file, sample);
-                const char* fname;
+        const TestPartDesc* expect = test->desc->parts;
+        GSList* list = msg->parts;
 
-                G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
-                fname = g_basename(part->file);
-                G_GNUC_END_IGNORE_DEPRECATIONS;
+        g_assert_cmpuint(g_slist_length(list), == ,desc->nparts);
+        while (list) {
+            const MMSMessagePart* part = list->data;
+            char* sample = g_build_filename(DATA_DIR, dir, "parts",
+                expect->file_name, NULL);
+            const char* fname;
 
-                g_free(sample);
-                if (!match) {
-                    /* Message message is printed by test_files_equal */
-                    return RET_ERR;
-                }
-                
-                if (strcmp(expect->content_type, part->content_type)) {
-                    GERR("Content type mismatch: expected %s, got %s",
-                        expect->content_type, part->content_type);
-                    return RET_ERR;
-                }
-                if (strcmp(expect->file_name, fname)) {
-                    GERR("File name mismatch: expected %s, got %s",
-                        expect->file_name, fname);
-                    return RET_ERR;
-                }
-                if (!part->content_id) {
-                    GERR("Missing content id");
-                    return RET_ERR;
-                }
-                if (strcmp(expect->content_id, part->content_id)) {
-                    GERR("Content-ID mismatch: expected %s, got %s",
-                        expect->content_id, part->content_id);
-                    return RET_ERR;
-                }
-               list = list->next;
-                expect++;
-            }
-            return RET_OK;
+            G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
+            fname = g_basename(part->file);
+            G_GNUC_END_IGNORE_DEPRECATIONS;
+
+            g_assert(test_files_equal(part->file, sample));
+            g_assert_cmpstr(expect->content_type, == ,part->content_type);
+            g_assert_cmpstr(expect->file_name, == ,fname);
+            g_assert(part->content_id);
+            g_assert_cmpstr(expect->content_id, == ,part->content_id);
+            g_free(sample);
+            list = list->next;
+            expect++;
         }
-        GERR("%u parts expected, got %u", desc->nparts, nparts);
-        return RET_ERR;
     }
 }
 
 static
 void
-test_finish(
+retrieve_test_finish(
     Test* test)
 {
     const TestDesc* desc = test->desc;
-    const char* name = desc->name;
-    if (test->ret == RET_OK) {
-        MMS_RECEIVE_STATE state;
-        state = mms_handler_test_receive_state(test->handler, NULL);
-        if (state != desc->expected_state) {
-            test->ret = RET_ERR;
-            GERR("%s state %d, expected %d", name, state,
-                desc->expected_state);
-        } else {
-            const void* resp_data = NULL;
-            gsize resp_len = 0;
-            GBytes* reply = test_http_get_post_data(test->http);
-            if (reply) resp_data = g_bytes_get_data(reply, &resp_len);
-            if (resp_len > 0) {
-                if (desc->reply_msg) {
-                    MMSPdu* pdu = g_new0(MMSPdu, 1);
-                    if (mms_message_decode(resp_data, resp_len, pdu)) {
-                        if (pdu->type == desc->reply_msg) {
-                            test->ret = test_validate_parts(test);
-                        } else {
-                            test->ret = RET_ERR;
-                            GERR("%s reply %u, expected %u", name,
-                                pdu->type, desc->reply_msg);
-                        }
-                    } else {
-                        test->ret = RET_ERR;
-                        GERR("%s can't decode reply message", name);
-                    }
-                    mms_message_free(pdu);
-                } else {
-                    test->ret = RET_ERR;
-                    GERR("%s expects no reply", name);
-                }
-            } else if (desc->reply_msg) {
-                test->ret = RET_ERR;
-                GERR("%s expects reply", name);
-            }
-        }
+    const void* resp_data = NULL;
+    gsize resp_len = 0;
+    GBytes* reply = test_http_get_post_data(test->http);
+    MMS_RECEIVE_STATE state = mms_handler_test_receive_state
+        (test->handler, NULL);
+
+    g_assert_cmpint(state, == ,desc->expected_state);
+    if (reply) resp_data = g_bytes_get_data(reply, &resp_len);
+    if (resp_len) {
+        MMSPdu* pdu;
+
+        /* Must be expected */
+        g_assert(desc->reply_msg);
+        pdu = g_new0(MMSPdu, 1);
+        g_assert(mms_message_decode(resp_data, resp_len, pdu));
+        g_assert_cmpint(pdu->type, == ,desc->reply_msg);
+        retrieve_test_validate_parts(test);
+        mms_message_free(pdu);
+    } else {
+        /* OK if we don't expect any reply */
+        g_assert(!desc->reply_msg);
     }
-    if (test->ret == RET_OK && desc->attic_file) {
+
+    if (desc->attic_file) {
         const char* dir = desc->dir ? desc->dir : desc->name;
-        char* f1 = g_strconcat(DATA_DIR, dir, "/", desc->ni_file, NULL);
-        char* f2 = g_strconcat(test->config->root_dir, "/" MMS_ATTIC_DIR "/",
+        char* f1 = g_build_filename(DATA_DIR, dir, desc->ni_file, NULL);
+        char* f2 = g_build_filename(test->config->root_dir, MMS_ATTIC_DIR,
             desc->attic_file, NULL);
-        if (test_files_equal(f1, f2)) {
-            char* dir = g_path_get_dirname(f2);
-            remove(f2);
-            rmdir(dir);
-            g_free(dir);
-        } else {
-            test->ret = RET_ERR;
-        }
+        char* d2 = g_path_get_dirname(f2);
+
+        g_assert(test_files_equal(f1, f2));
+
+        remove(f2);
+        rmdir(d2);
+        g_free(d2);
         g_free(f1);
         g_free(f2);
     }
-    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
+
     mms_handler_test_reset(test->handler);
     g_signal_handler_disconnect(test->handler, test->msgreceived_id);
     g_main_loop_quit(test->loop);
@@ -531,34 +453,20 @@ test_finish(
 
 static
 void
-test_done(
+retrieve_test_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
     Test* test = G_CAST(delegate,Test,delegate);
+
     if (!mms_handler_test_receive_pending(test->handler, NULL)) {
-        test_finish(test);
+        retrieve_test_finish(test);
     }
 }
 
 static
 gboolean
-test_timeout(
-    gpointer data)
-{
-    Test* test = data;
-    test->timeout_id = 0;
-    test->ret = RET_TIMEOUT;
-    GINFO("%s TIMEOUT", test->desc->name);
-    if (test->http) test_http_close(test->http);
-    mms_connman_test_close_connection(test->cm);
-    mms_dispatcher_cancel(test->disp, NULL);
-    return FALSE;
-}
-
-static
-gboolean
-test_notify(
+retrieve_prenotify(
     MMSHandler* handler,
     const char* imsi,
     const char* from,
@@ -568,6 +476,7 @@ test_notify(
     void* param)
 {
     Test* test = param;
+
     return !(test->desc->flags & TEST_REJECT_RECEIVE);
 }
 
@@ -582,12 +491,13 @@ test_cancel_msg_proc(
     void* param)
 {
    TestCancelMsg* cancel = param;
+
    GVERBOSE("Cancelling message %s", cancel->msg->id);
    mms_dispatcher_cancel(cancel->disp, cancel->msg->id);
    mms_dispatcher_unref(cancel->disp);
    mms_message_unref(cancel->msg);
    g_free(cancel);
-   return FALSE;
+   return G_SOURCE_REMOVE;
 }
 
 static
@@ -598,8 +508,10 @@ test_msgreceived(
     void* param)
 {
     Test* test = param;
+
     if (test->desc->flags & TEST_CANCEL_RECEIVED) {
         TestCancelMsg* cancel = g_new(TestCancelMsg,1);
+
         cancel->disp = mms_dispatcher_ref(test->disp);
         cancel->msg = mms_message_ref(msg);
         g_idle_add_full(G_PRIORITY_HIGH, test_cancel_msg_proc, cancel, NULL);
@@ -607,226 +519,118 @@ test_msgreceived(
 }
 
 static
-gboolean
-test_init(
-    Test* test,
-    const MMSConfig* config,
-    const TestDesc* desc,
-    gboolean debug)
+void
+run_test(
+    gconstpointer data)
 {
-    gboolean ok = FALSE;
-    GError* error = NULL;
+    const TestDesc* desc = data;
     const char* dir = desc->dir ? desc->dir : desc->name;
-    char* ni = g_strconcat(DATA_DIR, dir, "/", desc->ni_file, NULL);
-    char* rc = desc->rc_file ? g_strconcat(DATA_DIR, dir, "/",
-        desc->rc_file, NULL) : NULL;
-    GDEBUG(">>>>>>>>>> %s <<<<<<<<<<", desc->name);
-    memset(test, 0, sizeof(*test));
-    test->config = config;
-    test->notification_ind = g_mapped_file_new(ni, FALSE, &error);
-    if (test->notification_ind) {
-        if (rc) test->retrieve_conf = g_mapped_file_new(rc, FALSE, &error);
-        if (test->retrieve_conf || !rc) {
-            MMSSettings* settings = mms_settings_default_new(config);
-            MMSTransferList* transfers = mms_transfer_list_test_new();
-            g_mapped_file_ref(test->notification_ind);
-            test->desc = desc;
-            test->cm = mms_connman_test_new();
-            test->handler = mms_handler_test_new();
-            test->disp = mms_dispatcher_new(settings, test->cm, test->handler,
-                transfers);
-            test->loop = g_main_loop_new(NULL, FALSE);
-            if (!debug) {
-                test->timeout_id = g_timeout_add_seconds(TEST_TIMEOUT,
-                    test_timeout, test);
-            }
-            test->delegate.fn_done = test_done;
-            mms_dispatcher_set_delegate(test->disp, &test->delegate);
-            if (!(desc->flags & TEST_CONNECTION_FAILURE)) {
-                test->http = test_http_new(test->retrieve_conf,
-                    test->desc->content_type, test->desc->status);
-                mms_connman_test_set_proxy(test->cm, desc->proxy,
-                    test_http_get_port(test->http));
-            }
-            if (desc->flags & TEST_OFFLINE) {
-                mms_connman_test_set_offline(test->cm, TRUE);
-            }
-            if (desc->flags & TEST_DEFER_RECEIVE) {
-                mms_handler_test_defer_receive(test->handler, test->disp);
-            }
-            mms_handler_test_set_prenotify_fn(test->handler, test_notify, test);
-            test->msgreceived_id =
-                mms_handler_test_add_msgreceived_fn(test->handler,
-                    test_msgreceived, test);
-            mms_transfer_list_unref(transfers);
-            mms_settings_unref(settings);
-            test->ret = RET_ERR;
-            ok = TRUE;
-        } else {
-            GERR("%s", GERRMSG(error));
-            g_error_free(error);
-        }
-        g_mapped_file_unref(test->notification_ind);
-    } else {
-        GERR("%s", GERRMSG(error));
-        g_error_free(error);
+    MMSConfig config;
+    MMSSettings* settings;
+    MMSTransferList* transfers = mms_transfer_list_test_new();
+    char* ni = g_build_filename(DATA_DIR, dir, desc->ni_file, NULL);
+    char* rc = desc->rc_file ?
+        g_build_filename(DATA_DIR, dir, desc->rc_file, NULL) :
+        NULL;
+    GError* error = NULL;
+    GBytes* push;
+    TestDirs dirs;
+    Test test;
+
+    test_dirs_init(&dirs, "test_retrieve");
+    mms_lib_default_config(&config);
+    config.root_dir = dirs.root;
+    config.keep_temp_files = (test_opt.flags & TEST_FLAG_DEBUG) != 0;
+    config.network_idle_secs = 0;
+    config.attic_enabled = TRUE;
+
+    memset(&test, 0, sizeof(test));
+    test.desc = desc;
+    test.config = &config;
+    test.notification_ind = g_mapped_file_new(ni, FALSE, &error);
+    g_assert(test.notification_ind);
+    if (rc) {
+        test.retrieve_conf = g_mapped_file_new(rc, FALSE, &error);
+        g_assert(test.retrieve_conf);
     }
+
+    settings = mms_settings_default_new(&config);
+    test.cm = mms_connman_test_new();
+    test.handler = mms_handler_test_new();
+    test.disp = mms_dispatcher_new(settings, test.cm, test.handler, transfers);
+    test.loop = g_main_loop_new(NULL, FALSE);
+    test.delegate.fn_done = retrieve_test_done;
+    mms_dispatcher_set_delegate(test.disp, &test.delegate);
+    if (!(desc->flags & TEST_CONNECTION_FAILURE)) {
+        test.http = test_http_new(test.retrieve_conf,
+            test.desc->content_type, test.desc->status);
+        mms_connman_test_set_proxy(test.cm, desc->proxy,
+            test_http_get_port(test.http));
+    }
+    if (desc->flags & TEST_OFFLINE) {
+        mms_connman_test_set_offline(test.cm, TRUE);
+    }
+    if (desc->flags & TEST_DEFER_RECEIVE) {
+        mms_handler_test_defer_receive(test.handler, test.disp);
+    }
+    mms_handler_test_set_prenotify_fn(test.handler, retrieve_prenotify, &test);
+    test.msgreceived_id = mms_handler_test_add_msgreceived_fn(test.handler,
+        test_msgreceived, &test);
+
+    /* Simulate push and run the event loop */
+    push = g_bytes_new_static(g_mapped_file_get_contents(test.notification_ind),
+        g_mapped_file_get_length(test.notification_ind));
+    if (mms_dispatcher_handle_push(test.disp, "Connection", push, &error)) {
+        g_assert(mms_dispatcher_start(test.disp));
+        test_run_loop(&test_opt, test.loop);
+    } else {
+        /* Could be expected */
+        GDEBUG("%s", GERRMSG(error));
+        g_assert(desc->flags & TEST_PUSH_HANDLING_FAILURE_OK);
+        g_error_free(error);
+        retrieve_test_finish(&test);
+    }
+
+    /* Done */
+    if (test.http) {
+        test_http_close(test.http);
+        test_http_unref(test.http);
+    }
+    mms_connman_test_close_connection(test.cm);
+    mms_connman_unref(test.cm);
+    mms_handler_unref(test.handler);
+    mms_dispatcher_unref(test.disp);
+    g_main_loop_unref(test.loop);
+    g_mapped_file_unref(test.notification_ind);
+    if (test.retrieve_conf) g_mapped_file_unref(test.retrieve_conf);
+
+    test_dirs_cleanup(&dirs, TRUE);
+    mms_transfer_list_unref(transfers);
+    mms_settings_unref(settings);
+    g_bytes_unref(push);
     g_free(ni);
     g_free(rc);
-    return ok;
 }
 
-static
-void
-test_finalize(
-    Test* test)
-{
-    if (test->timeout_id) {
-        g_source_remove(test->timeout_id);
-        test->timeout_id = 0;
-    }
-    if (test->http) {
-        test_http_close(test->http);
-        test_http_unref(test->http);
-    }
-    mms_connman_test_close_connection(test->cm);
-    mms_connman_unref(test->cm);
-    mms_handler_unref(test->handler);
-    mms_dispatcher_unref(test->disp);
-    g_main_loop_unref(test->loop);
-    g_mapped_file_unref(test->notification_ind);
-    if (test->retrieve_conf) g_mapped_file_unref(test->retrieve_conf);
-}
-
-static
-int
-test_retrieve_once(
-    const MMSConfig* config,
-    const TestDesc* desc,
-    gboolean debug)
-{
-    Test test;
-    if (test_init(&test, config, desc, debug)) {
-        GError* error = NULL;
-        GBytes* push = g_bytes_new_static(
-            g_mapped_file_get_contents(test.notification_ind),
-            g_mapped_file_get_length(test.notification_ind));
-        if (mms_dispatcher_handle_push(test.disp, "TestConnection",
-            push, &error)) {
-            if (mms_dispatcher_start(test.disp)) {
-                test.ret = RET_OK;
-                g_main_loop_run(test.loop);
-            } else {
-                GINFO("%s FAILED", desc->name);
-            }
-        } else {
-            g_error_free(error);
-            if (desc->flags & TEST_PUSH_HANDLING_FAILURE_OK) {
-                test.ret = RET_OK;
-                test_finish(&test);
-            } else {
-                GINFO("%s FAILED", desc->name);
-            }
-        }
-        g_bytes_unref(push);
-        test_finalize(&test);
-        return test.ret;
-    } else {
-        return RET_ERR;
-    }
-}
-
-static
-int
-test_retrieve(
-    const MMSConfig* config,
-    const char* name,
-    gboolean debug)
-{
-    int i, ret;
-    if (name) {
-        const TestDesc* found = NULL;
-        for (i=0, ret = RET_ERR; i<G_N_ELEMENTS(retrieve_tests); i++) {
-            const TestDesc* test = retrieve_tests + i;
-            if (!strcmp(test->name, name)) {
-                ret = test_retrieve_once(config, test, debug);
-                found = test;
-                break;
-            }
-        }
-        if (!found) GERR("No such test: %s", name);
-    } else {
-        for (i=0, ret = RET_OK; i<G_N_ELEMENTS(retrieve_tests); i++) {
-            int status = test_retrieve_once(config, retrieve_tests + i, debug);
-            if (ret == RET_OK && status != RET_OK) ret = status;
-        }
-    }
-    return ret;
-}
+#define TEST_(x) "/Retrieve/" x
 
 int main(int argc, char* argv[])
 {
-    int ret = RET_ERR;
-    gboolean keep_temp = FALSE;
-    gboolean verbose = FALSE;
-    gboolean debug = FALSE;
-    GError* error = NULL;
-    GOptionContext* options;
-    GOptionEntry entries[] = {
-        { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
-          "Enable verbose output", NULL },
-        { "keep", 'k', 0, G_OPTION_ARG_NONE, &keep_temp,
-          "Keep temporary files", NULL },
-        { "debug", 'd', 0, G_OPTION_ARG_NONE, &debug,
-          "Disable timeout for debugging", NULL },
-        { NULL }
-    };
+    int ret;
+    guint i;
 
-    options = g_option_context_new("[TEST] - MMS retrieve test");
-    g_option_context_add_main_entries(options, entries, NULL);
-    if (g_option_context_parse(options, &argc, &argv, &error)) {
-        const char* test = "test_retrieve";
-        MMSConfig config;
-        TestDirs dirs;
+    mms_lib_init(argv[0]);
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(retrieve_tests); i++) {
+        const TestDesc* test = retrieve_tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
 
-        mms_lib_init(argv[0]);
-        gutil_log_set_type(GLOG_TYPE_STDOUT, test);
-        if (verbose) {
-            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-        } else {
-            gutil_log_timestamp = FALSE;
-            gutil_log_default.level = GLOG_LEVEL_INFO;
-            mms_task_http_log.level =
-            mms_task_decode_log.level =
-            mms_task_retrieve_log.level =
-            mms_task_notification_log.level = GLOG_LEVEL_NONE;
-        }
-
-        test_dirs_init(&dirs, test);
-        mms_lib_default_config(&config);
-        config.root_dir = dirs.root;
-        config.keep_temp_files = keep_temp;
-        config.network_idle_secs = 0;
-        config.attic_enabled = TRUE;
-
-        if (argc < 2) {
-            ret = test_retrieve(&config, NULL, debug);
-        } else {
-            int i;
-            for (i=1, ret = RET_OK; i<argc; i++) {
-                int test_status =  test_retrieve(&config, argv[i], debug);
-                if (ret == RET_OK && test_status != RET_OK) ret = test_status;
-            }
-        }
-
-        test_dirs_cleanup(&dirs, !keep_temp);
-        mms_lib_deinit();
-    } else {
-        fprintf(stderr, "%s\n", GERRMSG(error));
-        g_error_free(error);
-        ret = RET_ERR;
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
     }
-    g_option_context_free(options);
+    ret = g_test_run();
+    mms_lib_deinit();
     return ret;
 }
 

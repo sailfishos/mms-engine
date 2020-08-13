@@ -42,6 +42,11 @@ test_dirs_cleanup(
     TestDirs* dirs,
     gboolean remove);
 
+gboolean
+test_files_equal(
+    const char* path1,
+    const char* path2);
+
 /* Should be invoked after g_test_init */
 void
 test_init(

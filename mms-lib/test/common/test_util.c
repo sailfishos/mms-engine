@@ -58,6 +58,35 @@ test_dirs_cleanup(
     g_free(dirs->attic);
 }
 
+gboolean
+test_files_equal(
+    const char* path1,
+    const char* path2)
+{
+    gboolean equal = FALSE;
+    if (path1 && path2) {
+        GError* error = NULL;
+        GMappedFile* f1 = g_mapped_file_new(path1, FALSE, &error);
+        if (f1) {
+            GMappedFile* f2 = g_mapped_file_new(path2, FALSE, &error);
+            if (f2) {
+                const gsize size = g_mapped_file_get_length(f1);
+                if (g_mapped_file_get_length(f2) == size) {
+                    const void* data1 = g_mapped_file_get_contents(f1);
+                    const void* data2 = g_mapped_file_get_contents(f2);
+                    equal = !memcmp(data1, data2, size);
+                }
+                g_mapped_file_unref(f2);
+            }
+            g_mapped_file_unref(f1);
+        }
+    }
+    if (!equal) {
+        GERR("%s is not identical to %s", path1, path2);
+    }
+    return equal;
+}
+
 /* Should be invoked after g_test_init */
 void
 test_init(
