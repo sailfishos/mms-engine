@@ -18,6 +18,8 @@
 
 #include "mms_lib_types.h"
 
+#define TEST_TIMEOUT_SEC (10)
+
 typedef struct test_opt {
     int flags;
 } TestOpt;
@@ -46,6 +48,12 @@ test_init(
     TestOpt* opt,
     int* argc,
     char** argv);
+
+/* Run main loop with a timeout */
+void
+test_run_loop(
+    const TestOpt* opt,
+    GMainLoop* loop);
 
 #endif /* TEST_UTIL_H */
 

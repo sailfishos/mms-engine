@@ -94,6 +94,33 @@ test_init(
             GLOG_LEVEL_NONE;
 }
 
+/* Run main loop with a timeout */
+
+static
+gboolean
+test_timeout_expired(
+    gpointer data)
+{
+    g_assert_not_reached();
+    return G_SOURCE_REMOVE;
+}
+
+void
+test_run_loop(
+    const TestOpt* opt,
+    GMainLoop* loop)
+{
+    if (opt->flags & TEST_FLAG_DEBUG) {
+        g_main_loop_run(loop);
+    } else {
+        const guint timeout_id = g_timeout_add_seconds(TEST_TIMEOUT_SEC,
+            test_timeout_expired, NULL);
+
+        g_main_loop_run(loop);
+        g_source_remove(timeout_id);
+    }
+}
+
 /*
  * Local Variables:
  * mode: C
