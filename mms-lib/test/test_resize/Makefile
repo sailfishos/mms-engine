@@ -1,7 +1,7 @@
 # -*- Mode: makefile-gmake -*-
 
 EXE = test_resize
-SRC = test_resize.c
+COMMON_SRC = test_util.c
 LIB_PKGS = libexif libpng
 
 include ../common/Makefile

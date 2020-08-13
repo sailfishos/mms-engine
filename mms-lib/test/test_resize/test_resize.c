@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -8,9 +8,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+
+#include "test_util.h"
 
 #include "mms_attachment.h"
 #include "mms_settings.h"
@@ -33,8 +35,7 @@
 #include <jerror.h>
 #include <setjmp.h>
 
-#define RET_OK  (0)
-#define RET_ERR (1)
+static TestOpt test_opt;
 
 typedef struct test_size {
     unsigned int width;
@@ -192,6 +193,7 @@ test_jpeg_error_log(
     j_common_ptr cinfo)
 {
     char* buf = g_malloc(JMSG_LENGTH_MAX);
+
     buf[0] = 0;
     cinfo->err->format_message(cinfo, buf);
     buf[JMSG_LENGTH_MAX] = 0;
@@ -205,6 +207,7 @@ test_jpeg_error_exit(
     j_common_ptr cinfo)
 {
     TestJpegError* err = (TestJpegError*)cinfo->err;
+
     test_jpeg_error_log(GLOG_LEVEL_ERR, cinfo);
     longjmp(err->setjmp_buf, 1);
 }
@@ -223,6 +226,7 @@ test_jpeg_getc(
     j_decompress_ptr cinfo)
 {
     struct jpeg_source_mgr* src = cinfo->src;
+
     if (!src->bytes_in_buffer && !src->fill_input_buffer(cinfo)) {
         ERREXIT(cinfo, JERR_CANT_SUSPEND);
     }
@@ -330,10 +334,12 @@ test_png_size(
 {
     gboolean ok = FALSE;
     FILE* in = fopen(file, "rb");
+
     if (in) {
         png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
             NULL, NULL, NULL);
         png_infop info_ptr = png_create_info_struct(png_ptr);
+
         if (!setjmp(png_jmpbuf(png_ptr))) {
             png_init_io(png_ptr, in);
             png_read_info(png_ptr, info_ptr);
@@ -347,139 +353,90 @@ test_png_size(
 }
 
 static
-int
-test_run_one(
-    const MMSConfig* config,
-    const TestDesc* test)
+void
+run_test(
+    gconstpointer data)
 {
-    int ret = RET_ERR;
-    char* tmpl;
-    const char* dir;
+    const TestDesc* test = data;
+    TestDirs dirs;
     char* name = g_path_get_basename(test->file);
-    tmpl = g_strconcat(config->root_dir, "/resize_XXXXXX", NULL);
+    char* tmpl;
+    char* testfile;
+    const char* dir;
+    GError* error = NULL;
+    MMSConfig config;
+    MMSAttachment* at;
+    MMSAttachmentInfo info;
+    MMSSettingsSimData sim_settings;
+    gboolean ok = TRUE;
+    int i;
+
+    test_dirs_init(&dirs, "test_resize");
+    mms_lib_default_config(&config);
+    config.root_dir = dirs.root;
+    config.keep_temp_files = (test_opt.flags & TEST_FLAG_DEBUG) != 0;
+    tmpl = g_build_filename(config.root_dir, "resize_XXXXXX", NULL);
     dir = g_mkdtemp(tmpl);
-    if (dir) {
-        GError* error = NULL;
-        char* testfile = g_strconcat(dir, "/", name, NULL);
-        if (mms_file_copy(test->file, testfile, NULL)) {
-            MMSAttachment* at;
-            MMSAttachmentInfo info;
-            MMSSettingsSimData sim_settings;
-            mms_settings_sim_data_default(&sim_settings);
-            sim_settings.max_pixels = test->max_pixels;
-            info.file_name = testfile;
-            info.content_type = test->type->content_type;
-            info.content_id = name;
-            at = mms_attachment_new(config, &info, &error);
-            if (at) {
-                int i;
-                gboolean ok = TRUE;
-                for (i=0; i<test->steps && ok; i++) {
-                    if (!mms_attachment_resize(at, &sim_settings)) {
-                        ok = FALSE;
-                    }
-                }
-                if (ok && test->size.width && test->size.height) {
-                    TestSize size;
-                    if (test->type->filesize(at->file_name, &size)) {
-                        if (size.width == test->size.width &&
-                            size.height == test->size.height) {
-                            mms_attachment_reset(at);
-                            if (!strcmp(at->file_name, testfile)) {
-                                ret = RET_OK;
-                            } else {
-                                GDEBUG("Reset didn't work");
-                            }
-                        } else {
-                            GERR("Output size mismatch: (%ux%u) vs (%ux%u)",
-                                size.width, size.height,
-                                test->size.width, test->size.height);
-                        }
-                    }
-                } else if (!ok && !test->size.width && !test->size.height) {
-                    ret = RET_OK;
-                }
-                /* Extra ref/unref improves the coverage */
-                mms_attachment_ref(at);
-                mms_attachment_unref(at);
-                mms_attachment_unref(at);
-            } else {
-                GERR("%s", GERRMSG(error));
-                g_error_free(error);
-            }
-        } else {
-            GERR("Failed to copy %s -> %s", test->file, testfile);
+
+    g_assert(dir);
+    testfile = g_build_filename(dir, name, NULL);
+
+    g_assert(mms_file_copy(test->file, testfile, NULL));
+    mms_settings_sim_data_default(&sim_settings);
+    sim_settings.max_pixels = test->max_pixels;
+    info.file_name = testfile;
+    info.content_type = test->type->content_type;
+    info.content_id = name;
+    at = mms_attachment_new(&config, &info, &error);
+
+    g_assert(at);
+    for (i = 0; i < test->steps && ok; i++) {
+        if (!mms_attachment_resize(at, &sim_settings)) {
+            ok = FALSE;
         }
-        g_free(testfile);
     }
-    GINFO("%s: %s", (ret == RET_OK) ? "OK" : "FAILED", test->name);
+    if (ok && test->size.width && test->size.height) {
+        TestSize size;
+
+        g_assert(test->type->filesize(at->file_name, &size));
+        g_assert_cmpint(size.width, == ,test->size.width);
+        g_assert_cmpint(size.height, == ,test->size.height);
+        mms_attachment_reset(at);
+        g_assert_cmpstr(at->file_name, == ,testfile);
+    } else {
+        g_assert(!ok && !test->size.width && !test->size.height);
+    }
+
+    /* Extra ref/unref improves the coverage */
+    mms_attachment_ref(at);
+    mms_attachment_unref(at);
+    mms_attachment_unref(at);
+
+    g_free(testfile);
     g_free(name);
     g_free(tmpl);
-    return ret;
+
+    test_dirs_cleanup(&dirs, TRUE);
 }
 
-static
-int
-test_run(
-    const MMSConfig* config,
-    const char* name)
-{
-    int i, ret;
-    if (name) {
-        const TestDesc* found = NULL;
-        for (i=0, ret = RET_ERR; i<G_N_ELEMENTS(resize_tests); i++) {
-            const TestDesc* test = resize_tests + i;
-            if (!strcmp(test->name, name)) {
-                ret = test_run_one(config, test);
-                found = test;
-                break;
-            }
-        }
-        if (!found) GERR("No such test: %s", name);
-    } else {
-        for (i=0, ret = RET_OK; i<G_N_ELEMENTS(resize_tests); i++) {
-            int test_status = test_run_one(config, resize_tests + i);
-            if (ret == RET_OK && test_status != RET_OK) ret = test_status;
-        }
-    }
-    return ret;
-}
+#define TEST_(x) "/Resize/" x
+
 int main(int argc, char* argv[])
 {
-    int ret = RET_ERR;
-    gboolean keep_temp = FALSE;
-    gboolean verbose = FALSE;
-
-    GOptionContext* options;
-    GOptionEntry entries[] = {
-        { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
-          "Enable verbose output", NULL },
-        { "keep", 'k', 0, G_OPTION_ARG_NONE, &keep_temp,
-          "Keep temporary files", NULL },
-        { NULL }
-    };
+    int ret;
+    guint i;
 
     mms_lib_init(argv[0]);
-    options = g_option_context_new("[TEST] - Resizing test");
-    g_option_context_add_main_entries(options, entries, NULL);
-    if (g_option_context_parse(options, &argc, &argv, NULL) && argc < 3) {
-        const char* test = (argc == 2) ? argv[1] : NULL;
-        MMSConfig config;
-        mms_lib_default_config(&config);
-        config.root_dir = "/tmp";
-        config.keep_temp_files = keep_temp;
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(resize_tests); i++) {
+        const TestDesc* test = resize_tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
 
-        gutil_log_timestamp = FALSE;
-        gutil_log_default.name = "test_resize";
-        if (verbose) {
-            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-        } else {
-            gutil_log_default.level = GLOG_LEVEL_INFO;
-            mms_attachment_log.level = GLOG_LEVEL_ERR;
-        }
-        ret = test_run(&config, test);
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
     }
-    g_option_context_free(options);
+    ret = g_test_run();
     mms_lib_deinit();
     return ret;
 }
