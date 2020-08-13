@@ -1,6 +1,6 @@
 # -*- Mode: makefile-gmake -*-
 
 EXE = test_mms_codec
-SRC = test_mms_codec.c
+COMMON_SRC = test_util.c
 
 include ../common/Makefile

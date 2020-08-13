@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2016 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,45 +12,39 @@
  * GNU General Public License for more details.
  */
 
+#include "test_util.h"
+
 #include "mms_lib_util.h"
 #include "mms_lib_log.h"
 #include "mms_codec.h"
 
 #include <gutil_log.h>
 
-#define DATA_DIR "data/"
+#define DATA_DIR "data"
 
-#define RET_OK   (0)
-#define RET_ERR  (1)
+static TestOpt test_opt;
 
 static
-gboolean
-test_file(
-    const char* file)
+void
+run_test(
+    gconstpointer test_data)
 {
+    const char* file = test_data;
     GError* error = NULL;
-    char* path = g_strconcat(DATA_DIR, file, NULL);
-    const char* fname = g_file_test(path, G_FILE_TEST_EXISTS) ? path : file;
+    char* file2 = g_build_filename(DATA_DIR, file, NULL);
+    const char* fname = g_file_test(file, G_FILE_TEST_EXISTS) ? file : file2;
     GMappedFile* map = g_mapped_file_new(fname, FALSE, &error);
-    g_free(path);
-    if (map) {
-        struct mms_message* msg = g_new0(struct mms_message, 1);
-        const void* data = g_mapped_file_get_contents(map);
-        const gsize length = g_mapped_file_get_length(map);
-        gboolean ok = mms_message_decode(data, length, msg);
-        g_mapped_file_unref(map);
-        mms_message_free(msg);
-        if (ok) {
-            GINFO("OK: %s", file);
-            return TRUE;
-        }
-        GERR("Failed to decode %s", file);
-    } else {
-        GERR("%s", error->message);
-        g_error_free(error);
-    }
-    return FALSE;
+    struct mms_message* msg = g_new0(struct mms_message, 1);
+    const void* data = g_mapped_file_get_contents(map);
+    const gsize length = g_mapped_file_get_length(map);
+
+    g_assert(mms_message_decode(data, length, msg));
+    g_mapped_file_unref(map);
+    mms_message_free(msg);
+    g_free(file2);
 }
+
+#define TEST_(x) "/MmsCodec/" x
 
 int main(int argc, char* argv[])
 {
@@ -83,47 +77,40 @@ int main(int argc, char* argv[])
         "m-send_3.conf"
     };
 
-    int ret = RET_ERR;
-    gboolean verbose = FALSE;
-    GOptionContext* options;
-    GOptionEntry entries[] = {
-        { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
-          "Enable verbose output", NULL },
-        { NULL }
-    };
+    int ret;
 
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
     mms_lib_init(argv[0]);
-    options = g_option_context_new("[TESTS...] - MMS codec test");
-    g_option_context_add_main_entries(options, entries, NULL);
-    if (g_option_context_parse(options, &argc, &argv, NULL)) {
+
+    if (argc > 1) {
         int i;
 
-        gutil_log_set_type(GLOG_TYPE_STDOUT, "test_mms_codec");
-        if (verbose) {
-            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-        } else {
-            gutil_log_timestamp = FALSE;
-            gutil_log_default.level = GLOG_LEVEL_INFO;
-            mms_codec_log.level = GLOG_LEVEL_ERR;
-        }
+        /* Take file names from the command line */
+        for (i = 1; i < argc; i++) {
+            const char* file = argv[i];
+            char* test_name;
 
-        ret = RET_OK;
-        if (argc > 1) {
-            for (i=1; i<argc; i++) {
-                if (!test_file(argv[i])) {
-                    ret = RET_ERR;
-                }
-            }
-        } else {
-            /* Default set of test files */
-            for (i=0; i<G_N_ELEMENTS(default_files); i++) {
-                if (!test_file(default_files[i])) {
-                    ret = RET_ERR;
-                }
-            }
+            G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
+            test_name = g_strdup_printf(TEST_("%s"), g_basename(file));
+            G_GNUC_END_IGNORE_DEPRECATIONS;
+
+            g_test_add_data_func(test_name, file, run_test);
+            g_free(test_name);
+        }
+    } else {
+        guint i;
+
+        /* Default set of test files */
+        for (i = 0; i < G_N_ELEMENTS(default_files); i++) {
+            const char* file = default_files[i];
+            char* test_name = g_strdup_printf(TEST_("%s"), file);
+
+            g_test_add_data_func(test_name, file, run_test);
+            g_free(test_name);
         }
     }
-    g_option_context_free(options);
+    ret = g_test_run();
     mms_lib_deinit();
     return ret;
 }
