@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Copyright (C) 2013-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
@@ -25,11 +25,9 @@
 #include <gutil_log.h>
 #include <gutil_macros.h>
 
-#define RET_OK      (0)
-#define RET_ERR     (1)
-#define RET_TIMEOUT (2)
+#define DATA_DIR "data"
 
-#define DATA_DIR "data/"
+static TestOpt test_opt;
 
 typedef struct test_desc {
     const char* name;
@@ -46,10 +44,8 @@ typedef struct test {
     MMSConnMan* cm;
     MMSHandler* handler;
     MMSDispatcher* disp;
-    GMappedFile* notification_ind;
+    GMappedFile* pdu_file;
     GMainLoop* loop;
-    guint timeout_id;
-    int ret;
 } Test;
 
 static const TestDesc read_tests[] = {
@@ -73,203 +69,106 @@ static const TestDesc read_tests[] = {
 
 static
 void
-test_finish(
+read_ind_finish(
     Test* test)
 {
     const TestDesc* desc = test->desc;
-    const char* name = desc->name;
-    if (test->ret == RET_OK) {
-        MMS_READ_STATUS rs;
-        rs = mms_handler_test_read_status(test->handler, test->id);
-        if (rs != desc->status) {
-            test->ret = RET_ERR;
-            GERR("%s status %d, expected %d", name, rs, desc->status);
-        }
-    }
-    GINFO("%s: %s", (test->ret == RET_OK) ? "OK" : "FAILED", name);
+    MMS_READ_STATUS rs = mms_handler_test_read_status(test->handler, test->id);
+
+    g_assert_cmpint(rs, == ,desc->status);
     mms_handler_test_reset(test->handler);
     g_main_loop_quit(test->loop);
 }
 
 static
 void
-test_done(
+read_ind_done(
     MMSDispatcherDelegate* delegate,
     MMSDispatcher* dispatcher)
 {
     Test* test = G_CAST(delegate,Test,delegate);
+
     if (!mms_handler_test_receive_pending(test->handler, NULL)) {
-        test_finish(test);
+        read_ind_finish(test);
     }
-}
-
-static
-gboolean
-test_timeout(
-    gpointer data)
-{
-    Test* test = data;
-    test->timeout_id = 0;
-    test->ret = RET_TIMEOUT;
-    GINFO("%s TIMEOUT", test->desc->name);
-    mms_connman_test_close_connection(test->cm);
-    mms_dispatcher_cancel(test->disp, NULL);
-    return FALSE;
-}
-
-static
-gboolean
-test_init(
-    Test* test,
-    const MMSConfig* config,
-    const TestDesc* desc)
-{
-    gboolean ok = FALSE;
-    GError* error = NULL;
-    const char* dir = desc->name;
-    char* ni = g_strconcat(DATA_DIR, dir, "/", desc->ind_file, NULL);
-    memset(test, 0, sizeof(*test));
-    test->config = config;
-    test->notification_ind = g_mapped_file_new(ni, FALSE, &error);
-    if (test->notification_ind) {
-        MMSSettings* set = mms_settings_default_new(config);
-        test->desc = desc;
-        test->cm = mms_connman_test_new();
-        test->handler = mms_handler_test_new();
-        test->disp = mms_dispatcher_new(set, test->cm, test->handler, NULL);
-        test->loop = g_main_loop_new(NULL, FALSE);
-        test->timeout_id = g_timeout_add_seconds(10, test_timeout, test);
-        test->delegate.fn_done = test_done;
-        mms_dispatcher_set_delegate(test->disp, &test->delegate);
-        test->id = g_strdup(mms_handler_test_send_new(test->handler, "IMSI"));
-        mms_handler_message_sent(test->handler, test->id, desc->mmsid);
-        mms_settings_unref(set);
-        test->ret = RET_ERR;
-        ok = TRUE;
-    } else {
-        GERR("%s", GERRMSG(error));
-        g_error_free(error);
-    }
-    g_free(ni);
-    return ok;
 }
 
 static
 void
-test_finalize(
-    Test* test)
+run_test(
+    gconstpointer data)
 {
-    if (test->timeout_id) {
-        g_source_remove(test->timeout_id);
-        test->timeout_id = 0;
-    }
-    mms_connman_test_close_connection(test->cm);
-    mms_connman_unref(test->cm);
-    mms_handler_unref(test->handler);
-    mms_dispatcher_unref(test->disp);
-    g_main_loop_unref(test->loop);
-    g_mapped_file_unref(test->notification_ind);
-    g_free(test->id);
-}
-
-static
-int
-test_run_one(
-    const MMSConfig* config,
-    const TestDesc* desc)
-{
+    const TestDesc* desc = data;
+    char* ni = g_build_filename(DATA_DIR, desc->name, desc->ind_file, NULL);
+    MMSSettings* settings;
+    MMSConfig config;
     Test test;
-    if (test_init(&test, config, desc)) {
-        GError* error = NULL;
-        GBytes* push = g_bytes_new_static(
-            g_mapped_file_get_contents(test.notification_ind),
-            g_mapped_file_get_length(test.notification_ind));
-        if (mms_dispatcher_handle_push(test.disp, "TestConnection",
-            push, &error)) {
-            if (mms_dispatcher_start(test.disp)) {
-                test.ret = RET_OK;
-                g_main_loop_run(test.loop);
-            } else {
-                GINFO("%s FAILED", desc->name);
-            }
-        } else {
-            GERR("%s", GERRMSG(error));
-            GINFO("%s FAILED", desc->name);
-            g_error_free(error);
-        }
-        g_bytes_unref(push);
-        test_finalize(&test);
-        return test.ret;
-    } else {
-        return RET_ERR;
-    }
+    TestDirs dirs;
+    GBytes* push;
+    GError* error = NULL;
+
+    mms_lib_default_config(&config);
+    test_dirs_init(&dirs, "test_read_ind");
+    config.root_dir = dirs.root;
+    config.network_idle_secs = 0;
+    config.attic_enabled = TRUE;
+
+    memset(&test, 0, sizeof(test));
+    test.config = &config;
+    test.pdu_file = g_mapped_file_new(ni, FALSE, &error);
+    g_assert(test.pdu_file);
+    push = g_bytes_new_static(g_mapped_file_get_contents(test.pdu_file),
+        g_mapped_file_get_length(test.pdu_file));
+
+    settings = mms_settings_default_new(&config);
+    test.desc = desc;
+    test.cm = mms_connman_test_new();
+    test.handler = mms_handler_test_new();
+    test.disp = mms_dispatcher_new(settings, test.cm, test.handler, NULL);
+    test.loop = g_main_loop_new(NULL, FALSE);
+    test.delegate.fn_done = read_ind_done;
+    mms_dispatcher_set_delegate(test.disp, &test.delegate);
+    test.id = g_strdup(mms_handler_test_send_new(test.handler, "IMSI"));
+    mms_handler_message_sent(test.handler, test.id, desc->mmsid);
+    mms_settings_unref(settings);
+
+    g_assert(mms_dispatcher_handle_push(test.disp, "Connection", push, &error));
+    g_assert(mms_dispatcher_start(test.disp));
+
+    test_run_loop(&test_opt, test.loop);
+
+    mms_connman_test_close_connection(test.cm);
+    mms_connman_unref(test.cm);
+    mms_handler_unref(test.handler);
+    mms_dispatcher_unref(test.disp);
+    g_main_loop_unref(test.loop);
+    g_mapped_file_unref(test.pdu_file);
+    g_free(test.id);
+
+    test_dirs_cleanup(&dirs, TRUE);
+
+    g_bytes_unref(push);
+    g_free(ni);
 }
 
-static
-int
-test_run(
-    const MMSConfig* config,
-    const char* name)
-{
-    int i, ret;
-    if (name) {
-        const TestDesc* found = NULL;
-        for (i=0, ret = RET_ERR; i<G_N_ELEMENTS(read_tests); i++) {
-            const TestDesc* test = read_tests + i;
-            if (!strcmp(test->name, name)) {
-                ret = test_run_one(config, test);
-                found = test;
-                break;
-            }
-        }
-        if (!found) GERR("No such test: %s", name);
-    } else {
-        for (i=0, ret = RET_OK; i<G_N_ELEMENTS(read_tests); i++) {
-            int test_status = test_run_one(config, read_tests + i);
-            if (ret == RET_OK && test_status != RET_OK) ret = test_status;
-        }
-    }
-    return ret;
-}
+#define TEST_(x) "/ReadInd/" x
 
 int main(int argc, char* argv[])
 {
     int ret;
-    MMSConfig config;
-    const char* test = "test_read_ind";
-    const char* testcase = NULL;
+    guint i;
 
     mms_lib_init(argv[0]);
-    mms_lib_default_config(&config);
-    gutil_log_default.name = test;
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(read_tests); i++) {
+        const TestDesc* test = read_tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
 
-    if (argc > 1 && !strcmp(argv[1], "-v")) {
-        gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-        memmove(argv + 1, argv + 2, (argc-2)*sizeof(argv[0]));
-        argc--;
-    } else {
-        gutil_log_timestamp = FALSE;
-        gutil_log_default.level = GLOG_LEVEL_INFO;
-        mms_task_notification_log.level = GLOG_LEVEL_NONE;
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
     }
-
-    if (argc == 2 && argv[1][0] != '-') {
-        testcase = argv[1];
-    }
-
-    if (argc == 1 || testcase) {
-        TestDirs dirs;
-        test_dirs_init(&dirs, test);
-        config.root_dir = dirs.root;
-        config.network_idle_secs = 0;
-        config.attic_enabled = TRUE;
-        ret = test_run(&config, testcase);
-        test_dirs_cleanup(&dirs, TRUE);
-    } else {
-        printf("Usage: test_read_ind [-v] [TEST]\n");
-        ret = RET_ERR;
-    }
-
+    ret = g_test_run();
     mms_lib_deinit();
     return ret;
 }
