@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016-2018 Jolla Ltd.
- * Copyright (C) 2016-2018 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2016-2020 Jolla Ltd.
+ * Copyright (C) 2016-2020 Slava Monich <slava.monich@jolla.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,16 +12,17 @@
  * GNU General Public License for more details.
  */
 
+#include "test_util.h"
+
 #include "mms_settings.h"
 #include "mms_lib_util.h"
 #include "mms_lib_log.h"
 
 #include <gutil_log.h>
 
-#define DATA_DIR "data/"
+static TestOpt test_opt;
 
-#define RET_OK   (0)
-#define RET_ERR  (1)
+#define DATA_DIR "data/"
 
 typedef struct test_desc {
     const char* name;
@@ -104,38 +105,38 @@ static const TestDesc tests [] = {
 };
 
 static
-gboolean
-test_config_equal(
+void
+check_config(
     const MMSConfig* c1,
     const MMSConfig* c2)
 {
-    return !g_strcmp0(c1->root_dir, c2->root_dir) &&
-        c1->retry_secs == c2->retry_secs &&
-        c1->network_idle_secs == c2->network_idle_secs &&
-        c1->idle_secs == c2->idle_secs &&
-        c1->keep_temp_files == c2->keep_temp_files &&
-        c1->attic_enabled == c2->attic_enabled;
+    g_assert_cmpstr(c1->root_dir, == ,c2->root_dir);
+    g_assert_cmpint(c1->retry_secs, == ,c2->retry_secs);
+    g_assert_cmpint(c1->network_idle_secs, == ,c2->network_idle_secs);
+    g_assert_cmpint(c1->idle_secs, == ,c2->idle_secs);
+    g_assert(c1->keep_temp_files == c2->keep_temp_files);
+    g_assert(c1->attic_enabled == c2->attic_enabled);
 }
 
 static
-gboolean
-test_settings_equal(
+void
+check_settings(
     const MMSSettingsSimData* s1,
     const MMSSettingsSimData* s2)
 {
-    return !g_strcmp0(s1->user_agent, s2->user_agent) &&
-        !g_strcmp0(s1->uaprof, s2->uaprof) &&
-        s1->size_limit == s2->size_limit &&
-        s1->max_pixels == s2->max_pixels &&
-        s1->allow_dr == s2->allow_dr;
+    g_assert_cmpstr(s1->user_agent, == ,s2->user_agent);
+    g_assert_cmpstr(s1->uaprof, == ,s2->uaprof);
+    g_assert_cmpuint(s1->size_limit, == ,s2->size_limit);
+    g_assert_cmpuint(s1->max_pixels, == ,s2->max_pixels);
+    g_assert(s1->allow_dr == s2->allow_dr);
 }
 
 static
-int
-test_run(
-    const TestDesc* test)
+void
+run_test(
+    gconstpointer data)
 {
-    int ret = RET_ERR;
+    const TestDesc* test = data;
     GError* error = NULL;
     char* path = g_strconcat(DATA_DIR, test->name, ".conf", NULL);
     MMSConfigCopy global;
@@ -146,75 +147,33 @@ test_run(
     mms_lib_default_config(&global.config);
     mms_settings_sim_data_default(&defaults.data);
 
-    if (mms_settings_load_defaults(path, &global, &defaults, &error) &&
-        test_settings_equal(&defaults.data, &test->defaults) &&
-        test_config_equal(&global.config, &test->config)) {
-        ret = RET_OK;
-    }
-
-    if (error) {
-        GERR("%s", GERRMSG(error));
-        g_error_free(error);
-    }
+    g_assert(mms_settings_load_defaults(path, &global, &defaults, &error));
+    check_settings(&defaults.data, &test->defaults);
+    check_config(&global.config, &test->config);
 
     g_free(path);
     g_free(global.root_dir);
     mms_settings_sim_data_reset(&defaults);
-    GINFO("%s: %s", (ret == RET_OK) ? "OK" : "FAILED", test->name);
-    return ret;
 }
+
+#define TEST_(x) "/MediaType/" x
 
 int main(int argc, char* argv[])
 {
-    int ret = RET_ERR;
-    gboolean verbose = FALSE;
-    GOptionContext* options;
-    GOptionEntry entries[] = {
-        { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
-          "Enable verbose output", NULL },
-        { NULL }
-    };
+    guint i;
+    int ret;
 
     mms_lib_init(argv[0]);
-    options = g_option_context_new("[TESTS...] - MMS settings test");
-    g_option_context_add_main_entries(options, entries, NULL);
-    if (g_option_context_parse(options, &argc, &argv, NULL)) {
-        int i;
+    g_test_init(&argc, &argv, NULL);
+    test_init(&test_opt, &argc, argv);
+    for (i = 0; i < G_N_ELEMENTS(tests); i++) {
+        const TestDesc* test = tests + i;
+        char* name = g_strdup_printf(TEST_("%s"), test->name);
 
-        gutil_log_set_type(GLOG_TYPE_STDOUT, "test_settings");
-        if (verbose) {
-            gutil_log_default.level = GLOG_LEVEL_VERBOSE;
-        } else {
-            gutil_log_timestamp = FALSE;
-            gutil_log_default.level = GLOG_LEVEL_INFO;
-            mms_codec_log.level = GLOG_LEVEL_ERR;
-        }
-
-        ret = RET_OK;
-        if (argc > 1) {
-            for (i=1; i<argc; i++) {
-                int j;
-                for (j=0; j<G_N_ELEMENTS(tests); j++) {
-                    if (!g_strcmp0(argv[i], tests[i].name)) {
-                        int ret2 = test_run(tests + i);
-                        if (ret == RET_OK && ret2 != RET_OK) {
-                            ret = ret2;
-                        }
-                        break;
-                    }
-                }
-            }
-        } else {
-            /* Default set of tests */
-            for (i=0; i<G_N_ELEMENTS(tests); i++) {
-                int ret2 = test_run(tests + i);
-                if (ret == RET_OK && ret2 != RET_OK) {
-                    ret = ret2;
-                }
-            }
-        }
+        g_test_add_data_func(name, test, run_test);
+        g_free(name);
     }
-    g_option_context_free(options);
+    ret = g_test_run();
     mms_lib_deinit();
     return ret;
 }
