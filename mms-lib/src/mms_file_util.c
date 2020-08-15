@@ -9,10 +9,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
+#include "mms_attachment_info.h"
 #include "mms_file_util.h"
 #include "mms_error.h"
 
@@ -54,25 +55,18 @@ mms_smil_parse_end(
  */
 gboolean
 mms_file_is_smil(
-    const char* file)
+    const MMSAttachmentInfo* ai)
 {
     static const GMarkupParser toplevel = { mms_smil_parse_start,
         mms_smil_parse_end, NULL, NULL, NULL };
-    gboolean smil = FALSE;
-    GMappedFile* map = g_mapped_file_new(file, FALSE, NULL);
-    if (map) {
-        gboolean smil_found = FALSE;
-        GMarkupParseContext* parser = g_markup_parse_context_new(&toplevel,
-            G_MARKUP_TREAT_CDATA_AS_TEXT, &smil_found, NULL);
-        if (g_markup_parse_context_parse(parser,
-            g_mapped_file_get_contents(map),
-            g_mapped_file_get_length(map), NULL)) {
-            g_markup_parse_context_end_parse(parser, NULL);
-            smil = smil_found;
-        }
-        g_mapped_file_unref(map);
-        g_markup_parse_context_free(parser);
+    gboolean smil = FALSE, smil_found = FALSE;
+    GMarkupParseContext* parser = g_markup_parse_context_new(&toplevel,
+        G_MARKUP_TREAT_CDATA_AS_TEXT, &smil_found, NULL);
+    if (g_markup_parse_context_parse(parser, ai->data, ai->size, NULL)) {
+        g_markup_parse_context_end_parse(parser, NULL);
+        smil = smil_found;
     }
+    g_markup_parse_context_free(parser);
     return smil;
 }
 
@@ -200,46 +194,29 @@ mms_write_bytes(
 }
 
 /**
- * Copies the file. Assumes that the destination directory exists.
+ * Copies attachment to a file. Assumes that the destination directory
+ * already exists.
  */
 gboolean
-mms_file_copy(
-    const char* src,
+mms_copy_attachment(
+    const MMSAttachmentInfo* ai,
     const char* dest,
     GError** error)
 {
     gboolean ok = FALSE;
     int out = open(dest, O_CREAT|O_WRONLY|O_TRUNC|O_BINARY, MMS_FILE_PERM);
+
     if (out >= 0) {
-        int in = open(src, O_RDONLY | O_BINARY);
-        if (in >= 0) {
-            int nbytes;
-            const size_t buflen = 4096;
-            void* buf = g_malloc(buflen);
+        if (write(out, ai->data, ai->size) == (gssize)ai->size) {
             ok = TRUE;
-            while ((nbytes = read(in, buf, buflen)) > 0) {
-                if (write(out, buf, nbytes) < nbytes) {
-                    ok = FALSE;
-                    MMS_ERROR(error, MMS_LIB_ERROR_IO,
-                        "Failed to write %s: %s", dest, strerror(errno));
-                    break;
-                }
-            }
-            if (nbytes < 0) {
-                ok = FALSE;
-                MMS_ERROR(error, MMS_LIB_ERROR_IO,
-                    "Failed to read %s: %s", src, strerror(errno));
-            }
-            g_free(buf);
-            close(in);
         } else {
-            MMS_ERROR(error, MMS_LIB_ERROR_IO,
-                "Failed to open file %s: %s", src, strerror(errno));
+            MMS_ERROR(error, MMS_LIB_ERROR_IO, "Failed to write %s: %s",
+                dest, strerror(errno));
         }
         close(out);
     } else {
-        MMS_ERROR(error, MMS_LIB_ERROR_IO,
-            "Failed to create file %s: %s", dest, strerror(errno));
+        MMS_ERROR(error, MMS_LIB_ERROR_IO, "Failed to create file %s: %s",
+            dest, strerror(errno));
     }
     return ok;
 }

@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2018 Jolla Ltd.
- * Contact: Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2020 Jolla Ltd.
+ * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -8,12 +9,12 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
-#ifndef JOLLA_MMS_LIB_TYPES_H
-#define JOLLA_MMS_LIB_TYPES_H
+#ifndef SAILFISH_MMS_LIB_TYPES_H
+#define SAILFISH_MMS_LIB_TYPES_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,17 +44,10 @@ typedef GLogModule MMSLogModule;
 
 #ifdef __linux__
 #  define HAVE_MAGIC
-#  define HAVE_REALPATH
 #endif
 
-/* Attachment information */
-typedef struct mms_attachment_info {
-    const char* file_name;      /* Full path name */
-    const char* content_type;   /* Content type */
-    const char* content_id;     /* Content id */
-} MMSAttachmentInfo;
-
 /* Types */
+typedef struct mms_attachment_info MMSAttachmentInfo;
 typedef struct mms_config MMSConfig;
 typedef struct mms_settings MMSSettings;
 typedef struct mms_settings_sim_data MMSSettingsSimData;
@@ -83,7 +77,7 @@ typedef enum _MMS_CONNECTION_TYPE {
     MMS_CONNECTION_TYPE_USER        /* Connection requested by user */
 } MMS_CONNECTION_TYPE;
 
-#endif /* JOLLA_MMS_LIB_TYPES_H */
+#endif /* SAILFISH_MMS_LIB_TYPES_H */
 
 /*
  * Local Variables:

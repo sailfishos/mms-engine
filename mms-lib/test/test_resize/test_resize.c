@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,6 +16,7 @@
 #include "test_util.h"
 
 #include "mms_attachment.h"
+#include "mms_attachment_info.h"
 #include "mms_settings.h"
 #include "mms_lib_util.h"
 #include "mms_lib_log.h"
@@ -381,13 +383,19 @@ run_test(
     g_assert(dir);
     testfile = g_build_filename(dir, name, NULL);
 
-    g_assert(mms_file_copy(test->file, testfile, NULL));
+    /* Copy the file */
+    g_assert(mms_attachment_info_path(&info, test->file, NULL, NULL, &error));
+    g_assert(mms_copy_attachment(&info, testfile, &error));
+    mms_attachment_info_cleanup(&info);
+
     mms_settings_sim_data_default(&sim_settings);
     sim_settings.max_pixels = test->max_pixels;
-    info.file_name = testfile;
-    info.content_type = test->type->content_type;
-    info.content_id = name;
+
+    /* Create the attachment */
+    g_assert(mms_attachment_info_path(&info, testfile,test->type->content_type,
+        name, &error));
     at = mms_attachment_new(&config, &info, &error);
+    mms_attachment_info_cleanup(&info);
 
     g_assert(at);
     for (i = 0; i < test->steps && ok; i++) {

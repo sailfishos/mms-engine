@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
@@ -51,6 +51,7 @@ typedef struct mms_app_dbus_policy {
 #define MMS_ENGINE_DBUS_METHOD_RECEIVE_MESSAGE  "receiveMessage"
 #define MMS_ENGINE_DBUS_METHOD_SEND_READ_REPORT "sendReadReport"
 #define MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE     "sendMessage"
+#define MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE_FD  "sendMessageFd"
 #define MMS_ENGINE_DBUS_METHOD_PUSH             "push"
 #define MMS_ENGINE_DBUS_METHOD_PUSH_NOTIFY      "pushNotify"
 #define MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL    "setLogLevel"
@@ -60,8 +61,8 @@ typedef struct mms_app_dbus_policy {
 #define MMS_ENGINE_DBUS_METHOD_EXIT             "exit"
 
 static const DA_ACTION mms_engine_dbus_actions[] = {
-    #define INIT_DA_ACTION(id) \
-        {MMS_ENGINE_DBUS_METHOD_##id, MMS_ENGINE_ACTION_##id, 0},
+    #define INIT_DA_ACTION(ID,id,name) \
+        {MMS_ENGINE_DBUS_METHOD_##ID, MMS_ENGINE_ACTION_##ID, 0},
     MMS_ENGINE_DBUS_METHODS(INIT_DA_ACTION)
     #undef INIT_DA_ACTION
     { NULL }
@@ -73,6 +74,7 @@ static const MMSAppDBusPolicy mms_engine_default_dbus_policy = {
     MMS_ENGINE_DBUS_METHOD_RECEIVE_MESSAGE "()|"
     MMS_ENGINE_DBUS_METHOD_SEND_READ_REPORT"()|"
     MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE"()|"
+    MMS_ENGINE_DBUS_METHOD_SEND_MESSAGE_FD"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_LEVEL"()|"
     MMS_ENGINE_DBUS_METHOD_SET_LOG_TYPE"()|"
     MMS_ENGINE_DBUS_METHOD_MIGRATE_SETTINGS"()|"

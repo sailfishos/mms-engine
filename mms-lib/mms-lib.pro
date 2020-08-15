@@ -65,6 +65,7 @@ HEADERS += \
   src/mms_util.h \
 
 HEADERS += \
+  include/mms_attachment_info.h \
   include/mms_connection.h \
   include/mms_connman.h \
   include/mms_dispatcher.h \
