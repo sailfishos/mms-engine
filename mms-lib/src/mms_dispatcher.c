@@ -671,6 +671,7 @@ mms_dispatcher_send_message(
             id, imsi, to, cc, bcc, subject, flags, parts, nparts, error))) {
             return default_imsi ? default_imsi : g_strdup(imsi);
         }
+        g_free(default_imsi);
     } else {
         MMS_ERROR(error, MMS_LIB_ERROR_NOSIM,
             "No IMSI is provided and none is available");
