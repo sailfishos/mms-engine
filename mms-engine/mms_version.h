@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
@@ -16,7 +16,7 @@
 #define JOLLA_MMS_VERSION_H
 
 #ifndef MMS_ENGINE_VERSION
-#  define MMS_ENGINE_VERSION 1.0.72
+#  define MMS_ENGINE_VERSION 1.0.73
 #endif
 
 #define MMS_VERSION_STRING__(x) #x
