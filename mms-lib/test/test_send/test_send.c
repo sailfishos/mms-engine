@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
@@ -24,6 +24,7 @@
 #include "mms_lib_util.h"
 #include "mms_settings.h"
 #include "mms_dispatcher.h"
+#include "mms_attachment_info.h"
 
 #include <gutil_macros.h>
 #include <gutil_log.h>
@@ -34,9 +35,15 @@
 
 static TestOpt test_opt;
 
+typedef struct test_attachment {
+    const char* file_name;
+    const char* content_type;
+    const char* content_id;
+} TestAttachment;
+
 typedef struct test_desc {
     const char* name;
-    const MMSAttachmentInfo* parts;
+    const TestAttachment* parts;
     int nparts;
     gsize size_limit;
     const char* subject;
@@ -84,25 +91,27 @@ typedef struct test {
     GMappedFile* resp_file;
 } Test;
 
-static const MMSAttachmentInfo test_files_accept [] = {
+static const TestAttachment test_files_accept [] = {
     { "smil", "application/smil;charset=us-ascii", NULL },
     { "0001.jpg", "image/jpeg;name=0001.jpg", "image" },
     { "test.txt", "text/plain;charset=utf-8;name=wrong.name", "text" }
 };
 
-static const MMSAttachmentInfo test_files_accept_no_ext [] = {
+#ifdef HAVE_MAGIC
+static const TestAttachment test_files_accept_no_ext [] = {
     { "smil", NULL, NULL },
     { "0001", NULL, "image1" },
     { "0001", "", "image2" },
     { "test.text", "text/plain;charset=utf-8", "text" }
 };
+#endif /* HAVE_MAGIC */
 
-static const MMSAttachmentInfo test_files_reject [] = {
+static const TestAttachment test_files_reject [] = {
     { "0001.png", "image/png", "image" },
     { "test.txt", "text/plain", "text" }
 };
 
-static const MMSAttachmentInfo test_txt [] = {
+static const TestAttachment test_txt [] = {
     { "test.txt", NULL, "text" }
 };
 
@@ -126,6 +135,7 @@ static const TestDesc send_tests[] = {
         NULL,
         "TestMessageId"
     },{
+#ifdef HAVE_MAGIC
         "AcceptNoExt",
         ATTACHMENTS(test_files_accept_no_ext),
         0,
@@ -142,6 +152,7 @@ static const TestDesc send_tests[] = {
         NULL,
         "TestMessageId"
     },{
+#endif /* HAVE_MAGIC */
         "ServiceDenied",
         ATTACHMENTS(test_files_reject),
         0,
@@ -348,7 +359,8 @@ run_test(
     GError* error = NULL;
     TestDirs dirs;
     Test test;
-    guint port, i;
+    guint port;
+    int i;
     const char* id;
     char* imsi;
     char* imsi2;
@@ -383,8 +395,9 @@ run_test(
     for (i = 0; i < desc->nparts; i++) {
         test.files[i] = g_build_filename(DATA_DIR, desc->name,
             desc->parts[i].file_name, NULL);
-        test.parts[i] = desc->parts[i];
-        test.parts[i].file_name = test.files[i];
+
+        g_assert(mms_attachment_info_path(test.parts + i, test.files[i],
+            desc->parts[i].content_type, desc->parts[i].content_id, &error));
     }
     test.config = &config;
     test.desc = desc;
@@ -434,9 +447,6 @@ run_test(
     }
 
     /* Done */
-    g_free(imsi);
-    g_free(imsi2);
-
     test_http_close(test.http);
     test_http_unref(test.http);
     mms_connman_test_close_connection(test.cm);
@@ -445,11 +455,16 @@ run_test(
     mms_dispatcher_unref(test.disp);
     g_main_loop_unref(test.loop);
     if (test.resp_file) g_mapped_file_unref(test.resp_file);
-    for (i = 0; i < test.desc->nparts; i++) g_free(test.files[i]);
+    for (i = 0; i < test.desc->nparts; i++) {
+        mms_attachment_info_cleanup(test.parts + i);
+        g_free(test.files[i]);
+    }
     g_free(test.files);
     g_free(test.parts);
     g_free(test.id);
 
+    g_free(imsi);
+    g_free(imsi2);
     test_dirs_cleanup(&dirs, TRUE);
 }
 

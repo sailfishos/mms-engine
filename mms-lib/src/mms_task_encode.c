@@ -9,12 +9,13 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
 #include "mms_task.h"
 #include "mms_attachment.h"
+#include "mms_attachment_info.h"
 #include "mms_dispatcher.h"
 #include "mms_settings.h"
 #include "mms_handler.h"
@@ -457,24 +458,29 @@ mms_task_encode_prepare_attachments(
     int smil_index = -1;
     GPtrArray* array = g_ptr_array_sized_new(nparts);
     for (i=0; i<nparts; i++) {
+        const MMSAttachmentInfo* part = parts + i;
         MMSAttachment* attachment = NULL;
-        MMSAttachmentInfo info = parts[i];
         char* path;
 
         G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
         path = mms_task_encode_generate_path(dir,
-            g_basename(info.file_name), info.content_type);
+            g_basename(part->file_name), part->content_type);
         G_GNUC_END_IGNORE_DEPRECATIONS;
 
-        if (mms_file_copy(info.file_name, path, error)) {
-            info.file_name = path;
-            attachment = mms_attachment_new(config, &info, error);
-            if (attachment) {
-                if (smil_index < 0 &&
-                   (attachment->flags & MMS_ATTACHMENT_SMIL)) {
-                    smil_index = i;
+        if (mms_copy_attachment(part, path, error)) {
+            MMSAttachmentInfo ai;
+            
+            if (mms_attachment_info_path(&ai, path, part->content_type,
+                part->content_id, error)) {
+                attachment = mms_attachment_new(config, &ai, error);
+                if (attachment) {
+                    if (smil_index < 0 && (attachment->flags &
+                        MMS_ATTACHMENT_SMIL)) {
+                        smil_index = i;
+                    }
+                    g_ptr_array_add(array, attachment);
                 }
-                g_ptr_array_add(array, attachment);
+                mms_attachment_info_cleanup(&ai);
             }
         } else if (error && *error) {
             GERR("%s", GERRMSG(*error));

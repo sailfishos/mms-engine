@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  */
@@ -45,7 +45,7 @@
 
 gboolean
 mms_file_is_smil(
-    const char* file);
+    const MMSAttachmentInfo* ai);
 
 void
 mms_remove_file_and_dir(
@@ -81,8 +81,8 @@ mms_write_bytes(
     char** path);
 
 gboolean
-mms_file_copy(
-    const char* src,
+mms_copy_attachment(
+    const MMSAttachmentInfo* parts,
     const char* dest,
     GError** error);
 

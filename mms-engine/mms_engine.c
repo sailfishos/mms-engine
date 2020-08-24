@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
- * Copyright (C) 2019 Open Mobile Platform LLC.
+ * Copyright (C) 2019-2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,13 +9,14 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
 #include "mms_engine.h"
 #include "mms_log.h"
 
+#include "mms_attachment_info.h"
 #include "mms_dispatcher.h"
 #include "mms_settings.h"
 #include "mms_lib_util.h"
@@ -43,9 +44,11 @@
 #include <gutil_misc.h>
 #include <gutil_log.h>
 
+#include <gio/gunixfdlist.h>
+
 /* D-Bus proxy Signals */
 enum mms_engine_dbus_methods {
-    #define MMS_ENGINE_METHOD_(id) MMS_ENGINE_METHOD_##id,
+    #define MMS_ENGINE_METHOD_(ID,id,name) MMS_ENGINE_METHOD_##ID,
     MMS_ENGINE_DBUS_METHODS(MMS_ENGINE_METHOD_)
     #undef MMS_ENGINE_METHOD_
     MMS_ENGINE_METHOD_COUNT
@@ -139,6 +142,18 @@ mms_engine_idle_timer_check(
 }
 
 static
+GArray*
+mms_engine_new_attachment_array()
+{
+    GArray* ais = g_array_sized_new(FALSE, TRUE,
+        sizeof(MMSAttachmentInfo), 0);
+
+    g_array_set_clear_func(ais, (GDestroyNotify)
+        mms_attachment_info_cleanup);
+    return ais;
+}
+
+static
 gboolean
 mms_engine_dbus_access_allowed(
     MMSEngine* engine,
@@ -183,63 +198,185 @@ mms_engine_handle_send_message(
         MMS_ENGINE_ACTION_SEND_MESSAGE)) {
         /* mms_engine_dbus_access_allowed has completed the call */
     } else if (to && *to) {
-        unsigned int i;
-        char* to_list = g_strjoinv(",", (char**)to);
-        char* cc_list = NULL;
-        char* bcc_list = NULL;
-        char* id = NULL;
-        char* imsi;
-        MMSAttachmentInfo* parts;
-        GArray* info = g_array_sized_new(FALSE, FALSE, sizeof(*parts), 0);
+        GPtrArray* strings = g_ptr_array_new_full(3, g_free);
+        GArray* ais = mms_engine_new_attachment_array();
         GError* error = NULL;
 
         /* Extract attachment info */
         char* fn = NULL;
         char* ct = NULL;
         char* cid = NULL;
-        GVariantIter* iter = NULL;
-        g_variant_get(attachments, "a(sss)", &iter);
-        while (g_variant_iter_loop(iter, "(sss)", &fn, &ct, &cid)) {
-            MMSAttachmentInfo part;
-            part.file_name = g_strdup(fn);
-            part.content_type = g_strdup(ct);
-            part.content_id = g_strdup(cid);
-            g_array_append_vals(info, &part, 1);
+        GVariantIter* it = NULL;
+
+        g_variant_get(attachments, "a(sss)", &it);
+        while (g_variant_iter_loop(it, "(sss)", &fn, &ct, &cid)) {
+            MMSAttachmentInfo ai;
+
+            g_ptr_array_add(strings, fn);
+            g_ptr_array_add(strings, ct);
+            g_ptr_array_add(strings, cid);
+            if (mms_attachment_info_path(&ai, fn, ct, cid, &error)) {
+                /*
+                 * Need to zero these pointers to stop the next
+                 * g_variant_iter_loop() call from deallocating
+                 * the data allocated by the previous loop.
+                 */
+                fn = ct = cid = NULL;
+                g_array_append_vals(ais, &ai, 1);
+            } else {
+                GERR("%s", GERRMSG(error));
+                break;
+            }
         }
 
-        /* Convert address lists into comma-separated strings
-         * expected by mms_dispatcher_send_message and mms_codec */
-        if (cc && *cc) cc_list = g_strjoinv(",", (char**)cc);
-        if (bcc && *bcc) bcc_list = g_strjoinv(",", (char**)bcc);
-        if (database_id > 0) id = g_strdup_printf("%u", database_id);
-
-        /* Queue the message */
-        parts = (void*)info->data;
-        imsi = mms_dispatcher_send_message(engine->dispatcher, id,
-            imsi_to, to_list, cc_list, bcc_list, subject, flags, parts,
-            info->len, &error);
-        if (imsi) {
-            mms_dispatcher_start(engine->dispatcher);
-            org_nemomobile_mms_engine_complete_send_message(proxy, call, imsi);
-            g_free(imsi);
-        } else {
+        if (error) {
             g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
                 G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
             g_error_free(error);
+        } else {
+            MMSAttachmentInfo* parts = (MMSAttachmentInfo*)ais->data;
+            char* to_list = g_strjoinv(",", (char**)to);
+            char* cc_list = NULL;
+            char* bcc_list = NULL;
+            char* id = NULL;
+            char* imsi;
+
+            /* Convert address lists into comma-separated strings
+             * expected by mms_dispatcher_send_message and mms_codec */
+            if (cc && *cc) cc_list = g_strjoinv(",", (char**)cc);
+            if (bcc && *bcc) bcc_list = g_strjoinv(",", (char**)bcc);
+            if (database_id > 0) id = g_strdup_printf("%u", database_id);
+
+            /* Queue the message */
+            imsi = mms_dispatcher_send_message(engine->dispatcher, id,
+                imsi_to, to_list, cc_list, bcc_list, subject, flags, parts,
+                ais->len, &error);
+            if (imsi) {
+                mms_dispatcher_start(engine->dispatcher);
+                org_nemomobile_mms_engine_complete_send_message(proxy, call,
+                    imsi);
+                g_free(imsi);
+            } else {
+                g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+                    G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
+                g_error_free(error);
+            }
+
+            g_free(to_list);
+            g_free(cc_list);
+            g_free(bcc_list);
+            g_free(id);
         }
 
-        for (i=0; i<info->len; i++) {
-            g_free((void*)parts[i].file_name);
-            g_free((void*)parts[i].content_type);
-            g_free((void*)parts[i].content_id);
+        g_variant_iter_free(it);
+        g_array_unref(ais);
+        g_ptr_array_free(strings, TRUE);
+    } else {
+        g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+            G_DBUS_ERROR_FAILED, "Missing recipient");
+    }
+    mms_engine_idle_timer_check(engine);
+    return TRUE;
+}
+
+/* org.nemomobile.MmsEngine.sendMessageFd */
+static
+gboolean
+mms_engine_handle_send_message_fd(
+    OrgNemomobileMmsEngine* proxy,
+    GDBusMethodInvocation* call,
+    GUnixFDList* fdl,
+    int database_id,
+    const char* imsi_to,
+    const char* const* to,
+    const char* const* cc,
+    const char* const* bcc,
+    const char* subject,
+    guint flags,
+    GVariant* attachments,
+    MMSEngine* engine)
+{
+    if (!mms_engine_dbus_access_allowed(engine, call,
+        MMS_ENGINE_ACTION_SEND_MESSAGE)) {
+        /* mms_engine_dbus_access_allowed has completed the call */
+    } else if (to && *to) {
+        gint nfds = 0;
+        const gint* fds = g_unix_fd_list_peek_fds(fdl, &nfds);
+        GPtrArray* strings = g_ptr_array_new_full(3, g_free);
+        GArray* ais = mms_engine_new_attachment_array();
+        GError* error = NULL;
+
+        /* Extract attachment info */
+        gint32 fdi;
+        char* fn = NULL;
+        char* ct = NULL;
+        char* cid = NULL;
+        GVariantIter* it = NULL;
+
+        g_variant_get(attachments, "a(hsss)", &it);
+        while (g_variant_iter_loop(it, "(hsss)", &fdi, &fn, &ct, &cid)) {
+            MMSAttachmentInfo ai;
+
+            g_ptr_array_add(strings, fn);
+            g_ptr_array_add(strings, ct);
+            g_ptr_array_add(strings, cid);
+            if (fdi >= 0 && fdi < nfds /* validate the index */ &&
+                mms_attachment_info_fd(&ai, fds[fdi], fn, ct, cid, &error)) {
+                /*
+                 * Need to zero these pointers to stop the next
+                 * g_variant_iter_loop() call from deallocating
+                 * the data allocated by the previous loop.
+                 */
+                fn = ct = cid = NULL;
+                g_array_append_vals(ais, &ai, 1);
+            } else {
+                GERR("%s", GERRMSG(error));
+                break;
+            }
         }
 
-        g_free(to_list);
-        g_free(cc_list);
-        g_free(bcc_list);
-        g_free(id);
-        g_array_unref(info);
-        g_variant_iter_free(iter);
+        if (error) {
+            g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+                G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
+            g_error_free(error);
+        } else {
+            MMSAttachmentInfo* parts = (MMSAttachmentInfo*)ais->data;
+            char* to_list = g_strjoinv(",", (char**)to);
+            char* cc_list = NULL;
+            char* bcc_list = NULL;
+            char* id = NULL;
+            char* imsi;
+
+            /* Convert address lists into comma-separated strings
+             * expected by mms_dispatcher_send_message and mms_codec */
+            if (cc && *cc) cc_list = g_strjoinv(",", (char**)cc);
+            if (bcc && *bcc) bcc_list = g_strjoinv(",", (char**)bcc);
+            if (database_id > 0) id = g_strdup_printf("%u", database_id);
+
+            /* Queue the message */
+            imsi = mms_dispatcher_send_message(engine->dispatcher, id,
+                imsi_to, to_list, cc_list, bcc_list, subject, flags, parts,
+                ais->len, &error);
+            if (imsi) {
+                mms_dispatcher_start(engine->dispatcher);
+                org_nemomobile_mms_engine_complete_send_message_fd(proxy,
+                    call, fdl, imsi);
+                g_free(imsi);
+            } else {
+                g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
+                    G_DBUS_ERROR_FAILED, "%s", GERRMSG(error));
+                g_error_free(error);
+            }
+
+            g_free(to_list);
+            g_free(cc_list);
+            g_free(bcc_list);
+            g_free(id);
+        }
+
+        g_variant_iter_free(it);
+        g_array_unref(ais);
+        g_ptr_array_free(strings, TRUE);
     } else {
         g_dbus_method_invocation_return_error(call, G_DBUS_ERROR,
             G_DBUS_ERROR_FAILED, "Missing recipient");
@@ -623,39 +760,12 @@ mms_engine_new(
             DA_BUS_SESSION : DA_BUS_SYSTEM;
 
         mms->proxy = org_nemomobile_mms_engine_skeleton_new();
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_SEND_MESSAGE] =
-            g_signal_connect(mms->proxy, "handle-send-message",
-            G_CALLBACK(mms_engine_handle_send_message), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_PUSH] =
-            g_signal_connect(mms->proxy, "handle-push",
-            G_CALLBACK(mms_engine_handle_push), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_PUSH_NOTIFY] =
-            g_signal_connect(mms->proxy, "handle-push-notify",
-            G_CALLBACK(mms_engine_handle_push_notify), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_CANCEL] =
-            g_signal_connect(mms->proxy, "handle-cancel",
-            G_CALLBACK(mms_engine_handle_cancel), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_RECEIVE_MESSAGE] =
-            g_signal_connect(mms->proxy, "handle-receive-message",
-            G_CALLBACK(mms_engine_handle_receive_message), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_SEND_READ_REPORT] =
-            g_signal_connect(mms->proxy, "handle-send-read-report",
-            G_CALLBACK(mms_engine_handle_send_read_report), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_SET_LOG_LEVEL] =
-            g_signal_connect(mms->proxy, "handle-set-log-level",
-            G_CALLBACK(mms_engine_handle_set_log_level), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_SET_LOG_TYPE] =
-            g_signal_connect(mms->proxy, "handle-set-log-type",
-            G_CALLBACK(mms_engine_handle_set_log_type), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_GET_VERSION] =
-            g_signal_connect(mms->proxy, "handle-get-version",
-            G_CALLBACK(mms_engine_handle_get_version), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_MIGRATE_SETTINGS] =
-            g_signal_connect(mms->proxy, "handle-migrate-settings",
-            G_CALLBACK(mms_engine_handle_migrate_settings), mms);
-        mms->proxy_signal_id[MMS_ENGINE_METHOD_EXIT] =
-            g_signal_connect(mms->proxy, "handle-exit",
-            G_CALLBACK(mms_engine_handle_exit), mms);
+#define MMS_ENGINE_HANDLER_(ID,id,name)  \
+        mms->proxy_signal_id[MMS_ENGINE_METHOD_##ID] = \
+            g_signal_connect(mms->proxy, "handle-" name, \
+            G_CALLBACK(mms_engine_handle_##id), mms);
+        MMS_ENGINE_DBUS_METHODS(MMS_ENGINE_HANDLER_)
+#undef  MMS_ENGINE_HANDLER_
 
         return mms;
     }

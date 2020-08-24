@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2013-2020 Jolla Ltd.
  * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
- * Copyright (C) 2019 Open Mobile Platform LLC.
+ * Copyright (C) 2019-2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
 
@@ -40,22 +40,23 @@
 #endif /* MMS_ENGINE_CONFIG_FILE */
 
 #define MMS_ENGINE_DBUS_METHODS(m) \
-    m(CANCEL) \
-    m(RECEIVE_MESSAGE) \
-    m(SEND_READ_REPORT) \
-    m(SEND_MESSAGE) \
-    m(PUSH) \
-    m(PUSH_NOTIFY) \
-    m(SET_LOG_LEVEL) \
-    m(SET_LOG_TYPE) \
-    m(GET_VERSION) \
-    m(MIGRATE_SETTINGS) \
-    m(EXIT)
+    m(CANCEL,cancel,"cancel") \
+    m(RECEIVE_MESSAGE,receive_message,"receive-message") \
+    m(SEND_READ_REPORT,send_read_report,"send-read-report") \
+    m(SEND_MESSAGE,send_message,"send-message") \
+    m(SEND_MESSAGE_FD,send_message_fd,"send-message-fd") \
+    m(PUSH,push,"push") \
+    m(PUSH_NOTIFY,push_notify,"push-notify") \
+    m(SET_LOG_LEVEL,set_log_level,"set-log-level") \
+    m(SET_LOG_TYPE,set_log_type,"set-log-type") \
+    m(GET_VERSION,get_version,"get-version") \
+    m(MIGRATE_SETTINGS,migrate_settings,"migrate-settings") \
+    m(EXIT,exit,"exit")
 
 typedef enum mms_engine_action {
     /* Action ids must be non-zero, shift those by one */
     MMS_ENGINE_ACTION_NONE = 0,
-    #define MMS_ENGINE_ACTION_(id) MMS_ENGINE_ACTION_##id,
+    #define MMS_ENGINE_ACTION_(ID,id,name) MMS_ENGINE_ACTION_##ID,
     MMS_ENGINE_DBUS_METHODS(MMS_ENGINE_ACTION_)
     #undef MMS_ENGINE_ACTION_
 } MMS_ENGINE_ACTION;
