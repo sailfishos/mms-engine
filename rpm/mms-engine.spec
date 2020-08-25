@@ -8,7 +8,7 @@ Source0:  %{name}-%{version}.tar.bz2
 
 %define glib_version 2.32
 %define libsoup_version 2.38
-%define libwspcodec_version 2.2
+%define libwspcodec_version 2.2.3
 %define libgofono_version 2.0.0
 %define libgofonoext_version 1.0.4
 %define libglibutil_version 1.0.47
