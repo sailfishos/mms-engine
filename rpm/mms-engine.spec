@@ -17,6 +17,8 @@ Source0:  %{name}-%{version}.tar.bz2
 
 Requires: dbus
 Requires: ofono
+Requires: systemd
+Requires: mapplauncherd
 Requires: glib2 >= %{glib_version}
 Requires: libsoup >= %{libsoup_version}
 Requires: libwspcodec >= %{libwspcodec_version}
@@ -50,6 +52,9 @@ BuildRequires: pkgconfig(Qt5Gui)
 %define exe mms-engine
 %define schema org.nemomobile.mms.sim
 %define dbusname org.nemomobile.MmsEngine
+%define userservice mms-engine
+%define privilegesfile mms-engine.privileges
+%define privilegesdir %{_datadir}/mapplauncherd/privileges.d
 %define dbusconfig %{_datadir}/dbus-1/system-services
 %define dbuspolicy %{_sysconfdir}/dbus-1/system.d
 %define glibschemas  %{_datadir}/glib-2.0/schemas
@@ -77,21 +82,24 @@ make -C mms-send KEEP_SYMBOLS=1 release
 
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}%{_sbindir}
-mkdir -p %{buildroot}%{_unitdir}
-mkdir -p %{buildroot}%{dbusconfig}
-mkdir -p %{buildroot}%{dbuspolicy}
-mkdir -p %{buildroot}%{pushconfig}
-mkdir -p %{buildroot}%{glibschemas}
-mkdir -p %{buildroot}%{_prefix}/bin/
-cp %{src}/build/release/%{exe} %{buildroot}%{_sbindir}/
-cp %{src}/dbus-%{dbusname}.service %{buildroot}%{_unitdir}/
-cp %{src}/%{dbusname}.service %{buildroot}%{dbusconfig}/
-cp %{src}/%{dbusname}.dbus.conf %{buildroot}%{dbuspolicy}/%{dbusname}.conf
-cp %{src}/%{dbusname}.push.conf %{buildroot}%{pushconfig}/%{dbusname}.conf
-cp mms-settings-dconf/spec/%{schema}.gschema.xml %{buildroot}%{glibschemas}/
-cp mms-dump/build/release/mms-dump %{buildroot}%{_prefix}/bin/
-cp mms-send/build/release/mms-send %{buildroot}%{_prefix}/bin/
+install -d %{buildroot}%{_bindir}
+install -d %{buildroot}%{_sbindir}
+install -d %{buildroot}%{_unitdir}
+install -d %{buildroot}%{_userunitdir}
+install -d %{buildroot}%{dbusconfig}
+install -d %{buildroot}%{dbuspolicy}
+install -d %{buildroot}%{pushconfig}
+install -d %{buildroot}%{glibschemas}
+install -d %{buildroot}%{privilegesdir}
+install -m 755 %{src}/build/release/%{exe} %{buildroot}%{_sbindir}/
+install -m 644 %{src}/%{userservice}.service %{buildroot}%{_userunitdir}/
+install -m 644 %{src}/%{dbusname}.service %{buildroot}%{dbusconfig}/
+install -m 644 %{src}/%{dbusname}.dbus.conf %{buildroot}%{dbuspolicy}/%{dbusname}.conf
+install -m 644 %{src}/%{dbusname}.push.conf %{buildroot}%{pushconfig}/%{dbusname}.conf
+install -m 644 %{src}/%{privilegesfile} %{buildroot}%{privilegesdir}
+install -m 644 mms-settings-dconf/spec/%{schema}.gschema.xml %{buildroot}%{glibschemas}/
+install -m 755 mms-dump/build/release/mms-dump %{buildroot}%{_bindir}
+install -m 755 mms-send/build/release/mms-send %{buildroot}%{_bindir}
 
 %post
 glib-compile-schemas %{glibschemas}
@@ -107,11 +115,12 @@ make -C mms-lib/test test
 %config %{glibschemas}/%{schema}.gschema.xml
 %config %{dbuspolicy}/%{dbusname}.conf
 %config %{pushconfig}/%{dbusname}.conf
+%{privilegesdir}/%{privilegesfile}
 %{dbusconfig}/%{dbusname}.service
-%{_unitdir}/dbus-%{dbusname}.service
+%{_userunitdir}/%{userservice}.service
 %{_sbindir}/%{exe}
 
 %files tools
 %defattr(-,root,root,-)
-%{_prefix}/bin/mms-dump
-%{_prefix}/bin/mms-send
+%{_bindir}/mms-dump
+%{_bindir}/mms-send
