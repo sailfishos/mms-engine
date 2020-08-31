@@ -1,7 +1,5 @@
 # Goes to /usr/share/dbus-1/system-services
 [D-BUS Service]
 Name=org.nemomobile.MmsEngine
-Exec=/bin/false
-User=nemo
-SystemdService=dbus-org.nemomobile.MmsEngine.service
-
+Exec=/usr/bin/systemctl-user start mms-engine
+User=root
