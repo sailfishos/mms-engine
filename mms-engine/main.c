@@ -532,19 +532,17 @@ mms_app_parse_options(
         }
     }
 
-    g_option_context_free(options);
-    g_option_context_free(config_options);
-    g_free(config_file);
-    g_free(root_dir_help);
-    g_free(retry_secs_help);
-    g_free(idle_secs_help);
-    g_free(network_idle_secs_help);
-    g_free(description);
-
     if (!ok) {
         fprintf(stderr, "%s\n", GERRMSG(error));
         g_error_free(error);
         *result = RET_ERR;
+    } else if (argc > 1) {
+        char* help = g_option_context_get_help(options, TRUE, NULL);
+        /* No arguments expected */
+        fprintf(stderr, "%s", help);
+        g_free(help);
+        *result = RET_ERR;
+        ok = FALSE;
     } else if (log_modules) {
         MMSLogModule** ptr = mms_app_log_modules;
 
@@ -604,6 +602,14 @@ mms_app_parse_options(
         *result = RET_OK;
     }
 
+    g_option_context_free(options);
+    g_option_context_free(config_options);
+    g_free(config_file);
+    g_free(root_dir_help);
+    g_free(retry_secs_help);
+    g_free(idle_secs_help);
+    g_free(network_idle_secs_help);
+    g_free(description);
     g_free(ua);
     g_free(uaprof);
     g_free(root_dir);
