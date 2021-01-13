@@ -34,7 +34,7 @@ typedef struct mms_config_copy {
     char* root_dir;             /* Allocated copy of root_dir */
 } MMSConfigCopy;
 
-#define MMS_CONFIG_DEFAULT_ROOT_DIR             "/tmp/mms"
+#define MMS_CONFIG_DEFAULT_ROOT_DIR             NULL /* Dynamic */
 #define MMS_CONFIG_DEFAULT_RETRY_SECS           (15)
 #define MMS_CONFIG_DEFAULT_NETWORK_IDLE_SECS    (10)
 #define MMS_CONFIG_DEFAULT_IDLE_SECS            (30)
