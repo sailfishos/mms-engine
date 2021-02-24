@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2013-2020 Jolla Ltd.
- * Copyright (C) 2013-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2013-2021 Jolla Ltd.
+ * Copyright (C) 2013-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -637,10 +637,11 @@ int main(int argc, char* argv[])
     MMSConfig* config = &opt.global.config;
     MMSSettingsSimData* settings = &opt.settings.data;
 
-    mms_lib_init(argv[0]);
     gofono_log.name = "mms-ofono";
     gutil_log_default.name = MMS_APP_LOG_PREFIX;
+    gutil_log_timestamp = TRUE;
     memset(&opt, 0, sizeof(opt));
+    mms_lib_init(argv[0]);
     mms_lib_default_config(config);
     mms_settings_sim_data_default(settings);
     mms_app_dbus_config_init(&opt.dbus);
