@@ -1,6 +1,6 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.76
+Version:  1.0.77
 Release:  1
 License:  GPLv2
 URL:      https://git.sailfishos.org/mer-core/mms-engine
