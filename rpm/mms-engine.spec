@@ -30,9 +30,9 @@ Requires: libdbuslogserver-gio >= %{libdbuslog_version}
 Requires(post): glib2
 Requires(postun): glib2
 
-BuildRequires: systemd
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
+BuildRequires: pkgconfig(systemd)
 BuildRequires: pkgconfig(dconf)
 BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
