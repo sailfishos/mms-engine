@@ -6,6 +6,7 @@ License:  GPLv2
 URL:      https://github.com/sailfishos/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 
+%define gmime_package gmime-3.0
 %define glib_version 2.32
 %define libsoup_version 2.38
 %define libwspcodec_version 2.2.3
@@ -36,7 +37,7 @@ BuildRequires: pkgconfig(systemd)
 BuildRequires: pkgconfig(dconf)
 BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
-BuildRequires: pkgconfig(gmime-3.0)
+BuildRequires: pkgconfig(%{gmime_package})
 BuildRequires: pkgconfig(glib-2.0) >= %{glib_version}
 BuildRequires: pkgconfig(libsoup-2.4) >= %{libsoup_version}
 BuildRequires: pkgconfig(libwspcodec) >= %{libwspcodec_version}
@@ -76,7 +77,12 @@ MMS command line utilities
 %setup -q -n %{name}-%{version}
 
 %build
-make -C %{src} KEEP_SYMBOLS=1 MMS_ENGINE_VERSION="%{version}" SAILFISH=1 release
+make -C %{src} \
+  SAILFISH=1 \
+  KEEP_SYMBOLS=1 \
+  MMS_ENGINE_VERSION="%{version}" \
+  GMIME_PACKAGE="%{gmime_package}" \
+  release
 make -C mms-dump KEEP_SYMBOLS=1 release
 make -C mms-send KEEP_SYMBOLS=1 release
 
@@ -108,7 +114,7 @@ glib-compile-schemas %{glibschemas}
 glib-compile-schemas %{glibschemas}
 
 %check
-make -C mms-lib/test test
+make -C mms-lib/test GMIME_PACKAGE="%{gmime_package}" test
 
 %files
 %defattr(-,root,root,-)

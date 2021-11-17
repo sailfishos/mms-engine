@@ -17,8 +17,11 @@ include ../mms-lib/Config.mak
 # Required packages
 #
 
+GMIME_PACKAGE ?= gmime-3.0
 PKGS = gio-unix-2.0 gio-2.0 libdbusaccess libglibutil libdbuslogserver-gio
-LIB_PKGS = libwspcodec gmime-3.0 libgofono libsoup-2.4 dconf
+LIB_PKGS = $(GMIME_PACKAGE) libwspcodec libgofono libsoup-2.4 dconf
+
+SUBMAKE_OPTS += GMIME_PACKAGE=$(GMIME_PACKAGE)
 
 ifdef SAILFISH
 LIB_PKGS += libgofonoext
@@ -122,10 +125,7 @@ FULL_CFLAGS = $(BASE_FLAGS) -I. -I$(GEN_DIR) -I$(MMS_LIB_DIR)/include \
  -I$(MMS_SETTINGS_DIR)/include -I$(MMS_TRANSFERS_DIR)/include \
  -MMD -MP $(shell pkg-config --cflags $(PKGS))
 
-ifndef KEEP_SYMBOLS
-KEEP_SYMBOLS = 0
-endif
-
+KEEP_SYMBOLS ?= 0
 ifneq ($(KEEP_SYMBOLS),0)
 RELEASE_FLAGS += -g
 SUBMAKE_OPTS += KEEP_SYMBOLS=1
