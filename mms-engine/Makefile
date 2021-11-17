@@ -18,7 +18,7 @@ include ../mms-lib/Config.mak
 #
 
 PKGS = gio-unix-2.0 gio-2.0 libdbusaccess libglibutil libdbuslogserver-gio
-LIB_PKGS = libwspcodec gmime-2.6 libgofono libsoup-2.4 dconf
+LIB_PKGS = libwspcodec gmime-3.0 libgofono libsoup-2.4 dconf
 
 ifdef SAILFISH
 LIB_PKGS += libgofonoext

@@ -23,7 +23,7 @@ include ../../Config.mak
 # Required packages
 #
 
-PKGS += gmime-2.6 glib-2.0 libsoup-2.4 libglibutil
+PKGS += gmime-3.0 glib-2.0 libsoup-2.4 libglibutil
 LIB_PKGS += $(PKGS) libwspcodec $(RESIZE_PKG)
 
 #

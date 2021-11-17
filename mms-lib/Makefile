@@ -12,7 +12,7 @@ include Config.mak
 # Required packages
 #
 
-PKGS = libglibutil libwspcodec gmime-2.6 libsoup-2.4 glib-2.0
+PKGS = libglibutil libwspcodec gmime-3.0 libsoup-2.4 glib-2.0
 
 #
 # Default target

@@ -36,7 +36,7 @@ BuildRequires: pkgconfig(systemd)
 BuildRequires: pkgconfig(dconf)
 BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
-BuildRequires: pkgconfig(gmime-2.6)
+BuildRequires: pkgconfig(gmime-3.0)
 BuildRequires: pkgconfig(glib-2.0) >= %{glib_version}
 BuildRequires: pkgconfig(libsoup-2.4) >= %{libsoup_version}
 BuildRequires: pkgconfig(libwspcodec) >= %{libwspcodec_version}
