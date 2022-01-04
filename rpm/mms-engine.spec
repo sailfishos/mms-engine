@@ -1,12 +1,11 @@
 Name:     mms-engine
 Summary:  MMS engine
-Version:  1.0.79
+Version:  1.0.80
 Release:  1
 License:  GPLv2
 URL:      https://github.com/sailfishos/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 
-%define gmime_package gmime-3.0
 %define glib_version 2.32
 %define libsoup_version 2.38
 %define libwspcodec_version 2.2.3
@@ -33,11 +32,12 @@ Requires(postun): glib2
 
 BuildRequires: file-devel
 BuildRequires: libjpeg-turbo-devel
+BuildRequires: gmime-devel
+BuildRequires: pkgconfig
 BuildRequires: pkgconfig(systemd)
 BuildRequires: pkgconfig(dconf)
 BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
-BuildRequires: pkgconfig(%{gmime_package})
 BuildRequires: pkgconfig(glib-2.0) >= %{glib_version}
 BuildRequires: pkgconfig(libsoup-2.4) >= %{libsoup_version}
 BuildRequires: pkgconfig(libwspcodec) >= %{libwspcodec_version}
@@ -48,6 +48,18 @@ BuildRequires: pkgconfig(libdbusaccess) >= %{libdbusaccess_version}
 BuildRequires: pkgconfig(libdbuslogserver-gio) >= %{libdbuslog_version}
 #BuildRequires: pkgconfig(ImageMagick)
 BuildRequires: pkgconfig(Qt5Gui)
+
+# license macro requires rpm >= 4.11
+BuildRequires: pkgconfig(rpm)
+%define license_support %(pkg-config --exists 'rpm >= 4.11'; echo $?)
+
+# Choose gmime version
+%define gmime_v2 %(rpm -q gmime | grep -q gmime-2; echo $?)
+%if %{gmime_v2} == 0
+%define gmime_package gmime-2.6
+%else
+%define gmime_package gmime-3.0
+%endif
 
 %define src mms-engine
 %define exe mms-engine
@@ -118,7 +130,6 @@ make -C mms-lib/test GMIME_PACKAGE="%{gmime_package}" test
 
 %files
 %defattr(-,root,root,-)
-%license LICENSE.GPL2
 %config %{glibschemas}/%{schema}.gschema.xml
 %config %{dbuspolicy}/%{dbusname}.conf
 %config %{pushconfig}/%{dbusname}.conf
@@ -126,6 +137,9 @@ make -C mms-lib/test GMIME_PACKAGE="%{gmime_package}" test
 %{dbusconfig}/%{dbusname}.service
 %{_userunitdir}/%{userservice}.service
 %{_sbindir}/%{exe}
+%if %{license_support} == 0
+%license LICENSE.GPL2
+%endif
 
 %files tools
 %defattr(-,root,root,-)
