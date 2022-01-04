@@ -118,6 +118,7 @@ make -C mms-lib/test GMIME_PACKAGE="%{gmime_package}" test
 
 %files
 %defattr(-,root,root,-)
+%license LICENSE.GPL2
 %config %{glibschemas}/%{schema}.gschema.xml
 %config %{dbuspolicy}/%{dbusname}.conf
 %config %{pushconfig}/%{dbusname}.conf
