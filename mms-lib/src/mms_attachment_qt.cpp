@@ -12,9 +12,9 @@
  * GNU General Public License for more details.
  */
 
-extern "C" {
 #define GLOG_MODULE_NAME mms_attachment_log
 #include <gutil_log.h>
+extern "C" {
 #include "mms_attachment_image.h"
 }
 
