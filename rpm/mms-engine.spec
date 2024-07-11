@@ -125,8 +125,10 @@ glib-compile-schemas %{glibschemas}
 %postun
 glib-compile-schemas %{glibschemas}
 
+%ifarch %{ix86} x86_64
 %check
 make -C mms-lib/test GMIME_PACKAGE="%{gmime_package}" test
+%endif
 
 %files
 %defattr(-,root,root,-)
