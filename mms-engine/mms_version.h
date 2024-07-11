@@ -16,7 +16,7 @@
 #define JOLLA_MMS_VERSION_H
 
 #ifndef MMS_ENGINE_VERSION
-#  define MMS_ENGINE_VERSION 1.0.81
+#  define MMS_ENGINE_VERSION 1.0.82
 #endif
 
 #define MMS_VERSION_STRING__(x) #x
