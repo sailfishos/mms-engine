@@ -2093,7 +2093,6 @@ static gboolean mms_encode_send_req_part_header(struct mms_attachment *part,
 	const char *ct_str;
 	char *name = NULL;
 	unsigned int ctp_len;
-	unsigned int cid_len;
 	unsigned int cloc_len;
 	unsigned int cd_len;
 	unsigned char ctp_val[MAX_ENC_VALUE_BYTES];
@@ -2152,10 +2151,8 @@ static gboolean mms_encode_send_req_part_header(struct mms_attachment *part,
 
 	/* Compute content-id header length : token + (Quoted String) */
 	if (part->content_id != NULL) {
-		cid_len = 1 + strlen(part->content_id) + 3 + 1;
-		len += cid_len;
-	} else
-		cid_len = 0;
+		len += 1 + strlen(part->content_id) + 3 + 1;
+	}
 
 	/* Compute content-location header length : text-string */
 	if (part->content_location != NULL) {
