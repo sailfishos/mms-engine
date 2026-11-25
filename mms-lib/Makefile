@@ -13,7 +13,7 @@ include Config.mak
 #
 
 GMIME_PACKAGE ?= gmime-3.0
-PKGS = $(GMIME_PACKAGE) libglibutil libwspcodec libsoup-2.4 glib-2.0
+PKGS = $(GMIME_PACKAGE) libglibutil libwspcodec libsoup-2.4 libcares glib-2.0
 
 #
 # Default target
@@ -34,6 +34,7 @@ SRC = \
   mms_connection.c \
   mms_connman.c \
   mms_dispatcher.c \
+  mms_dns.c \
   mms_error.c \
   mms_handler.c \
   mms_lib_util.c \

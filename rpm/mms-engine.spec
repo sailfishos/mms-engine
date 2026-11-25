@@ -6,8 +6,9 @@ License:  GPLv2
 URL:      https://github.com/sailfishos/mms-engine
 Source0:  %{name}-%{version}.tar.bz2
 
-%define glib_version 2.32
+%define glib_version 2.60
 %define libsoup_version 2.38
+%define cares_version 1.27
 %define libwspcodec_version 2.2.3
 %define libgofono_version 2.0.0
 %define libgofonoext_version 1.0.4
@@ -21,6 +22,7 @@ Requires: systemd
 Requires: mapplauncherd
 Requires: glib2 >= %{glib_version}
 Requires: libsoup >= %{libsoup_version}
+Requires: c-ares >= %{cares_version}
 Requires: libwspcodec >= %{libwspcodec_version}
 Requires: libgofono >= %{libgofono_version}
 Requires: libgofonoext >= %{libgofonoext_version}
@@ -40,6 +42,7 @@ BuildRequires: pkgconfig(libpng)
 BuildRequires: pkgconfig(libexif)
 BuildRequires: pkgconfig(glib-2.0) >= %{glib_version}
 BuildRequires: pkgconfig(libsoup-2.4) >= %{libsoup_version}
+BuildRequires: pkgconfig(libcares) >= %{cares_version}
 BuildRequires: pkgconfig(libwspcodec) >= %{libwspcodec_version}
 BuildRequires: pkgconfig(libgofono) >= %{libgofono_version}
 BuildRequires: pkgconfig(libgofonoext) >= %{libgofonoext_version}

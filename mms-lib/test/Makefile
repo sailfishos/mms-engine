@@ -5,6 +5,7 @@ all:
 	@$(MAKE) -C test_media_type $*
 	@$(MAKE) -C test_mms_codec $*
 	@$(MAKE) -C test_delivery_ind $*
+	@$(MAKE) -C test_dns $*
 	@$(MAKE) -C test_read_ind $*
 	@$(MAKE) -C test_read_report $*
 	@$(MAKE) -C test_resize $*
