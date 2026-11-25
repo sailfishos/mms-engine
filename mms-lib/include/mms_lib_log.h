@@ -35,7 +35,8 @@
     log(mms_task_publish_log)\
     log(mms_task_send_log)\
     log(mms_connman_log)\
-    log(mms_connection_log)
+    log(mms_connection_log)\
+    log(mms_dns_log)
 
 MMS_LIB_LOG_MODULES(GLOG_MODULE_DECL)
 

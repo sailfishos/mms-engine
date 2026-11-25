@@ -19,7 +19,7 @@ include ../mms-lib/Config.mak
 
 GMIME_PACKAGE ?= gmime-3.0
 PKGS = gio-unix-2.0 gio-2.0 libdbusaccess libglibutil libdbuslogserver-gio
-LIB_PKGS = $(GMIME_PACKAGE) libwspcodec libgofono libsoup-2.4 dconf
+LIB_PKGS = $(GMIME_PACKAGE) libwspcodec libgofono libsoup-2.4 libcares dconf
 
 SUBMAKE_OPTS += GMIME_PACKAGE=$(GMIME_PACKAGE)
 

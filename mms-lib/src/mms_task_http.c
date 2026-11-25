@@ -16,6 +16,7 @@
 
 #include "mms_task_http.h"
 #include "mms_connection.h"
+#include "mms_dns.h"
 #include "mms_settings.h"
 #include "mms_file_util.h"
 #include "mms_transfer_list.h"
@@ -70,6 +71,7 @@ typedef struct mms_http_transfer {
     MMSConnection* connection;
     SoupSession* session;
     SoupMessage* message;
+    MMSDnsHost* dns;
     int receive_fd;
     int send_fd;
     guint bytes_sent;
@@ -122,25 +124,22 @@ mms_http_uri_parse(
     return uri;
 }
 
+/* Determines address of the MMS interface */
 static
-SoupSession*
-mms_http_create_session(
-    const MMSSettingsSimData* cfg,
-    MMSConnection* conn)
+gboolean
+mms_http_netif_address(
+    const char* netif,
+    struct sockaddr* address)
 {
-    SoupSession* session = NULL;
-
-    /* Determine address of the MMS interface */
-    if (conn->netif && conn->netif[0]) {
+    gboolean ok = FALSE;
+    if (netif && netif[0]) {
 #ifndef _WIN32
         struct ifreq ifr;
         int fd = socket(AF_INET, SOCK_DGRAM, 0);
         if (fd >= 0) {
             memset(&ifr, 0, sizeof(ifr));
-            strncpy(ifr.ifr_name, conn->netif, IFNAMSIZ-1);
+            strncpy(ifr.ifr_name, netif, IFNAMSIZ-1);
             if (ioctl(fd, SIOCGIFADDR, &ifr) >= 0) {
-                SoupAddress* local_address = soup_address_new_from_sockaddr(
-                    &ifr.ifr_addr, sizeof(ifr.ifr_addr));
 #  if GUTIL_LOG_DEBUG
                 char buf[128];
                 int af = ifr.ifr_addr.sa_family;
@@ -157,20 +156,38 @@ mms_http_create_session(
                 buf[sizeof(buf)-1] = 0;
                 GDEBUG("MMS interface address %s", buf);
 #  endif /* GUTIL_LOG_DEBUG */
-                GASSERT(local_address);
-                session = soup_session_async_new_with_options(
-                    SOUP_SESSION_LOCAL_ADDRESS, local_address,
-                    NULL);
-                g_object_unref(local_address);
+                *address = ifr.ifr_addr;
+                ok = TRUE;
             } else {
                 GERR("Failed to query IP address of %s: %s",
-                    conn->netif, strerror(errno));
+                    netif, strerror(errno));
             }
             close(fd);
         }
 #endif /* _WIN32 */
     } else {
         GWARN("MMS interface is unknown");
+    }
+    return ok;
+}
+
+static
+SoupSession*
+mms_http_create_session(
+    const MMSSettingsSimData* cfg,
+    MMSConnection* conn,
+    const struct sockaddr* local)
+{
+    SoupSession* session = NULL;
+
+    if (local) {
+        SoupAddress* local_address = soup_address_new_from_sockaddr(
+            (struct sockaddr*)local, sizeof(*local));
+        GASSERT(local_address);
+        session = soup_session_async_new_with_options(
+            SOUP_SESSION_LOCAL_ADDRESS, local_address,
+            NULL);
+        g_object_unref(local_address);
     }
 
     if (!session) {
@@ -234,6 +251,29 @@ mms_http_create_session(
     return session;
 }
 
+/* Resolves the host that the session connects to over the MMS connection */
+static
+MMSDnsHost*
+mms_http_register_dns(
+    SoupSession* session,
+    SoupURI* uri,
+    MMSConnection* conn,
+    const struct sockaddr* local)
+{
+    MMSDnsHost* dns = NULL;
+    if (conn->dns && local && local->sa_family == AF_INET) {
+        const struct sockaddr_in* local_in = (const void*)local;
+        SoupURI* proxy_uri = NULL;
+        g_object_get(session, SOUP_SESSION_PROXY_URI, &proxy_uri, NULL);
+        dns = mms_dns_register((proxy_uri ? proxy_uri : uri)->host,
+            conn->dns, &local_in->sin_addr);
+        if (proxy_uri) {
+            soup_uri_free(proxy_uri);
+        }
+    }
+    return dns;
+}
+
 static
 MMSHttpTransfer*
 mms_http_transfer_new(
@@ -247,7 +287,12 @@ mms_http_transfer_new(
     SoupURI* soup_uri = mms_http_uri_parse(uri);
     if (soup_uri) {
         MMSHttpTransfer* tx = g_new0(MMSHttpTransfer, 1);
-        tx->session = mms_http_create_session(cfg, connection);
+        struct sockaddr addr;
+        const struct sockaddr* local =
+            mms_http_netif_address(connection->netif, &addr) ? &addr : NULL;
+        tx->session = mms_http_create_session(cfg, connection, local);
+        tx->dns = mms_http_register_dns(tx->session, soup_uri, connection,
+            local);
         tx->message = soup_message_new_from_uri(method, soup_uri);
         tx->connection = mms_connection_ref(connection);
         tx->receive_fd = receive_fd;
@@ -280,6 +325,7 @@ mms_http_transfer_free(
         soup_session_abort(tx->session);
         g_object_unref(tx->session);
         g_object_unref(tx->message);
+        mms_dns_unregister(tx->dns);
         mms_connection_unref(tx->connection);
         if (tx->receive_fd >= 0) close(tx->receive_fd);
         if (tx->send_fd >= 0) close(tx->send_fd);

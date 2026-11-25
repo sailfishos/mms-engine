@@ -40,6 +40,7 @@ enum context_handler_id {
     CONTEXT_HANDLER_VALID,
     CONTEXT_HANDLER_ACTIVE,
     CONTEXT_HANDLER_INTERFACE,
+    CONTEXT_HANDLER_SETTINGS,
     CONTEXT_HANDLER_MMS_PROXY,
     CONTEXT_HANDLER_MMS_CENTER,
     CONTEXT_HANDLER_ACTIVATE_FAILED,
@@ -214,6 +215,31 @@ mms_connection_nemo_interface_changed(
 
 static
 void
+mms_connection_nemo_update_dns(
+    MMSConnectionNemo* self)
+{
+    const OfonoConnCtxSettings* settings = self->context->settings;
+    if (settings && settings->dns && settings->dns[0]) {
+        self->connection.dns = (const char* const*)settings->dns;
+        GDEBUG("DomainNameServers: %s", settings->dns[0]);
+    } else {
+        self->connection.dns = NULL;
+    }
+}
+
+static
+void
+mms_connection_nemo_settings_changed(
+    OfonoConnCtx* context,
+    void* arg)
+{
+    MMSConnectionNemo* self = MMS_CONNECTION_NEMO(arg);
+    GASSERT(self->context == context);
+    mms_connection_nemo_update_dns(self);
+}
+
+static
+void
 mms_connection_nemo_mms_proxy_changed(
     OfonoConnCtx* context,
     void* arg)
@@ -317,6 +343,7 @@ mms_connection_nemo_setup_context(
         conn->netif = context->ifname;
         GDEBUG("Interface: %s", conn->netif);
     }
+    mms_connection_nemo_update_dns(self);
 
     /* Track context property changes */
     self->context_handler_id[CONTEXT_HANDLER_ACTIVE] =
@@ -325,6 +352,9 @@ mms_connection_nemo_setup_context(
     self->context_handler_id[CONTEXT_HANDLER_INTERFACE] =
         ofono_connctx_add_interface_changed_handler(context,
         mms_connection_nemo_interface_changed, self);
+    self->context_handler_id[CONTEXT_HANDLER_SETTINGS] =
+        ofono_connctx_add_settings_changed_handler(context,
+        mms_connection_nemo_settings_changed, self);
     self->context_handler_id[CONTEXT_HANDLER_MMS_PROXY] =
         ofono_connctx_add_mms_proxy_changed_handler(context,
         mms_connection_nemo_mms_proxy_changed, self);
@@ -574,6 +604,7 @@ mms_connection_nemo_dispose(
         self->context = NULL;
     }
     self->connection.netif = NULL;
+    self->connection.dns = NULL;
     G_OBJECT_CLASS(mms_connection_nemo_parent_class)->dispose(object);
 }
 

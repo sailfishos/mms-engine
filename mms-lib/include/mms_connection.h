@@ -44,6 +44,7 @@ struct mms_connection {
     const char* mmsc;
     const char* mmsproxy;
     const char* netif;
+    const char* const* dns;     /* DNS servers of the MMS connection */
     MMS_CONNECTION_TYPE type;
     MMS_CONNECTION_STATE state;
 };
