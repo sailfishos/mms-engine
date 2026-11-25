@@ -58,6 +58,7 @@ typedef struct mms_connection_nemo {
     gulong connmgr_handler_id[CONNMGR_HANDLER_COUNT];
     char* imsi;
     char* path;
+    char** dns;
 } MMSConnectionNemo;
 
 typedef MMSConnectionClass MMSConnectionNemoClass;
@@ -213,18 +214,24 @@ mms_connection_nemo_interface_changed(
     }
 }
 
+/*
+ * libgofono frees the server list whenever ofono sends the settings again,
+ * and signals only when they change, so keep a copy.
+ */
 static
 void
 mms_connection_nemo_update_dns(
     MMSConnectionNemo* self)
 {
     const OfonoConnCtxSettings* settings = self->context->settings;
+    g_strfreev(self->dns);
     if (settings && settings->dns && settings->dns[0]) {
-        self->connection.dns = (const char* const*)settings->dns;
-        GDEBUG("DomainNameServers: %s", settings->dns[0]);
+        self->dns = g_strdupv((char**)settings->dns);
+        GDEBUG("DomainNameServers: %s", self->dns[0]);
     } else {
-        self->connection.dns = NULL;
+        self->dns = NULL;
     }
+    self->connection.dns = (const char* const*)self->dns;
 }
 
 static
@@ -624,6 +631,7 @@ mms_connection_nemo_finalize(
     mms_connman_unref(self->cm);
     g_free(self->imsi);
     g_free(self->path);
+    g_strfreev(self->dns);
     G_OBJECT_CLASS(mms_connection_nemo_parent_class)->finalize(object);
 }
 
